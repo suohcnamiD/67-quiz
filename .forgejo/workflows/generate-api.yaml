@@ -38,9 +38,11 @@ jobs:
 
       - name: Trigger Orval
         run: |
+          cd frontend
           npx orval
 
       - name: Check typescript validity
         run: |
+          cd frontend
           npx tsc --noEmit
           cd ..
