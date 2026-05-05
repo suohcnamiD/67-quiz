@@ -21,6 +21,9 @@ repositories {
 
 openApi {
     outputDir.set(file("$rootDir/../api"))
+    customBootRun {
+        args.set(listOf("--spring.profiles.active=openapi"))
+    }
 }
 
 

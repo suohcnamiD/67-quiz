@@ -22,7 +22,7 @@ jobs:
         run: |
           cd backend
           chmod +x gradlew
-          ./gradlew generateOpenApiDocs -Dspring.profiles.active=openapi
+          ./gradlew generateOpenApiDocs
           cd ..
 
 
