@@ -1,0 +1,37 @@
+spring:
+  jpa:
+    open-in-view: false
+    database-platform: org.hibernate.dialect.H2Dialect
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: never
+  application:
+    name: my-app
+  web:
+    error:
+      include-stacktrace: never
+      include-message: never
+      include-binding-errors: never
+      include-exception: false
+      whitelabel:
+        enabled: false
+    resources:
+      add-mappings: false
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driver-class-name: org.h2.Driver
+  liquibase:
+    enabled: false
+
+server:
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        secure: true
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
