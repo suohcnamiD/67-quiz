@@ -20,7 +20,9 @@ jobs:
 
       - name: Build and generate OpenAPI docs
         run: |
+          cd backend
           ./gradlew generateOpenApiSpec
+          cd ..
 
 
       - name: Set up Node 24
@@ -30,6 +32,7 @@ jobs:
 
       - name: Install dependencies
         run: |
+          cd frontend
           npm ci
 
       - name: Trigger Orval
@@ -39,3 +42,4 @@ jobs:
       - name: Check typescript validity
         run: |
           npx tsc --noEmit
+          cd ..
