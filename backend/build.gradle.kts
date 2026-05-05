@@ -2,6 +2,7 @@ plugins {
     java
     id("org.springframework.boot") version "4.0.6"
     id("io.spring.dependency-management") version "1.1.7"
+    id("org.springdoc.openapi-gradle-plugin") version "1.9.0"
 }
 
 group = "dev.nomabi.panel"
@@ -18,7 +19,10 @@ repositories {
     mavenCentral()
 }
 
-//tasks.openApiGenerate.
+openApi {
+    outputDir.set(file("$rootDir/../api"))
+}
+
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")

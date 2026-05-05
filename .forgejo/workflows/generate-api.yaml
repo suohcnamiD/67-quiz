@@ -1,0 +1,41 @@
+name: Generate OpenAPI docs from SpringDoc
+
+on:
+  push:
+    branches:
+      - '*'
+
+jobs:
+  generate-docs:
+    runs-on: docker
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+
+      - name: Build and generate OpenAPI docs
+        run: |
+          ./gradlew generateOpenApiSpec
+
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+
+      - name: Trigger Orval
+        run: |
+          npx orval
+
+      - name: Check typescript validity
+        run: |
+          npx tsc --noEmit

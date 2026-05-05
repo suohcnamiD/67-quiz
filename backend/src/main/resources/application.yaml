@@ -1,4 +1,6 @@
 spring:
+  jpa:
+    open-in-view: false
   session:
     store-type: jdbc
     jdbc:
@@ -29,3 +31,8 @@ server:
       cookie:
         http-only: true
         secure: true
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
