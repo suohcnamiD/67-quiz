@@ -1,0 +1,31 @@
+spring:
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: never
+  application:
+    name: my-app
+  web:
+    error:
+      include-stacktrace: never
+      include-message: never
+      include-binding-errors: never
+      include-exception: false
+      whitelabel:
+        enabled: false
+    resources:
+      add-mappings: false
+  datasource:
+    url: ${DATABASE_URL:jdbc:mariadb://${DATABASE_HOST:localhost}:${DATABASE_PORT:3306}/${DATABASE_NAME:main}}
+    username: ${DATABASE_USERNAME:user}
+    password: ${DATABASE_PASSWORD:password}
+  liquibase:
+    enabled: true
+    change-log: classpath:/db/changelog/main.yaml
+
+server:
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        secure: true

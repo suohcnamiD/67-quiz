@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - include:
+      file: 000-security.yaml
+      relativeToChangelogFile: true
+  - include:
+      file: 001-domain.yaml
+      relativeToChangelogFile: true

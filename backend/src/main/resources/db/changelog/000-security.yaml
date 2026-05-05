@@ -1,0 +1,99 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-spring-session-tables
+      author: you
+      changes:
+        - createTable:
+            tableName: SPRING_SESSION
+            tableSpace: ~
+            remarks: Spring Session JDBC session table
+            columns:
+              - column:
+                  name: PRIMARY_ID
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: SPRING_SESSION_PK
+              - column:
+                  name: SESSION_ID
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: CREATION_TIME
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: LAST_ACCESS_TIME
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: MAX_INACTIVE_INTERVAL
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: EXPIRY_TIME
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: PRINCIPAL_NAME
+                  type: VARCHAR(100)
+
+        - createIndex:
+            indexName: SPRING_SESSION_IX1
+            tableName: SPRING_SESSION
+            unique: true
+            columns:
+              - column:
+                  name: SESSION_ID
+
+        - createIndex:
+            indexName: SPRING_SESSION_IX2
+            tableName: SPRING_SESSION
+            columns:
+              - column:
+                  name: EXPIRY_TIME
+
+        - createIndex:
+            indexName: SPRING_SESSION_IX3
+            tableName: SPRING_SESSION
+            columns:
+              - column:
+                  name: PRINCIPAL_NAME
+
+        - createTable:
+            tableName: SPRING_SESSION_ATTRIBUTES
+            columns:
+              - column:
+                  name: SESSION_PRIMARY_ID
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ATTRIBUTE_NAME
+                  type: VARCHAR(200)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ATTRIBUTE_BYTES
+                  type: BLOB
+                  constraints:
+                    nullable: false
+
+        - addPrimaryKey:
+            tableName: SPRING_SESSION_ATTRIBUTES
+            columnNames: SESSION_PRIMARY_ID, ATTRIBUTE_NAME
+            constraintName: SPRING_SESSION_ATTRIBUTES_PK
+
+        - addForeignKeyConstraint:
+            baseTableName: SPRING_SESSION_ATTRIBUTES
+            baseColumnNames: SESSION_PRIMARY_ID
+            referencedTableName: SPRING_SESSION
+            referencedColumnNames: PRIMARY_ID
+            constraintName: SPRING_SESSION_ATTRIBUTES_FK
+            onDelete: CASCADE

@@ -1,0 +1,100 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-roles-table
+      author: you
+      changes:
+        - createTable:
+            tableName: roles
+            columns:
+              - column:
+                  name: id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: ROLES_PK
+              - column:
+                  name: name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+
+        - addUniqueConstraint:
+            tableName: roles
+            columnNames: name
+            constraintName: ROLES_NAME_UQ
+
+  - changeSet:
+      id: create-users-table
+      author: you
+      changes:
+        - createTable:
+            tableName: users
+            columns:
+              - column:
+                  name: id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: USERS_PK
+              - column:
+                  name: username
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: display_name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: password
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+
+        - addUniqueConstraint:
+            tableName: users
+            columnNames: username
+            constraintName: USERS_USERNAME_UQ
+
+  - changeSet:
+      id: create-user-roles-table
+      author: you
+      changes:
+        - createTable:
+            tableName: user_roles
+            columns:
+              - column:
+                  name: user_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: role_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+
+        - addPrimaryKey:
+            tableName: user_roles
+            columnNames: user_id, role_id
+            constraintName: USER_ROLES_PK
+
+        - addForeignKeyConstraint:
+            baseTableName: user_roles
+            baseColumnNames: user_id
+            referencedTableName: users
+            referencedColumnNames: id
+            constraintName: USER_ROLES_USERS_FK
+            onDelete: CASCADE
+
+        - addForeignKeyConstraint:
+            baseTableName: user_roles
+            baseColumnNames: role_id
+            referencedTableName: roles
+            referencedColumnNames: id
+            constraintName: USER_ROLES_ROLES_FK
+            onDelete: CASCADE
+
