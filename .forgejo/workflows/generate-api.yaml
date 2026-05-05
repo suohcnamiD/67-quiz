@@ -21,6 +21,7 @@ jobs:
       - name: Build and generate OpenAPI docs
         run: |
           cd backend
+          chmod +x gradlew
           ./gradlew generateOpenApiSpec
           cd ..
 
