@@ -45,5 +45,5 @@ jobs:
       - name: Check typescript validity
         run: |
           cd frontend
-          npx tsc --noEmit -p tsconfig.app.json
+          npx vue-tsc --noEmit -p tsconfig.app.json
           cd ..
