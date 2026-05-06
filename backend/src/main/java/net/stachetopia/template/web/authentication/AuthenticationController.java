@@ -40,8 +40,8 @@ public class AuthenticationController {
         return ResponseEntity.ok(new LoginResponse(userRoles));
     }
 
-    @PostMapping("/loginbak")
-    public ResponseEntity<LoginResponse> loginbak(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+    @PostMapping("/login")
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
         List<String> userRoles = logInService.loginUser(request, httpRequest);
         return ResponseEntity.ok(new LoginResponse(userRoles));
     }
