@@ -22,7 +22,8 @@ jobs:
         run: |
           cd backend
           chmod +x gradlew
-          ./gradlew generateOpenApiDocs
+          ./gradlew --version
+          ./gradlew generateOpenApiDocs --no-daemon --stacktrace
           cd ..
 
 
