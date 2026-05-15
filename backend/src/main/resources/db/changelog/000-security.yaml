@@ -1,7 +1,7 @@
 databaseChangeLog:
   - changeSet:
       id: create-spring-session-tables
-      author: you
+      author: Dimi
       changes:
         - createTable:
             tableName: SPRING_SESSION

@@ -1,100 +1,299 @@
 databaseChangeLog:
   - changeSet:
-      id: create-roles-table
-      author: you
+      id: create-quizzes-table
+      author: Dimi
       changes:
         - createTable:
-            tableName: roles
+            tableName: quizzes
             columns:
               - column:
-                  name: id
+                  name: quiz_id
                   type: CHAR(36)
                   constraints:
                     nullable: false
                     primaryKey: true
-                    primaryKeyName: ROLES_PK
+                    primaryKeyName: QUIZZES_PK
               - column:
-                  name: name
-                  type: VARCHAR(255)
-                  constraints:
-                    nullable: false
-
-        - addUniqueConstraint:
-            tableName: roles
-            columnNames: name
-            constraintName: ROLES_NAME_UQ
-
-  - changeSet:
-      id: create-users-table
-      author: you
-      changes:
-        - createTable:
-            tableName: users
-            columns:
+                  name: first_question_id
+                  type: CHAR(36)
               - column:
-                  name: id
+                  name: author_id
                   type: CHAR(36)
                   constraints:
                     nullable: false
-                    primaryKey: true
-                    primaryKeyName: USERS_PK
-              - column:
-                  name: username
-                  type: VARCHAR(255)
-                  constraints:
-                    nullable: false
-              - column:
-                  name: display_name
-                  type: VARCHAR(255)
-                  constraints:
-                    nullable: false
-              - column:
-                  name: password
-                  type: VARCHAR(255)
-                  constraints:
-                    nullable: false
-
-        - addUniqueConstraint:
-            tableName: users
-            columnNames: username
-            constraintName: USERS_USERNAME_UQ
 
   - changeSet:
-      id: create-user-roles-table
-      author: you
+      id: create-questions-table
+      author: Dimi
       changes:
         - createTable:
-            tableName: user_roles
+            tableName: questions
             columns:
+              - column:
+                  name: question_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: quiz_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: next_question_id
+                  type: CHAR(36)
+
+        - addPrimaryKey:
+            tableName: questions
+            columnNames: question_id, quiz_id
+            constraintName: QUESTIONS_PK
+
+  - changeSet:
+      id: create-options-table
+      author: Dimi
+      changes:
+        - createTable:
+            tableName: options
+            columns:
+              - column:
+                  name: option_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: quiz_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: question_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: text
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+
+        - addPrimaryKey:
+            tableName: options
+            columnNames: option_id, quiz_id, question_id
+            constraintName: OPTIONS_PK
+
+  - changeSet:
+      id: create-quiz-attempts-table
+      author: Dimi
+      changes:
+        - createTable:
+            tableName: quiz_attempts
+            columns:
+              - column:
+                  name: attempt_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: quiz_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: user_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+
+        - addPrimaryKey:
+            tableName: quiz_attempts
+            columnNames: attempt_id, quiz_id, user_id
+            constraintName: QUIZ_ATTEMPTS_PK
+
+  - changeSet:
+      id: create-question-submissions-table
+      author: Dimi
+      changes:
+        - createTable:
+            tableName: question_submissions
+            columns:
+              - column:
+                  name: question_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: quiz_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
               - column:
                   name: user_id
                   type: CHAR(36)
                   constraints:
                     nullable: false
               - column:
-                  name: role_id
+                  name: attempt_id
                   type: CHAR(36)
                   constraints:
                     nullable: false
 
         - addPrimaryKey:
-            tableName: user_roles
-            columnNames: user_id, role_id
-            constraintName: USER_ROLES_PK
+            tableName: question_submissions
+            columnNames: question_id, quiz_id, user_id, attempt_id
+            constraintName: QUESTION_SUBMISSIONS_PK
+
+  - changeSet:
+      id: create-submission-selected-options-table
+      author: Dimi
+      changes:
+        - createTable:
+            tableName: submission_selected_options
+            columns:
+              - column:
+                  name: quiz_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: question_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: attempt_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: user_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: option_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+
+        - addPrimaryKey:
+            tableName: submission_selected_options
+            columnNames: quiz_id, question_id, attempt_id, user_id, option_id
+            constraintName: SUBMISSION_SELECTED_OPTIONS_PK
+
+  - changeSet:
+      id: create-question-correct-options-table
+      author: Dimi
+      changes:
+        - createTable:
+            tableName: question_correct_options
+            columns:
+              - column:
+                  name: quiz_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: question_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: option_id
+                  type: CHAR(36)
+                  constraints:
+                    nullable: false
+
+        - addPrimaryKey:
+            tableName: question_correct_options
+            columnNames: quiz_id, question_id, option_id
+            constraintName: QUESTION_CORRECT_OPTIONS_PK
+
+  - changeSet:
+      id: add-all-foreign-keys
+      author: Dimi
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: quizzes
+            baseColumnNames: first_question_id
+            referencedTableName: questions
+            referencedColumnNames: question_id
+            constraintName: QUIZZES_FIRST_QUESTION_FK
 
         - addForeignKeyConstraint:
-            baseTableName: user_roles
-            baseColumnNames: user_id
-            referencedTableName: users
-            referencedColumnNames: id
-            constraintName: USER_ROLES_USERS_FK
-            onDelete: CASCADE
+            baseTableName: questions
+            baseColumnNames: quiz_id
+            referencedTableName: quizzes
+            referencedColumnNames: quiz_id
+            constraintName: QUESTIONS_QUIZ_FK
 
         - addForeignKeyConstraint:
-            baseTableName: user_roles
-            baseColumnNames: role_id
-            referencedTableName: roles
-            referencedColumnNames: id
-            constraintName: USER_ROLES_ROLES_FK
-            onDelete: CASCADE
+            baseTableName: questions
+            baseColumnNames: next_question_id
+            referencedTableName: questions
+            referencedColumnNames: question_id
+            constraintName: QUESTIONS_NEXT_QUESTION_FK
+
+        - addForeignKeyConstraint:
+            baseTableName: options
+            baseColumnNames: quiz_id, question_id
+            referencedTableName: questions
+            referencedColumnNames: quiz_id, question_id
+            constraintName: OPTIONS_QUESTION_FK
+
+        - addForeignKeyConstraint:
+            baseTableName: quiz_attempts
+            baseColumnNames: quiz_id
+            referencedTableName: quizzes
+            referencedColumnNames: quiz_id
+            constraintName: QUIZ_ATTEMPTS_QUIZ_FK
+
+        - addForeignKeyConstraint:
+            baseTableName: question_submissions
+            baseColumnNames: question_id, quiz_id
+            referencedTableName: questions
+            referencedColumnNames: question_id, quiz_id
+            constraintName: QUESTION_SUBMISSIONS_QUESTION_FK
+
+        - addForeignKeyConstraint:
+            baseTableName: question_submissions
+            baseColumnNames: attempt_id
+            referencedTableName: quiz_attempts
+            referencedColumnNames: attempt_id
+            constraintName: QUESTION_SUBMISSIONS_ATTEMPT_FK
+
+        - addForeignKeyConstraint:
+            baseTableName: submission_selected_options
+            baseColumnNames: question_id, quiz_id, user_id, attempt_id
+            referencedTableName: question_submissions
+            referencedColumnNames: question_id, quiz_id, user_id, attempt_id
+            constraintName: SUBMISSION_SELECTED_OPTIONS_SUBMISSION_FK
+
+        - addForeignKeyConstraint:
+            baseTableName: submission_selected_options
+            baseColumnNames: quiz_id, question_id, option_id
+            referencedTableName: options
+            referencedColumnNames: quiz_id, question_id, option_id
+            constraintName: SUBMISSION_SELECTED_OPTIONS_OPTION_FK
+
+        - addForeignKeyConstraint:
+            baseTableName: question_correct_options
+            baseColumnNames: quiz_id, question_id
+            referencedTableName: questions
+            referencedColumnNames: quiz_id, question_id
+            constraintName: QUESTION_CORRECT_OPTIONS_QUESTION_FK
+
+        - addForeignKeyConstraint:
+            baseTableName: question_correct_options
+            baseColumnNames: quiz_id, question_id, option_id
+            referencedTableName: options
+            referencedColumnNames: quiz_id, question_id, option_id
+            constraintName: QUESTION_CORRECT_OPTIONS_OPTION_FK
+
+  - changeSet:
+      id: add-user-foreign-keys
+      author: Dimi
+      changes:
+        - sql:
+            sql: -- User FK constraints deferred due to type mismatch issues
+            comment: User foreign keys will be managed at the application level
 

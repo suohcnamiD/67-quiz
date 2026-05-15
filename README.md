@@ -29,11 +29,11 @@ It's triggered upon pushing into any branch because it doesn't change anything.
 
 
 ## Guidelines
-bebeebe
 
 ### Contributing
 No pushing into main!!! This is enforced via a protection rule - create pull requests instead.
 To use the REST API, use the generated API client in `./frontend/src/api` instead of making HTTP calls directly.
+To modify the database, add new Liquibase changelogs in `./backend/src/main/resources/db/changelog` and add them to the main changelog.
 
 ### Project structure
 #### Backend
