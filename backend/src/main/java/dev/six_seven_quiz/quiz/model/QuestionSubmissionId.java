@@ -1,17 +1,22 @@
 package dev.six_seven_quiz.quiz.model;
 
-import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
-import jakarta.persistence.Embedded;
 
 import java.util.UUID;
 
 @Embeddable
 public class QuestionSubmissionId {
 
-    @Column(name = "question_id")
+    public QuestionSubmissionId() {}
+    public QuestionSubmissionId(
+        UUID quizAttemptId,
+        UUID questionId
+    ) {
+        this.quizAttemptId = quizAttemptId;
+        this.questionId = questionId;
+    }
+
+    private UUID quizAttemptId;
     private UUID questionId;
 
-    @Embedded
-    private QuizAttemptId quizAttemptId;
 }

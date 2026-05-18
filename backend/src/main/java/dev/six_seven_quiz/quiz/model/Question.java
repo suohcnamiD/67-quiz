@@ -3,18 +3,29 @@ package dev.six_seven_quiz.quiz.model;
 
 import jakarta.persistence.*;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Entity
 @Table(name = "questions")
 public class Question {
 
-    @EmbeddedId
-    private QuestionId id;
+    public Question() {}
+    public Question(
+            Quiz quiz,
+            List<Option> options
+    ) {
+        this.quiz = quiz;
+        this.options = new ArrayList<>(options);
+    }
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
     @ManyToOne
     @JoinColumn(name = "quiz_id", nullable = false)
-    @MapsId("quizId")
     private Quiz quiz;
 
     @OneToOne
@@ -29,20 +40,31 @@ public class Question {
             name = "question_correct_options",
             joinColumns = {
                     @JoinColumn(name = "quiz_id", referencedColumnName = "quiz_id"),
-                    @JoinColumn(name = "question_id", referencedColumnName = "question_id")
+                    @JoinColumn(name = "question_id", referencedColumnName = "id")
             },
             inverseJoinColumns = {
-                    @JoinColumn(name = "quiz_id", referencedColumnName = "quiz_id", insertable = false, updatable = false),
-                    @JoinColumn(name = "option_id", referencedColumnName = "option_id")
+                    @JoinColumn(name = "option_id", referencedColumnName = "id")
             }
     )
     private List<Option> correctOptions;
+
+    public UUID getId() {
+        return id;
+    }
 
     public Quiz getQuiz() {
         return quiz;
     }
 
-    public void setQuiz(Quiz quiz) {
-        this.quiz = quiz;
+    public Question getNextQuestion() {
+        return nextQuestion;
+    }
+
+    public List<Option> getOptions() {
+        return options;
+    }
+
+    public List<Option> getCorrectOptions() {
+        return correctOptions;
     }
 }

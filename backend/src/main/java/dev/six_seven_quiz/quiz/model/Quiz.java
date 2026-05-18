@@ -11,13 +11,15 @@ import java.util.UUID;
 public class Quiz {
 
     public Quiz() {}
-    public Quiz(String name) {
+
+    public Quiz(String name, ApplicationUser author) {
         this.name = name;
+        this.author = author;
     }
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "quiz_id", updatable = false, nullable = false)
+    @Column(name = "id", updatable = false, nullable = false)
     private UUID quizId;
 
     @OneToOne

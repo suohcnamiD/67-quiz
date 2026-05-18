@@ -5,7 +5,6 @@ databaseChangeLog:
       changes:
         - createTable:
             tableName: SPRING_SESSION
-            tableSpace: ~
             remarks: Spring Session JDBC session table
             columns:
               - column:

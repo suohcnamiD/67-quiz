@@ -25,7 +25,7 @@ public class QuizService {
     public QuizDto createQuiz(UserDetails userDetails, CreateQuizRequest request) {
         ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
 
-        Quiz rawNewQuiz = new Quiz(request.quizName());
+        Quiz rawNewQuiz = new Quiz(request.quizName(), user);
         rawNewQuiz.setAuthor(user);
 
         Quiz newQuiz = quizRepository.save(rawNewQuiz);

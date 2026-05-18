@@ -1,299 +1,378 @@
 databaseChangeLog:
   - changeSet:
-      id: create-quizzes-table
-      author: Dimi
+      id: create-roles-table
+      author: chovy
       changes:
         - createTable:
-            tableName: quizzes
+            tableName: roles
+            remarks: Roles for authorization
             columns:
               - column:
-                  name: quiz_id
-                  type: CHAR(36)
+                  name: id
+                  type: UUID
                   constraints:
                     nullable: false
                     primaryKey: true
-                    primaryKeyName: QUIZZES_PK
+                    primaryKeyName: roles_pk
               - column:
-                  name: first_question_id
-                  type: CHAR(36)
-              - column:
-                  name: author_id
-                  type: CHAR(36)
+                  name: name
+                  type: VARCHAR(255)
                   constraints:
                     nullable: false
+                    unique: true
+                    uniqueConstraintName: roles_name_unique
+
+  - changeSet:
+      id: create-users-table
+      author: chovy
+      changes:
+        - createTable:
+            tableName: users
+            remarks: Application users base table (JOINED inheritance)
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: users_pk
+              - column:
+                  name: username
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: users_username_unique
+              - column:
+                  name: display_name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: password
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: dtype
+                  type: VARCHAR(31)
+                  remarks: Discriminator column for Hibernate inheritance
+
+  - changeSet:
+      id: create-user-roles-table
+      author: chovy
+      changes:
+        - createTable:
+            tableName: user_roles
+            remarks: Many-to-many join table between users and roles
+            columns:
+              - column:
+                  name: user_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: role_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: user_roles
+            columnNames: user_id, role_id
+            constraintName: user_roles_pk
+        - addForeignKeyConstraint:
+            baseTableName: user_roles
+            baseColumnNames: user_id
+            referencedTableName: users
+            referencedColumnNames: id
+            constraintName: user_roles_user_fk
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: user_roles
+            baseColumnNames: role_id
+            referencedTableName: roles
+            referencedColumnNames: id
+            constraintName: user_roles_role_fk
+            onDelete: CASCADE
+
+  - changeSet:
+      id: create-quizzes-table
+      author: chovy
+      changes:
+        - createTable:
+            tableName: quizzes
+            remarks: Quiz entities
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: quizzes_pk
+              - column:
+                  name: author_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: name
+                  type: VARCHAR(255)
+              - column:
+                  name: first_question_id
+                  type: UUID
+        - addForeignKeyConstraint:
+            baseTableName: quizzes
+            baseColumnNames: author_id
+            referencedTableName: users
+            referencedColumnNames: id
+            constraintName: quizzes_author_fk
+            onDelete: CASCADE
 
   - changeSet:
       id: create-questions-table
-      author: Dimi
+      author: chovy
       changes:
         - createTable:
             tableName: questions
+            remarks: Questions belonging to quizzes
             columns:
               - column:
-                  name: question_id
-                  type: CHAR(36)
+                  name: id
+                  type: UUID
                   constraints:
                     nullable: false
+                    primaryKey: true
+                    primaryKeyName: questions_pk
               - column:
                   name: quiz_id
-                  type: CHAR(36)
+                  type: UUID
                   constraints:
                     nullable: false
               - column:
                   name: next_question_id
-                  type: CHAR(36)
-
-        - addPrimaryKey:
-            tableName: questions
-            columnNames: question_id, quiz_id
-            constraintName: QUESTIONS_PK
-
-  - changeSet:
-      id: create-options-table
-      author: Dimi
-      changes:
-        - createTable:
-            tableName: options
-            columns:
-              - column:
-                  name: option_id
-                  type: CHAR(36)
-                  constraints:
-                    nullable: false
-              - column:
-                  name: quiz_id
-                  type: CHAR(36)
-                  constraints:
-                    nullable: false
-              - column:
-                  name: question_id
-                  type: CHAR(36)
-                  constraints:
-                    nullable: false
-              - column:
-                  name: text
-                  type: VARCHAR(255)
-                  constraints:
-                    nullable: false
-
-        - addPrimaryKey:
-            tableName: options
-            columnNames: option_id, quiz_id, question_id
-            constraintName: OPTIONS_PK
+                  type: UUID
+        - addForeignKeyConstraint:
+            baseTableName: questions
+            baseColumnNames: quiz_id
+            referencedTableName: quizzes
+            referencedColumnNames: id
+            constraintName: questions_quiz_fk
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: questions
+            baseColumnNames: next_question_id
+            referencedTableName: questions
+            referencedColumnNames: id
+            constraintName: questions_next_question_fk
+            onDelete: SET NULL
 
   - changeSet:
-      id: create-quiz-attempts-table
-      author: Dimi
-      changes:
-        - createTable:
-            tableName: quiz_attempts
-            columns:
-              - column:
-                  name: attempt_id
-                  type: CHAR(36)
-                  constraints:
-                    nullable: false
-              - column:
-                  name: quiz_id
-                  type: CHAR(36)
-                  constraints:
-                    nullable: false
-              - column:
-                  name: user_id
-                  type: CHAR(36)
-                  constraints:
-                    nullable: false
-
-        - addPrimaryKey:
-            tableName: quiz_attempts
-            columnNames: attempt_id, quiz_id, user_id
-            constraintName: QUIZ_ATTEMPTS_PK
-
-  - changeSet:
-      id: create-question-submissions-table
-      author: Dimi
-      changes:
-        - createTable:
-            tableName: question_submissions
-            columns:
-              - column:
-                  name: question_id
-                  type: CHAR(36)
-                  constraints:
-                    nullable: false
-              - column:
-                  name: quiz_id
-                  type: CHAR(36)
-                  constraints:
-                    nullable: false
-              - column:
-                  name: user_id
-                  type: CHAR(36)
-                  constraints:
-                    nullable: false
-              - column:
-                  name: attempt_id
-                  type: CHAR(36)
-                  constraints:
-                    nullable: false
-
-        - addPrimaryKey:
-            tableName: question_submissions
-            columnNames: question_id, quiz_id, user_id, attempt_id
-            constraintName: QUESTION_SUBMISSIONS_PK
-
-  - changeSet:
-      id: create-submission-selected-options-table
-      author: Dimi
-      changes:
-        - createTable:
-            tableName: submission_selected_options
-            columns:
-              - column:
-                  name: quiz_id
-                  type: CHAR(36)
-                  constraints:
-                    nullable: false
-              - column:
-                  name: question_id
-                  type: CHAR(36)
-                  constraints:
-                    nullable: false
-              - column:
-                  name: attempt_id
-                  type: CHAR(36)
-                  constraints:
-                    nullable: false
-              - column:
-                  name: user_id
-                  type: CHAR(36)
-                  constraints:
-                    nullable: false
-              - column:
-                  name: option_id
-                  type: CHAR(36)
-                  constraints:
-                    nullable: false
-
-        - addPrimaryKey:
-            tableName: submission_selected_options
-            columnNames: quiz_id, question_id, attempt_id, user_id, option_id
-            constraintName: SUBMISSION_SELECTED_OPTIONS_PK
-
-  - changeSet:
-      id: create-question-correct-options-table
-      author: Dimi
-      changes:
-        - createTable:
-            tableName: question_correct_options
-            columns:
-              - column:
-                  name: quiz_id
-                  type: CHAR(36)
-                  constraints:
-                    nullable: false
-              - column:
-                  name: question_id
-                  type: CHAR(36)
-                  constraints:
-                    nullable: false
-              - column:
-                  name: option_id
-                  type: CHAR(36)
-                  constraints:
-                    nullable: false
-
-        - addPrimaryKey:
-            tableName: question_correct_options
-            columnNames: quiz_id, question_id, option_id
-            constraintName: QUESTION_CORRECT_OPTIONS_PK
-
-  - changeSet:
-      id: add-all-foreign-keys
-      author: Dimi
+      id: add-quiz-first-question-fk
+      author: chovy
       changes:
         - addForeignKeyConstraint:
             baseTableName: quizzes
             baseColumnNames: first_question_id
             referencedTableName: questions
-            referencedColumnNames: question_id
-            constraintName: QUIZZES_FIRST_QUESTION_FK
+            referencedColumnNames: id
+            constraintName: quizzes_first_question_fk
+            onDelete: SET NULL
 
-        - addForeignKeyConstraint:
-            baseTableName: questions
-            baseColumnNames: quiz_id
-            referencedTableName: quizzes
-            referencedColumnNames: quiz_id
-            constraintName: QUESTIONS_QUIZ_FK
-
-        - addForeignKeyConstraint:
-            baseTableName: questions
-            baseColumnNames: next_question_id
-            referencedTableName: questions
-            referencedColumnNames: question_id
-            constraintName: QUESTIONS_NEXT_QUESTION_FK
-
+  - changeSet:
+      id: create-options-table
+      author: chovy
+      changes:
+        - createTable:
+            tableName: options
+            remarks: Answer options for questions
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: options_pk
+              - column:
+                  name: question_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: text
+                  type: VARCHAR(1000)
+                  constraints:
+                    nullable: false
         - addForeignKeyConstraint:
             baseTableName: options
-            baseColumnNames: quiz_id, question_id
+            baseColumnNames: question_id
             referencedTableName: questions
-            referencedColumnNames: quiz_id, question_id
-            constraintName: OPTIONS_QUESTION_FK
+            referencedColumnNames: id
+            constraintName: options_question_fk
+            onDelete: CASCADE
 
+  - changeSet:
+      id: create-question-correct-options-table
+      author: chovy
+      changes:
+        - createTable:
+            tableName: question_correct_options
+            remarks: Many-to-many join table for question correct answers
+            columns:
+              - column:
+                  name: quiz_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: question_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: option_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: question_correct_options
+            columnNames: quiz_id, question_id, option_id
+            constraintName: question_correct_options_pk
+        - addForeignKeyConstraint:
+            baseTableName: question_correct_options
+            baseColumnNames: question_id
+            referencedTableName: questions
+            referencedColumnNames: id
+            constraintName: question_correct_options_question_fk
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: question_correct_options
+            baseColumnNames: option_id
+            referencedTableName: options
+            referencedColumnNames: id
+            constraintName: question_correct_options_option_fk
+            onDelete: CASCADE
+
+  - changeSet:
+      id: create-quiz-attempts-table
+      author: chovy
+      changes:
+        - createTable:
+            tableName: quiz_attempts
+            remarks: Quiz attempt records
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: quiz_attempts_pk
+              - column:
+                  name: user_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: quiz_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: start_time
+                  type: TIMESTAMP
+        - addForeignKeyConstraint:
+            baseTableName: quiz_attempts
+            baseColumnNames: user_id
+            referencedTableName: users
+            referencedColumnNames: id
+            constraintName: quiz_attempts_user_fk
+            onDelete: CASCADE
         - addForeignKeyConstraint:
             baseTableName: quiz_attempts
             baseColumnNames: quiz_id
             referencedTableName: quizzes
-            referencedColumnNames: quiz_id
-            constraintName: QUIZ_ATTEMPTS_QUIZ_FK
-
-        - addForeignKeyConstraint:
-            baseTableName: question_submissions
-            baseColumnNames: question_id, quiz_id
-            referencedTableName: questions
-            referencedColumnNames: question_id, quiz_id
-            constraintName: QUESTION_SUBMISSIONS_QUESTION_FK
-
-        - addForeignKeyConstraint:
-            baseTableName: question_submissions
-            baseColumnNames: attempt_id
-            referencedTableName: quiz_attempts
-            referencedColumnNames: attempt_id
-            constraintName: QUESTION_SUBMISSIONS_ATTEMPT_FK
-
-        - addForeignKeyConstraint:
-            baseTableName: submission_selected_options
-            baseColumnNames: question_id, quiz_id, user_id, attempt_id
-            referencedTableName: question_submissions
-            referencedColumnNames: question_id, quiz_id, user_id, attempt_id
-            constraintName: SUBMISSION_SELECTED_OPTIONS_SUBMISSION_FK
-
-        - addForeignKeyConstraint:
-            baseTableName: submission_selected_options
-            baseColumnNames: quiz_id, question_id, option_id
-            referencedTableName: options
-            referencedColumnNames: quiz_id, question_id, option_id
-            constraintName: SUBMISSION_SELECTED_OPTIONS_OPTION_FK
-
-        - addForeignKeyConstraint:
-            baseTableName: question_correct_options
-            baseColumnNames: quiz_id, question_id
-            referencedTableName: questions
-            referencedColumnNames: quiz_id, question_id
-            constraintName: QUESTION_CORRECT_OPTIONS_QUESTION_FK
-
-        - addForeignKeyConstraint:
-            baseTableName: question_correct_options
-            baseColumnNames: quiz_id, question_id, option_id
-            referencedTableName: options
-            referencedColumnNames: quiz_id, question_id, option_id
-            constraintName: QUESTION_CORRECT_OPTIONS_OPTION_FK
+            referencedColumnNames: id
+            constraintName: quiz_attempts_quiz_fk
+            onDelete: CASCADE
 
   - changeSet:
-      id: add-user-foreign-keys
-      author: Dimi
+      id: create-question-submissions-table
+      author: chovy
       changes:
-        - sql:
-            sql: -- User FK constraints deferred due to type mismatch issues
-            comment: User foreign keys will be managed at the application level
+        - createTable:
+            tableName: question_submissions
+            remarks: Question submissions with composite key
+            columns:
+              - column:
+                  name: quiz_attempt_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: question_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: question_submissions
+            columnNames: quiz_attempt_id, question_id
+            constraintName: question_submissions_pk
+        - addForeignKeyConstraint:
+            baseTableName: question_submissions
+            baseColumnNames: quiz_attempt_id
+            referencedTableName: quiz_attempts
+            referencedColumnNames: id
+            constraintName: question_submissions_attempt_fk
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: question_submissions
+            baseColumnNames: question_id
+            referencedTableName: questions
+            referencedColumnNames: id
+            constraintName: question_submissions_question_fk
+            onDelete: CASCADE
 
+  - changeSet:
+      id: create-submission-selected-options-table
+      author: chovy
+      changes:
+        - createTable:
+            tableName: submission_selected_options
+            remarks: Many-to-many join table for selected options in submissions
+            columns:
+              - column:
+                  name: attempt_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: question_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: option_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: submission_selected_options
+            columnNames: attempt_id, question_id, option_id
+            constraintName: submission_selected_options_pk
+        - addForeignKeyConstraint:
+            baseTableName: submission_selected_options
+            baseColumnNames: attempt_id, question_id
+            referencedTableName: question_submissions
+            referencedColumnNames: quiz_attempt_id, question_id
+            constraintName: submission_selected_options_submission_fk
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: submission_selected_options
+            baseColumnNames: option_id
+            referencedTableName: options
+            referencedColumnNames: id
+            constraintName: submission_selected_options_option_fk
+            onDelete: CASCADE

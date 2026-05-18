@@ -2,42 +2,44 @@ package dev.six_seven_quiz.quiz.model;
 
 import jakarta.persistence.*;
 
+import java.util.UUID;
+
 @Entity
 @Table(name = "options")
 public class Option {
 
-    @EmbeddedId
-    private OptionId id;
+    public Option() {}
+    public Option(Question question, String text) {
+        this.question = question;
+        this.text = text;
+    }
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    @ManyToOne
+    @JoinColumn(name = "question_id", nullable = false, insertable = false, updatable = false)
+    private Question question;
 
     @Column(name = "text", nullable = false)
     private String text;
 
-    @ManyToOne
-    @JoinColumn(name = "quiz_id")
-    @MapsId("quizId")
-    private Quiz quiz;
+    public void setText(String text) {
+        this.text = text;
+    }
 
-    @ManyToOne
-    @JoinColumns({
-            @JoinColumn(name = "quiz_id", referencedColumnName = "quiz_id", insertable = false, updatable = false),
-            @JoinColumn(name = "question_id", referencedColumnName = "question_id", insertable = false, updatable = false)
-    })
-    private Question question;
+    public UUID getId() {
+        return id;
+    }
 
     public Question getQuestion() {
         return question;
     }
 
-    public void setQuestion(Question question) {
-        this.question = question;
+    public String getText() {
+        return text;
     }
 
 
-    public Quiz getQuiz() {
-        return quiz;
-    }
-
-    public void setQuiz(Quiz quiz) {
-        this.quiz = quiz;
-    }
 }
