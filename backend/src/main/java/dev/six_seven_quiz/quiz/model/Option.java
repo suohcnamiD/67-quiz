@@ -9,17 +9,21 @@ import java.util.UUID;
 public class Option {
 
     public Option() {}
-    public Option(Question question, String text) {
+    public Option(Question question, String text, Boolean isCorrect) {
         this.question = question;
         this.text = text;
+        this.correct = isCorrect;
     }
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @Column(name = "correct", nullable = false)
+    private Boolean correct;
+
     @ManyToOne
-    @JoinColumn(name = "question_id", nullable = false, insertable = false, updatable = false)
+    @JoinColumn(name = "question_id", referencedColumnName = "id", nullable = false, updatable = false)
     private Question question;
 
     @Column(name = "text", nullable = false)
@@ -39,6 +43,10 @@ public class Option {
 
     public String getText() {
         return text;
+    }
+
+    public Boolean isCorrect() {
+        return correct;
     }
 
 

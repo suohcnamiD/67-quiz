@@ -1,4 +1,4 @@
-package dev.six_seven_quiz.quiz;
+package dev.six_seven_quiz.quiz.component.mapper;
 
 import dev.six_seven_quiz.quiz.dto.response.QuizDto;
 import dev.six_seven_quiz.quiz.model.Quiz;

@@ -64,4 +64,14 @@ public class ApplicationUser {
     public String getDisplayName() {
         return displayName;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        ApplicationUser that = (ApplicationUser) o;
+
+        return id.equals(that.id);
+    }
 }

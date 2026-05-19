@@ -376,3 +376,76 @@ databaseChangeLog:
             referencedColumnNames: id
             constraintName: submission_selected_options_option_fk
             onDelete: CASCADE
+
+  - changeSet:
+      id: add-text-to-questions
+      author: backend
+      changes:
+        - addColumn:
+            tableName: questions
+            columns:
+              - column:
+                  name: text
+                  type: VARCHAR(1000)
+                  constraints:
+                    nullable: false
+
+  - changeSet:
+      id: add-correct-to-options
+      author: backend
+      changes:
+        - addColumn:
+            tableName: options
+            columns:
+              - column:
+                  name: correct
+                  type: BOOLEAN
+                  constraints:
+                    nullable: false
+                  defaultValue: false
+
+  - changeSet:
+      id: drop-question-correct-options-table
+      author: backend
+      changes:
+        - dropTable:
+            tableName: question_correct_options
+
+  - changeSet:
+      id: add-finished-to-quiz-attempts
+      author: backend
+      changes:
+        - addColumn:
+            tableName: quiz_attempts
+            columns:
+              - column:
+                  name: finished
+                  type: BOOLEAN
+                  constraints:
+                    nullable: false
+                  defaultValue: false
+
+  - changeSet:
+      id: fix-question-submissions-column-names
+      author: backend
+      changes:
+        - renameColumn:
+            tableName: question_submissions
+            oldColumnName: quiz_attempt_id
+            newColumnName: attempt_id
+
+  - changeSet:
+      id: fix-submission-selected-options-fk
+      author: backend
+      changes:
+        - dropForeignKeyConstraint:
+            baseTableName: submission_selected_options
+            constraintName: submission_selected_options_submission_fk
+        - addForeignKeyConstraint:
+            baseTableName: submission_selected_options
+            baseColumnNames: attempt_id, question_id
+            referencedTableName: question_submissions
+            referencedColumnNames: attempt_id, question_id
+            constraintName: submission_selected_options_submission_fk
+            onDelete: CASCADE
+

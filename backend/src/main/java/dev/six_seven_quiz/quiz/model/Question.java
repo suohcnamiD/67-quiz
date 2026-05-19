@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -14,10 +15,11 @@ public class Question {
     public Question() {}
     public Question(
             Quiz quiz,
-            List<Option> options
+            String text
     ) {
         this.quiz = quiz;
-        this.options = new ArrayList<>(options);
+        this.options = new ArrayList<>();
+        this.text = text;
     }
 
     @Id
@@ -28,25 +30,15 @@ public class Question {
     @JoinColumn(name = "quiz_id", nullable = false)
     private Quiz quiz;
 
+    @Column(name = "text", nullable = false)
+    private String text;
+
     @OneToOne
     @JoinColumn(name = "next_question_id")
     private Question nextQuestion;
 
-    @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<Option> options;
-
-    @ManyToMany
-    @JoinTable(
-            name = "question_correct_options",
-            joinColumns = {
-                    @JoinColumn(name = "quiz_id", referencedColumnName = "quiz_id"),
-                    @JoinColumn(name = "question_id", referencedColumnName = "id")
-            },
-            inverseJoinColumns = {
-                    @JoinColumn(name = "option_id", referencedColumnName = "id")
-            }
-    )
-    private List<Option> correctOptions;
 
     public UUID getId() {
         return id;
@@ -64,7 +56,19 @@ public class Question {
         return options;
     }
 
-    public List<Option> getCorrectOptions() {
-        return correctOptions;
+    public void addOptions(List<Option> newOptions) {
+        if (this.options == null) {
+            this.options = new ArrayList<>();
+        }
+
+        this.options.addAll(newOptions);
+    }
+
+    public void setNextQuestion(Question newQuestion) {
+        this.nextQuestion = newQuestion;
+    }
+
+    public String getText() {
+        return text;
     }
 }

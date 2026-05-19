@@ -4,6 +4,7 @@ import dev.six_seven_quiz.user.ApplicationUser;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,13 +16,17 @@ public class QuizAttempt {
     public QuizAttempt(ApplicationUser user, Quiz quiz) {
         this.user = user;
         this.quiz = quiz;
-        this.startTime = LocalDateTime.now();
+        this.startedAt = LocalDateTime.now();
+        this.questionSubmissions = new ArrayList<>();
     }
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id")
     private UUID id;
+
+    @Column(name = "finished", nullable = false)
+    private boolean finished = false;
 
     @ManyToOne
     @JoinColumn(name = "user_id", referencedColumnName = "id")
@@ -32,7 +37,7 @@ public class QuizAttempt {
     private Quiz quiz;
 
     @Column(name = "start_time")
-    private LocalDateTime startTime;
+    private LocalDateTime startedAt;
 
     @OneToMany(mappedBy = "attempt")
     private List<QuestionSubmission> questionSubmissions;
@@ -50,11 +55,19 @@ public class QuizAttempt {
         return quiz;
     }
 
-    public LocalDateTime getStartTime() {
-        return startTime;
+    public LocalDateTime getStartedAt() {
+        return startedAt;
     }
 
     public List<QuestionSubmission> getQuestionSubmissions() {
         return questionSubmissions;
+    }
+
+    public boolean isFinished() {
+        return finished;
+    }
+
+    public void finish() {
+        this.finished = true;
     }
 }
