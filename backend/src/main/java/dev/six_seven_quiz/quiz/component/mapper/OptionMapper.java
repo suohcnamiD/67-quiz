@@ -1,6 +1,6 @@
 package dev.six_seven_quiz.quiz.component.mapper;
 
-import dev.six_seven_quiz.quiz.dto.response.OptionDto;
+import dev.six_seven_quiz.quiz.dto.response.attempt.AttemptOptionDto;
 import dev.six_seven_quiz.quiz.model.Option;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -12,5 +12,5 @@ import org.mapstruct.ReportingPolicy;
 )
 public interface OptionMapper {
     @Mapping(source = "selected", target = "selected")
-    OptionDto toDto(Option option, boolean selected);
+    AttemptOptionDto toDto(Option option, boolean selected);
 }

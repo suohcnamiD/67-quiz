@@ -22,4 +22,9 @@ public class AttemptExceptionHandler {
     public ResponseEntity<Failure> handleOptionNotFound(OptionNotFoundException exception) {
         return Failure.of(HttpStatus.NOT_FOUND, ApiError.of("OPTION_NOT_FOUND", Map.of("id", exception.getOptionId()))).toResponseEntity();
     }
+
+    @ExceptionHandler(AttemptFinishedException.class)
+    public ResponseEntity<Failure> handleAttemptFinished(AttemptFinishedException exception) {
+        return Failure.of(HttpStatus.BAD_REQUEST, ApiError.of("ATTEMPT_ALREADY_FINISHED")).toResponseEntity();
+    }
 }

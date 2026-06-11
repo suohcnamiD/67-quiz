@@ -1,9 +1,7 @@
 package dev.six_seven_quiz.authentication.service;
 
 import dev.six_seven_quiz.authentication.dto.request.LoginRequest;
-import dev.six_seven_quiz.authentication.exception.DuplicateUsernameException;
-import dev.six_seven_quiz.authentication.exception.InvalidUsernameException;
-import dev.six_seven_quiz.authentication.exception.PasswordTooShortException;
+import dev.six_seven_quiz.authentication.exception.*;
 import dev.six_seven_quiz.user.ApplicationUser;
 import dev.six_seven_quiz.user.ApplicationUserMapper;
 import dev.six_seven_quiz.user.ApplicationUserRepository;
@@ -21,13 +19,15 @@ import java.util.regex.Pattern;
 @Service
 public class RegistrationService {
     private static final int MINIMAL_PASSWORD_LENGTH = 8;
+    private static final int MINIMAL_USERNAME_LENGTH = 5;
+    private static final int MAXIMAL_USERNAME_LENGTH = 16;
 
     private final ApplicationUserRepository applicationUserRepository;
     private final PasswordEncoder passwordEncoder;
     private final SecureRandom secureRandom = new SecureRandom();
     private final ZoneId timeZoneId;
     private final ApplicationUserMapper applicationUserMapper;
-    private final Pattern usernamePattern = Pattern.compile("^[a-zA-Z][a-zA-Z0-9_]{5,16}$");
+    private final Pattern usernamePattern = Pattern.compile("^[a-zA-Z][a-zA-Z0-9_]+$");
     private final LogInService logInService;
 
     @PersistenceContext
@@ -49,6 +49,8 @@ public class RegistrationService {
         applicationUserRepository.findByUsername(username).ifPresent(_ -> {throw new DuplicateUsernameException();});
         if (!isUsernameValid(username)) throw new InvalidUsernameException();
         if (password.length() < MINIMAL_PASSWORD_LENGTH) throw new PasswordTooShortException(MINIMAL_PASSWORD_LENGTH);
+        if (username.length() < MINIMAL_USERNAME_LENGTH) throw new UsernameTooShortException(MINIMAL_USERNAME_LENGTH);
+        if (username.length() > MAXIMAL_USERNAME_LENGTH) throw new UsernameTooLongException(MAXIMAL_USERNAME_LENGTH);
 
         String encodedPassword = passwordEncoder.encode(password);
         ApplicationUser rawNewUser = new ApplicationUser(username, encodedPassword, username);

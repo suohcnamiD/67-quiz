@@ -1,4 +1,4 @@
-package dev.six_seven_quiz.quiz.dto.response;
+package dev.six_seven_quiz.quiz.dto.response.viewing;
 
 import java.util.UUID;
 

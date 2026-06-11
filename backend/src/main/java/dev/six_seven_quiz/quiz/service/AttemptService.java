@@ -3,9 +3,11 @@ package dev.six_seven_quiz.quiz.service;
 import dev.six_seven_quiz.quiz.component.mapper.*;
 import dev.six_seven_quiz.quiz.dto.request.AttemptAction;
 import dev.six_seven_quiz.quiz.dto.request.CommitAttemptActionsRequest;
-import dev.six_seven_quiz.quiz.dto.response.AttemptDto;
-import dev.six_seven_quiz.quiz.dto.response.AttemptQuestionDto;
-import dev.six_seven_quiz.quiz.dto.response.OptionDto;
+import dev.six_seven_quiz.quiz.dto.request.FinishAttemptRequest;
+import dev.six_seven_quiz.quiz.dto.response.attempt.AttemptDto;
+import dev.six_seven_quiz.quiz.dto.response.attempt.AttemptQuestionDto;
+import dev.six_seven_quiz.quiz.dto.response.attempt.AttemptOptionDto;
+import dev.six_seven_quiz.quiz.exception.AttemptFinishedException;
 import dev.six_seven_quiz.quiz.exception.AttemptNotFoundException;
 import dev.six_seven_quiz.quiz.exception.NoAccessToAttemptException;
 import dev.six_seven_quiz.quiz.exception.QuizNotFoundException;
@@ -50,6 +52,7 @@ public class AttemptService {
         ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
         Attempt attempt = quizAttemptRepository.findById(request.attemptId()).orElseThrow(() -> new AttemptNotFoundException(request.attemptId()));
         validateUserAttemptOwnership(user, attempt);
+        validateAttemptUnfinished(attempt);
         for (AttemptAction action : request.actions()) {
             if (action.selected()) attempt.selectOption(action.questionId(), action.optionId());
             else attempt.deselectOption(action.questionId(), action.optionId());
@@ -78,19 +81,39 @@ public class AttemptService {
         if (!attempt.getUser().equals(user)) throw new NoAccessToAttemptException(attempt.getId());
     }
 
+    private void validateAttemptUnfinished(Attempt attempt) {
+        if (attempt.isFinished()) throw new AttemptFinishedException();
+    }
+
     private AttemptDto attemptToDto(Attempt attempt) {
         List<AttemptQuestionDto> attemptQuestions = attempt.getQuestions().stream().map(question -> {
             List<Option> generalOptions = question.getOptions();
             List<Option> selectedOptions = question.getSelectedOptions();
 
-            List<OptionDto> optionDtos = new ArrayList<>();
+            List<AttemptOptionDto> attemptOptionDtos = new ArrayList<>();
 
             for (Option option : generalOptions) {
                 boolean selected = selectedOptions.contains(option);
-                optionDtos.add(optionMapper.toDto(option, selected));
+                attemptOptionDtos.add(optionMapper.toDto(option, selected));
             }
-            return attemptQuestionMapper.toDto(question, optionDtos);
+            return attemptQuestionMapper.toDto(question, attemptOptionDtos);
         }).toList();
         return attemptMapper.toDto(attempt, attemptQuestions);
+    }
+
+    @Transactional
+    public AttemptDto finishAttemptAsUser(UserDetails userDetails, FinishAttemptRequest request) {
+        Attempt attempt = quizAttemptRepository.findById(request.attemptId()).orElseThrow(() -> new AttemptNotFoundException(request.attemptId()));
+        ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
+        validateUserAttemptOwnership(user, attempt);
+        validateAttemptUnfinished(attempt);
+
+        attempt.finish();
+
+        attempt = quizAttemptRepository.save(attempt);
+        entityManager.flush();
+        entityManager.refresh(attempt);
+
+        return attemptToDto(attempt);
     }
 }

@@ -4,9 +4,9 @@ import jakarta.validation.constraints.NotNull;
 
 import java.util.UUID;
 
-public record AttemptQuizRequest(
+public record FinishAttemptRequest(
 
         @NotNull
-        UUID quizId
+        UUID attemptId
 ) {
 }

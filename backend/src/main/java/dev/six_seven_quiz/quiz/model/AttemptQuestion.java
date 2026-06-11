@@ -52,6 +52,10 @@ public class AttemptQuestion {
         return (int) selectedOptions.stream().filter(Option::isCorrect).count();
     }
 
+    public String getText() {
+        return getQuestion().getText();
+    }
+
     public Question getQuestion() {
         return question;
     }

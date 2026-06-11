@@ -1,6 +1,5 @@
 package dev.six_seven_quiz.quiz.model;
 
-import dev.six_seven_quiz.quiz.dto.response.OptionDto;
 import dev.six_seven_quiz.quiz.exception.QuestionNotFoundException;
 import dev.six_seven_quiz.user.ApplicationUser;
 import jakarta.persistence.*;

@@ -41,7 +41,7 @@ public class Quiz {
     @Column(name = "duration")
     private Duration duration;
 
-    @ManyToMany(fetch = FetchType.EAGER, cascade = {CascadeType.DETACH, CascadeType.MERGE, CascadeType.PERSIST, CascadeType.REFRESH})
+    @OneToMany(fetch = FetchType.EAGER, cascade = {CascadeType.DETACH, CascadeType.MERGE, CascadeType.PERSIST, CascadeType.REFRESH, CascadeType.REMOVE})
     @JoinTable(
             name = "quiz_questions",
             joinColumns = @JoinColumn(name = "quiz_id"),

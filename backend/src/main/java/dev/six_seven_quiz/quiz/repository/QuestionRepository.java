@@ -8,4 +8,5 @@ import java.util.UUID;
 
 public interface QuestionRepository extends JpaRepository<Question, UUID> {
 
+    int countByQuiz_QuizId(UUID quizId);
 }

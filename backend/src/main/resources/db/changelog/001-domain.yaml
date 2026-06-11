@@ -373,3 +373,27 @@ databaseChangeLog:
             referencedColumnNames: id
             constraintName: attempt_question_selected_options_option_fk
             onDelete: CASCADE
+
+  - changeSet:
+     id: add-duration-to-quizzes
+     author: copilot
+     changes:
+       - addColumn:
+           tableName: quizzes
+           columns:
+             - column:
+                 name: duration
+                 type: BIGINT
+                 remarks: Quiz duration in nanoseconds (Java Duration type)
+
+  - changeSet:
+       id: add-finish-deadline-to-attempts
+       author: copilot
+       changes:
+         - addColumn:
+             tableName: quiz_attempts
+             columns:
+               - column:
+                   name: finish_deadline
+                   type: TIMESTAMP
+                   remarks: Deadline for completing the quiz attempt

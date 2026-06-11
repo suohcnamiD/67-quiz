@@ -1,7 +1,7 @@
 package dev.six_seven_quiz.quiz.component.mapper;
 
-import dev.six_seven_quiz.quiz.dto.response.AttemptDto;
-import dev.six_seven_quiz.quiz.dto.response.AttemptQuestionDto;
+import dev.six_seven_quiz.quiz.dto.response.attempt.AttemptDto;
+import dev.six_seven_quiz.quiz.dto.response.attempt.AttemptQuestionDto;
 import dev.six_seven_quiz.quiz.model.Attempt;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

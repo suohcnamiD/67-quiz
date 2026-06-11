@@ -4,9 +4,8 @@ import jakarta.validation.constraints.NotNull;
 
 import java.util.UUID;
 
-public record AttemptQuizRequest(
-
+public record DeleteQuestionRequest(
         @NotNull
-        UUID quizId
+        UUID questionId
 ) {
 }

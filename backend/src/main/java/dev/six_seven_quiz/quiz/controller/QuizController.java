@@ -1,47 +1,53 @@
 package dev.six_seven_quiz.quiz.controller;
 
-import dev.six_seven_quiz.quiz.dto.request.AddQuestionRequest;
 import dev.six_seven_quiz.quiz.dto.request.CreateQuizRequest;
-import dev.six_seven_quiz.quiz.dto.response.QuestionSummaryDto;
-import dev.six_seven_quiz.quiz.dto.response.QuizDto;
-import dev.six_seven_quiz.quiz.service.AttemptService;
-import dev.six_seven_quiz.quiz.service.QuestionService;
+import dev.six_seven_quiz.quiz.dto.response.authoring.QuizDto;
 import dev.six_seven_quiz.quiz.service.QuizService;
 import jakarta.validation.Valid;
-import org.springframework.data.domain.Page;
+import jakarta.validation.constraints.NotNull;
+import org.springframework.data.web.PagedResourcesAssembler;
+import org.springframework.hateoas.EntityModel;
+import org.springframework.hateoas.PagedModel;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/quiz")
 public class QuizController {
 
     private final QuizService quizService;
-    private final QuestionService questionService;
-    private final AttemptService attemptService;
 
-    public QuizController(QuizService quizService, QuestionService questionService, AttemptService attemptService) {
+    public QuizController(QuizService quizService) {
         this.quizService = quizService;
-        this.questionService = questionService;
-        this.attemptService = attemptService;
     }
 
-    @PostMapping("/question")
-    public List<QuestionSummaryDto> addQuizQuestion(
-            @AuthenticationPrincipal UserDetails userDetails,
-            @RequestBody @Valid AddQuestionRequest request
+
+    @DeleteMapping("/{quizId}")
+    public void delete(
+            @PathVariable @NotNull UUID quizId,
+            @AuthenticationPrincipal UserDetails userDetails
     ) {
-        return questionService.addQuizQuestionAsUser(userDetails, request);
+        quizService.deleteAsUser(quizId, userDetails);
+    }
+
+    @GetMapping("/authoring/{quizId}")
+    public QuizDto getQuiz(
+            @PathVariable @NotNull UUID quizId,
+            @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        return quizService.getAsAuthor(quizId, userDetails);
     }
 
     @GetMapping
-    public Page<QuizDto> getQuizzes(
-            @RequestParam (defaultValue = "0") int page
+    public PagedModel<EntityModel<QuizDto>> getQuizzes(
+            @RequestParam (defaultValue = "0") int page,
+            @AuthenticationPrincipal UserDetails userDetails,
+            PagedResourcesAssembler<QuizDto> pagedResourcesAssembler
     ) {
-        return quizService.getQuizzes(page);
+        return pagedResourcesAssembler.toModel(quizService.getQuizzes(page, userDetails));
     }
 
     @PostMapping

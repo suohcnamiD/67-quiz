@@ -1,6 +1,5 @@
 package dev.six_seven_quiz.quiz.component;
 
-import dev.six_seven_quiz.quiz.controller.QuizController;
 import dev.six_seven_quiz.quiz.exception.*;
 import dev.six_seven_quiz.shared.dto.Failure;
 import dev.six_seven_quiz.shared.dto.error.ApiError;
@@ -12,6 +11,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.Map;
 
+@RestControllerAdvice
 @Order(1)
 public class QuizExceptionHandler {
 
