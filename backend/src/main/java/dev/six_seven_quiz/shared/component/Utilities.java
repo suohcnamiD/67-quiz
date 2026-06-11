@@ -2,6 +2,9 @@ package dev.six_seven_quiz.shared.component;
 
 import dev.six_seven_quiz.shared.dto.Failure;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;

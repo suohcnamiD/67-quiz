@@ -1,5 +1,6 @@
 package dev.six_seven_quiz.authentication.component;
 
+import dev.six_seven_quiz.authentication.AuthenticationController;
 import dev.six_seven_quiz.authentication.exception.*;
 import dev.six_seven_quiz.shared.dto.Failure;
 import dev.six_seven_quiz.shared.dto.error.ApiError;
@@ -11,7 +12,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.Map;
 
-@RestControllerAdvice
+@RestControllerAdvice(assignableTypes = AuthenticationController.class)
 @Order(1)
 public class RegistrationExceptionHandler {
 

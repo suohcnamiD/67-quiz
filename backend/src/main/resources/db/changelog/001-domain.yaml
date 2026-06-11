@@ -1,34 +1,10 @@
 databaseChangeLog:
   - changeSet:
-      id: create-roles-table
-      author: chovy
-      changes:
-        - createTable:
-            tableName: roles
-            remarks: Roles for authorization
-            columns:
-              - column:
-                  name: id
-                  type: UUID
-                  constraints:
-                    nullable: false
-                    primaryKey: true
-                    primaryKeyName: roles_pk
-              - column:
-                  name: name
-                  type: VARCHAR(255)
-                  constraints:
-                    nullable: false
-                    unique: true
-                    uniqueConstraintName: roles_name_unique
-
-  - changeSet:
       id: create-users-table
-      author: chovy
+      author: copilot
       changes:
         - createTable:
             tableName: users
-            remarks: Application users base table (JOINED inheritance)
             columns:
               - column:
                   name: id
@@ -43,7 +19,6 @@ databaseChangeLog:
                   constraints:
                     nullable: false
                     unique: true
-                    uniqueConstraintName: users_username_unique
               - column:
                   name: display_name
                   type: VARCHAR(255)
@@ -54,18 +29,34 @@ databaseChangeLog:
                   type: VARCHAR(255)
                   constraints:
                     nullable: false
+
+  - changeSet:
+      id: create-roles-table
+      author: copilot
+      changes:
+        - createTable:
+            tableName: roles
+            columns:
               - column:
-                  name: dtype
-                  type: VARCHAR(31)
-                  remarks: Discriminator column for Hibernate inheritance
+                  name: id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: roles_pk
+              - column:
+                  name: name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+                    unique: true
 
   - changeSet:
       id: create-user-roles-table
-      author: chovy
+      author: copilot
       changes:
         - createTable:
             tableName: user_roles
-            remarks: Many-to-many join table between users and roles
             columns:
               - column:
                   name: user_id
@@ -98,11 +89,10 @@ databaseChangeLog:
 
   - changeSet:
       id: create-quizzes-table
-      author: chovy
+      author: copilot
       changes:
         - createTable:
             tableName: quizzes
-            remarks: Quiz entities
             columns:
               - column:
                   name: id
@@ -119,9 +109,8 @@ databaseChangeLog:
               - column:
                   name: name
                   type: VARCHAR(255)
-              - column:
-                  name: first_question_id
-                  type: UUID
+                  constraints:
+                    nullable: false
         - addForeignKeyConstraint:
             baseTableName: quizzes
             baseColumnNames: author_id
@@ -132,11 +121,10 @@ databaseChangeLog:
 
   - changeSet:
       id: create-questions-table
-      author: chovy
+      author: copilot
       changes:
         - createTable:
             tableName: questions
-            remarks: Questions belonging to quizzes
             columns:
               - column:
                   name: id
@@ -151,8 +139,10 @@ databaseChangeLog:
                   constraints:
                     nullable: false
               - column:
-                  name: next_question_id
-                  type: UUID
+                  name: text
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
         - addForeignKeyConstraint:
             baseTableName: questions
             baseColumnNames: quiz_id
@@ -160,33 +150,13 @@ databaseChangeLog:
             referencedColumnNames: id
             constraintName: questions_quiz_fk
             onDelete: CASCADE
-        - addForeignKeyConstraint:
-            baseTableName: questions
-            baseColumnNames: next_question_id
-            referencedTableName: questions
-            referencedColumnNames: id
-            constraintName: questions_next_question_fk
-            onDelete: SET NULL
-
-  - changeSet:
-      id: add-quiz-first-question-fk
-      author: chovy
-      changes:
-        - addForeignKeyConstraint:
-            baseTableName: quizzes
-            baseColumnNames: first_question_id
-            referencedTableName: questions
-            referencedColumnNames: id
-            constraintName: quizzes_first_question_fk
-            onDelete: SET NULL
 
   - changeSet:
       id: create-options-table
-      author: chovy
+      author: copilot
       changes:
         - createTable:
             tableName: options
-            remarks: Answer options for questions
             columns:
               - column:
                   name: id
@@ -201,8 +171,13 @@ databaseChangeLog:
                   constraints:
                     nullable: false
               - column:
+                  name: correct
+                  type: BOOLEAN
+                  constraints:
+                    nullable: false
+              - column:
                   name: text
-                  type: VARCHAR(1000)
+                  type: VARCHAR(255)
                   constraints:
                     nullable: false
         - addForeignKeyConstraint:
@@ -214,12 +189,12 @@ databaseChangeLog:
             onDelete: CASCADE
 
   - changeSet:
-      id: create-question-correct-options-table
-      author: chovy
+      id: create-quiz-questions-table
+      author: copilot
       changes:
         - createTable:
-            tableName: question_correct_options
-            remarks: Many-to-many join table for question correct answers
+            tableName: quiz_questions
+            remarks: Ordered quiz questions for quiz entities
             columns:
               - column:
                   name: quiz_id
@@ -232,36 +207,39 @@ databaseChangeLog:
                   constraints:
                     nullable: false
               - column:
-                  name: option_id
-                  type: UUID
+                  name: position
+                  type: INT
                   constraints:
                     nullable: false
         - addPrimaryKey:
-            tableName: question_correct_options
-            columnNames: quiz_id, question_id, option_id
-            constraintName: question_correct_options_pk
+            tableName: quiz_questions
+            columnNames: quiz_id, position
+            constraintName: quiz_questions_pk
         - addForeignKeyConstraint:
-            baseTableName: question_correct_options
+            baseTableName: quiz_questions
+            baseColumnNames: quiz_id
+            referencedTableName: quizzes
+            referencedColumnNames: id
+            constraintName: quiz_questions_quiz_fk
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: quiz_questions
             baseColumnNames: question_id
             referencedTableName: questions
             referencedColumnNames: id
-            constraintName: question_correct_options_question_fk
+            constraintName: quiz_questions_question_fk
             onDelete: CASCADE
-        - addForeignKeyConstraint:
-            baseTableName: question_correct_options
-            baseColumnNames: option_id
-            referencedTableName: options
-            referencedColumnNames: id
-            constraintName: question_correct_options_option_fk
-            onDelete: CASCADE
+        - addUniqueConstraint:
+            tableName: quiz_questions
+            columnNames: quiz_id, question_id
+            constraintName: quiz_questions_unique_quiz_question
 
   - changeSet:
       id: create-quiz-attempts-table
-      author: chovy
+      author: copilot
       changes:
         - createTable:
             tableName: quiz_attempts
-            remarks: Quiz attempt records
             columns:
               - column:
                   name: id
@@ -271,15 +249,17 @@ databaseChangeLog:
                     primaryKey: true
                     primaryKeyName: quiz_attempts_pk
               - column:
-                  name: user_id
-                  type: UUID
+                  name: finished
+                  type: BOOLEAN
+                  defaultValueBoolean: false
                   constraints:
                     nullable: false
               - column:
+                  name: user_id
+                  type: UUID
+              - column:
                   name: quiz_id
                   type: UUID
-                  constraints:
-                    nullable: false
               - column:
                   name: start_time
                   type: TIMESTAMP
@@ -289,60 +269,30 @@ databaseChangeLog:
             referencedTableName: users
             referencedColumnNames: id
             constraintName: quiz_attempts_user_fk
-            onDelete: CASCADE
+            onDelete: SET NULL
         - addForeignKeyConstraint:
             baseTableName: quiz_attempts
             baseColumnNames: quiz_id
             referencedTableName: quizzes
             referencedColumnNames: id
             constraintName: quiz_attempts_quiz_fk
-            onDelete: CASCADE
+            onDelete: SET NULL
 
   - changeSet:
-      id: create-question-submissions-table
-      author: chovy
+      id: create-attempt-questions-table
+      author: copilot
       changes:
         - createTable:
-            tableName: question_submissions
-            remarks: Question submissions with composite key
+            tableName: attempt_questions
+            remarks: Ordered questions that belong to a quiz attempt
             columns:
               - column:
-                  name: quiz_attempt_id
+                  name: id
                   type: UUID
                   constraints:
                     nullable: false
-              - column:
-                  name: question_id
-                  type: UUID
-                  constraints:
-                    nullable: false
-        - addPrimaryKey:
-            tableName: question_submissions
-            columnNames: quiz_attempt_id, question_id
-            constraintName: question_submissions_pk
-        - addForeignKeyConstraint:
-            baseTableName: question_submissions
-            baseColumnNames: quiz_attempt_id
-            referencedTableName: quiz_attempts
-            referencedColumnNames: id
-            constraintName: question_submissions_attempt_fk
-            onDelete: CASCADE
-        - addForeignKeyConstraint:
-            baseTableName: question_submissions
-            baseColumnNames: question_id
-            referencedTableName: questions
-            referencedColumnNames: id
-            constraintName: question_submissions_question_fk
-            onDelete: CASCADE
-
-  - changeSet:
-      id: create-submission-selected-options-table
-      author: chovy
-      changes:
-        - createTable:
-            tableName: submission_selected_options
-            remarks: Many-to-many join table for selected options in submissions
-            columns:
+                    primaryKey: true
+                    primaryKeyName: attempt_questions_pk
               - column:
                   name: attempt_id
                   type: UUID
@@ -354,98 +304,72 @@ databaseChangeLog:
                   constraints:
                     nullable: false
               - column:
+                  name: answered
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: position
+                  type: INT
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: attempt_questions
+            baseColumnNames: attempt_id
+            referencedTableName: quiz_attempts
+            referencedColumnNames: id
+            constraintName: attempt_questions_attempt_fk
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: attempt_questions
+            baseColumnNames: question_id
+            referencedTableName: questions
+            referencedColumnNames: id
+            constraintName: attempt_questions_question_fk
+            onDelete: CASCADE
+        - addUniqueConstraint:
+            tableName: attempt_questions
+            columnNames: attempt_id, position
+            constraintName: attempt_questions_unique_attempt_position
+        - addUniqueConstraint:
+            tableName: attempt_questions
+            columnNames: attempt_id, question_id
+            constraintName: attempt_questions_unique_attempt_question
+
+  - changeSet:
+      id: create-attempt-question-selected-options-table
+      author: copilot
+      changes:
+        - createTable:
+            tableName: attempt_question_selected_options
+            remarks: Selected options for each attempt question
+            columns:
+              - column:
+                  name: attempt_question_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
                   name: option_id
                   type: UUID
                   constraints:
                     nullable: false
         - addPrimaryKey:
-            tableName: submission_selected_options
-            columnNames: attempt_id, question_id, option_id
-            constraintName: submission_selected_options_pk
+            tableName: attempt_question_selected_options
+            columnNames: attempt_question_id, option_id
+            constraintName: attempt_question_selected_options_pk
         - addForeignKeyConstraint:
-            baseTableName: submission_selected_options
-            baseColumnNames: attempt_id, question_id
-            referencedTableName: question_submissions
-            referencedColumnNames: quiz_attempt_id, question_id
-            constraintName: submission_selected_options_submission_fk
+            baseTableName: attempt_question_selected_options
+            baseColumnNames: attempt_question_id
+            referencedTableName: attempt_questions
+            referencedColumnNames: id
+            constraintName: attempt_question_selected_options_attempt_question_fk
             onDelete: CASCADE
         - addForeignKeyConstraint:
-            baseTableName: submission_selected_options
+            baseTableName: attempt_question_selected_options
             baseColumnNames: option_id
             referencedTableName: options
             referencedColumnNames: id
-            constraintName: submission_selected_options_option_fk
+            constraintName: attempt_question_selected_options_option_fk
             onDelete: CASCADE
-
-  - changeSet:
-      id: add-text-to-questions
-      author: backend
-      changes:
-        - addColumn:
-            tableName: questions
-            columns:
-              - column:
-                  name: text
-                  type: VARCHAR(1000)
-                  constraints:
-                    nullable: false
-
-  - changeSet:
-      id: add-correct-to-options
-      author: backend
-      changes:
-        - addColumn:
-            tableName: options
-            columns:
-              - column:
-                  name: correct
-                  type: BOOLEAN
-                  constraints:
-                    nullable: false
-                  defaultValue: false
-
-  - changeSet:
-      id: drop-question-correct-options-table
-      author: backend
-      changes:
-        - dropTable:
-            tableName: question_correct_options
-
-  - changeSet:
-      id: add-finished-to-quiz-attempts
-      author: backend
-      changes:
-        - addColumn:
-            tableName: quiz_attempts
-            columns:
-              - column:
-                  name: finished
-                  type: BOOLEAN
-                  constraints:
-                    nullable: false
-                  defaultValue: false
-
-  - changeSet:
-      id: fix-question-submissions-column-names
-      author: backend
-      changes:
-        - renameColumn:
-            tableName: question_submissions
-            oldColumnName: quiz_attempt_id
-            newColumnName: attempt_id
-
-  - changeSet:
-      id: fix-submission-selected-options-fk
-      author: backend
-      changes:
-        - dropForeignKeyConstraint:
-            baseTableName: submission_selected_options
-            constraintName: submission_selected_options_submission_fk
-        - addForeignKeyConstraint:
-            baseTableName: submission_selected_options
-            baseColumnNames: attempt_id, question_id
-            referencedTableName: question_submissions
-            referencedColumnNames: attempt_id, question_id
-            constraintName: submission_selected_options_submission_fk
-            onDelete: CASCADE
-

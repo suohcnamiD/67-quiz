@@ -3,6 +3,7 @@ package dev.six_seven_quiz.quiz.component.mapper;
 import dev.six_seven_quiz.quiz.dto.response.OptionDto;
 import dev.six_seven_quiz.quiz.model.Option;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
 
 @Mapper(
@@ -10,5 +11,6 @@ import org.mapstruct.ReportingPolicy;
         unmappedTargetPolicy = ReportingPolicy.ERROR
 )
 public interface OptionMapper {
+    @Mapping(source = "selected", target = "selected")
     OptionDto toDto(Option option, boolean selected);
 }

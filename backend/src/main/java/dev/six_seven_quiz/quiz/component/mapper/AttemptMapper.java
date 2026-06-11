@@ -1,11 +1,10 @@
 package dev.six_seven_quiz.quiz.component.mapper;
 
 import dev.six_seven_quiz.quiz.dto.response.AttemptDto;
-import dev.six_seven_quiz.quiz.dto.response.QuestionDto;
-import dev.six_seven_quiz.quiz.dto.response.QuizDto;
-import dev.six_seven_quiz.quiz.model.Quiz;
-import dev.six_seven_quiz.quiz.model.QuizAttempt;
+import dev.six_seven_quiz.quiz.dto.response.AttemptQuestionDto;
+import dev.six_seven_quiz.quiz.model.Attempt;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
 
 import java.util.List;
@@ -15,5 +14,7 @@ import java.util.List;
         unmappedTargetPolicy = ReportingPolicy.ERROR
 )
 public interface AttemptMapper {
-    AttemptDto toDto(QuizAttempt attempt, List<QuestionDto> questions);
+    @Mapping(source = "attempt.id", target = "id")
+    @Mapping(source = "questions", target = "questions")
+    AttemptDto toDto(Attempt attempt, List<AttemptQuestionDto> questions);
 }

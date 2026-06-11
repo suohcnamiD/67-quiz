@@ -1,6 +1,7 @@
 package dev.six_seven_quiz.quiz.service;
 
 import dev.six_seven_quiz.quiz.component.mapper.QuestionMapper;
+import dev.six_seven_quiz.quiz.dto.QuestionData;
 import dev.six_seven_quiz.quiz.dto.request.AddQuestionRequest;
 import dev.six_seven_quiz.quiz.dto.response.QuestionSummaryDto;
 import dev.six_seven_quiz.quiz.exception.BlankIndexedOptionException;
@@ -45,60 +46,10 @@ public class QuestionService {
         Quiz quiz = quizRepository.findById(request.quizId()).orElseThrow(() -> new QuizNotFoundException(request.quizId()));
         if (!quiz.getAuthor().equals(user)) throw new NoAccessToQuizException(request.quizId());
 
-        Optional<Question> oldLastQuestionOptional = getLastQuizQuestion(quiz);
+        quiz.addQuestion(new QuestionData(request.text(), request.options()));
 
-        Question rawQuestion = new Question(quiz, request.text());
-        rawQuestion = questionRepository.save(rawQuestion);
+        quiz = quizRepository.save(quiz);
 
-        int i = 0;
-
-        for (Map.Entry<String, Boolean> optionEntry : request.options().entrySet()) {
-            String optionText = optionEntry.getKey();
-            Boolean isCorrect = optionEntry.getValue();
-
-            if (optionText.isBlank()) throw new BlankIndexedOptionException(i);
-            i++;
-        }
-
-        List<Option> createdOptions = new ArrayList<>();
-        for (Map.Entry<String, Boolean> optionEntry : request.options().entrySet()) {
-            String optionText = optionEntry.getKey();
-            Boolean isCorrect = optionEntry.getValue();
-            Option rawOption = new Option(rawQuestion, optionText, isCorrect);
-            createdOptions.add(rawOption);
-        }
-        createdOptions = optionRepository.saveAll(createdOptions);
-
-        rawQuestion.addOptions(createdOptions);
-        Question newQuestion = questionRepository.save(rawQuestion);
-
-        if (oldLastQuestionOptional.isPresent()) {
-            Question oldLastQuestion = oldLastQuestionOptional.get();
-            oldLastQuestion.setNextQuestion(newQuestion);
-            questionRepository.save(oldLastQuestion);
-        } else {
-            quiz.setFirstQuestion(newQuestion);
-            quizRepository.save(quiz);
-        }
-
-        Quiz refreshedQuiz = quizRepository.findById(quiz.getId()).orElseThrow(() -> new QuizNotFoundException(quiz.getId()));
-
-        return getQuizQuestions(refreshedQuiz).stream().map(questionMapper::toSummaryDto).toList();
-    }
-
-    public Optional<Question> getLastQuizQuestion(Quiz quiz) {
-        return questionRepository.getByQuiz_quizIdAndNextQuestionIsNull(quiz.getId());
-    }
-
-
-    @Transactional
-    public List<Question> getQuizQuestions(Quiz quiz) {
-        List<Question> result = new ArrayList<>();
-        Question currentQuestion = quiz.getFirstQuestion();
-        while (currentQuestion != null) {
-            result.add(currentQuestion);
-            currentQuestion = currentQuestion.getNextQuestion();
-        }
-        return result;
+        return quiz.getQuestions().stream().map(questionMapper::toSummaryDto).toList();
     }
 }

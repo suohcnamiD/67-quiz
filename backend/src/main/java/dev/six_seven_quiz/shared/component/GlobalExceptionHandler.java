@@ -26,7 +26,6 @@ import java.util.stream.Collectors;
 import static org.springframework.http.HttpStatus.*;
 
 @RestControllerAdvice
-@Order(2) // Ensure this runs after any more specific exception handlers
 public class GlobalExceptionHandler {
 
     private final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);

@@ -1,0 +1,103 @@
+package dev.six_seven_quiz.quiz.model;
+
+import dev.six_seven_quiz.quiz.dto.response.OptionDto;
+import dev.six_seven_quiz.quiz.exception.QuestionNotFoundException;
+import dev.six_seven_quiz.user.ApplicationUser;
+import jakarta.persistence.*;
+
+import java.time.LocalDateTime;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Entity
+@Table(name = "quiz_attempts")
+public class Attempt {
+
+    public Attempt() {}
+    public Attempt(ApplicationUser user, Quiz quiz, LocalDateTime finishDeadline) {
+        this.user = user;
+        this.quiz = quiz;
+        this.startedAt = LocalDateTime.now();
+        this.questions = new ArrayList<>(quiz.getQuestions().stream().map(AttemptQuestion::new).toList());
+        this.finishDeadline = finishDeadline;
+    }
+
+    private transient Map<UUID, AttemptQuestion> questionsById;
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "id")
+    private UUID id;
+
+    @Column(name = "finished", nullable = false)
+    private boolean finished = false;
+
+    @Column(name = "finish_deadline")
+    private LocalDateTime finishDeadline;
+
+    @ManyToOne
+    @JoinColumn(name = "user_id", referencedColumnName = "id")
+    private ApplicationUser user;
+
+    @ManyToOne
+    @JoinColumn(name = "quiz_id", referencedColumnName = "id")
+    private Quiz quiz;
+
+    @Column(name = "start_time")
+    private LocalDateTime startedAt;
+
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @JoinColumn(name = "attempt_id", nullable = false)
+    @OrderColumn(name = "position", nullable = false)
+    private List<AttemptQuestion> questions;
+
+    public ApplicationUser getUser() {
+        return user;
+    }
+
+    public Quiz getQuiz() {
+        return quiz;
+    }
+
+    public LocalDateTime getStartedAt() {
+        return startedAt;
+    }
+
+    public List<AttemptQuestion> getQuestions() {
+        return questions;
+    }
+
+    public boolean isFinished() {
+        return finished;
+    }
+
+    public void finish() {
+        this.finished = true;
+    }
+
+    private Optional<AttemptQuestion> findQuestion(UUID questionId) {
+        if (questionsById == null) {
+            questionsById = questions.stream()
+                    .collect(Collectors.toMap(AttemptQuestion::getId, question -> question));
+        }
+        return Optional.ofNullable(questionsById.get(questionId));
+    }
+
+    public void selectOption(UUID questionId, UUID optionId) {
+        AttemptQuestion question = findQuestion(questionId).orElseThrow(() -> new QuestionNotFoundException(questionId));
+        question.selectOption(optionId);
+    }
+
+    public void deselectOption(UUID questionId, UUID optionId) {
+        AttemptQuestion question = findQuestion(questionId).orElseThrow(() -> new QuestionNotFoundException(questionId));
+        question.deselectOption(optionId);
+    }
+
+    public UUID getId() {
+        return id;
+    }
+
+    public LocalDateTime getFinishDeadline() {
+        return finishDeadline;
+    }
+}

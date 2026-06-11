@@ -1,4 +1,4 @@
-package dev.six_seven_quiz.quiz;
+package dev.six_seven_quiz.quiz.dto.request;
 
 import java.util.UUID;
 

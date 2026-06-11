@@ -33,10 +33,6 @@ public class Question {
     @Column(name = "text", nullable = false)
     private String text;
 
-    @OneToOne
-    @JoinColumn(name = "next_question_id")
-    private Question nextQuestion;
-
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<Option> options;
 
@@ -46,10 +42,6 @@ public class Question {
 
     public Quiz getQuiz() {
         return quiz;
-    }
-
-    public Question getNextQuestion() {
-        return nextQuestion;
     }
 
     public List<Option> getOptions() {
@@ -62,10 +54,6 @@ public class Question {
         }
 
         this.options.addAll(newOptions);
-    }
-
-    public void setNextQuestion(Question newQuestion) {
-        this.nextQuestion = newQuestion;
     }
 
     public String getText() {
