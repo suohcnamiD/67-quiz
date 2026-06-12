@@ -1,0 +1,28 @@
+info:
+  name: Add Question to Quiz
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: http://localhost:8080/question
+  body:
+    type: json
+    data: |-
+      {
+        "quizId": "2f31d7fe-31d7-481e-9ebd-09960501fc01",
+        "text": "What strategy of conflict resolution is applied heavily in Landau?",
+        "options": [
+          {
+            "text": "Public Humiliation",
+            "correct": false
+          }
+        ]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

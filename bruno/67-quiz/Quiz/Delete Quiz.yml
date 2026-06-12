@@ -1,0 +1,15 @@
+info:
+  name: Delete Quiz
+  type: http
+  seq: 5
+
+http:
+  method: DELETE
+  url: http://localhost:8080/quiz/33c0724f-7085-4e1d-bb99-229019a61afc
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

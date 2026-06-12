@@ -1,0 +1,22 @@
+info:
+  name: Create Quiz
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: http://localhost:8080/quiz
+  body:
+    type: json
+    data: |-
+      {
+        "quizName": "ICC Semester 2",
+        "quizDuration": "PT60000s"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

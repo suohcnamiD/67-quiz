@@ -1,0 +1,21 @@
+info:
+  name: Finish Quiz Attempt
+  type: http
+  seq: 1
+
+http:
+  method: PATCH
+  url: http://localhost:8080/attempt/finish
+  body:
+    type: json
+    data: |-
+      {
+        "attemptId": "2624b6dc-b8b8-45a2-852b-b0cc4499b2e8"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
