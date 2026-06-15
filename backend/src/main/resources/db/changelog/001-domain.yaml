@@ -1,48 +1,24 @@
 databaseChangeLog:
   - changeSet:
-      id: create-roles-table
-      author: you
-      changes:
-        - createTable:
-            tableName: roles
-            columns:
-              - column:
-                  name: id
-                  type: CHAR(36)
-                  constraints:
-                    nullable: false
-                    primaryKey: true
-                    primaryKeyName: ROLES_PK
-              - column:
-                  name: name
-                  type: VARCHAR(255)
-                  constraints:
-                    nullable: false
-
-        - addUniqueConstraint:
-            tableName: roles
-            columnNames: name
-            constraintName: ROLES_NAME_UQ
-
-  - changeSet:
       id: create-users-table
-      author: you
+      author: copilot
       changes:
         - createTable:
             tableName: users
             columns:
               - column:
                   name: id
-                  type: CHAR(36)
+                  type: UUID
                   constraints:
                     nullable: false
                     primaryKey: true
-                    primaryKeyName: USERS_PK
+                    primaryKeyName: users_pk
               - column:
                   name: username
                   type: VARCHAR(255)
                   constraints:
                     nullable: false
+                    unique: true
               - column:
                   name: display_name
                   type: VARCHAR(255)
@@ -54,47 +30,370 @@ databaseChangeLog:
                   constraints:
                     nullable: false
 
-        - addUniqueConstraint:
-            tableName: users
-            columnNames: username
-            constraintName: USERS_USERNAME_UQ
+  - changeSet:
+      id: create-roles-table
+      author: copilot
+      changes:
+        - createTable:
+            tableName: roles
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: roles_pk
+              - column:
+                  name: name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+                    unique: true
 
   - changeSet:
       id: create-user-roles-table
-      author: you
+      author: copilot
       changes:
         - createTable:
             tableName: user_roles
             columns:
               - column:
                   name: user_id
-                  type: CHAR(36)
+                  type: UUID
                   constraints:
                     nullable: false
               - column:
                   name: role_id
-                  type: CHAR(36)
+                  type: UUID
                   constraints:
                     nullable: false
-
         - addPrimaryKey:
             tableName: user_roles
             columnNames: user_id, role_id
-            constraintName: USER_ROLES_PK
-
+            constraintName: user_roles_pk
         - addForeignKeyConstraint:
             baseTableName: user_roles
             baseColumnNames: user_id
             referencedTableName: users
             referencedColumnNames: id
-            constraintName: USER_ROLES_USERS_FK
+            constraintName: user_roles_user_fk
             onDelete: CASCADE
-
         - addForeignKeyConstraint:
             baseTableName: user_roles
             baseColumnNames: role_id
             referencedTableName: roles
             referencedColumnNames: id
-            constraintName: USER_ROLES_ROLES_FK
+            constraintName: user_roles_role_fk
             onDelete: CASCADE
 
+  - changeSet:
+      id: create-quizzes-table
+      author: copilot
+      changes:
+        - createTable:
+            tableName: quizzes
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: quizzes_pk
+              - column:
+                  name: author_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: quizzes
+            baseColumnNames: author_id
+            referencedTableName: users
+            referencedColumnNames: id
+            constraintName: quizzes_author_fk
+            onDelete: CASCADE
+
+  - changeSet:
+      id: create-questions-table
+      author: copilot
+      changes:
+        - createTable:
+            tableName: questions
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: questions_pk
+              - column:
+                  name: quiz_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: text
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: questions
+            baseColumnNames: quiz_id
+            referencedTableName: quizzes
+            referencedColumnNames: id
+            constraintName: questions_quiz_fk
+            onDelete: CASCADE
+
+  - changeSet:
+      id: create-options-table
+      author: copilot
+      changes:
+        - createTable:
+            tableName: options
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: options_pk
+              - column:
+                  name: question_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: correct
+                  type: BOOLEAN
+                  constraints:
+                    nullable: false
+              - column:
+                  name: text
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: options
+            baseColumnNames: question_id
+            referencedTableName: questions
+            referencedColumnNames: id
+            constraintName: options_question_fk
+            onDelete: CASCADE
+
+  - changeSet:
+      id: create-quiz-questions-table
+      author: copilot
+      changes:
+        - createTable:
+            tableName: quiz_questions
+            remarks: Ordered quiz questions for quiz entities
+            columns:
+              - column:
+                  name: quiz_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: question_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: position
+                  type: INT
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: quiz_questions
+            columnNames: quiz_id, position
+            constraintName: quiz_questions_pk
+        - addForeignKeyConstraint:
+            baseTableName: quiz_questions
+            baseColumnNames: quiz_id
+            referencedTableName: quizzes
+            referencedColumnNames: id
+            constraintName: quiz_questions_quiz_fk
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: quiz_questions
+            baseColumnNames: question_id
+            referencedTableName: questions
+            referencedColumnNames: id
+            constraintName: quiz_questions_question_fk
+            onDelete: CASCADE
+        - addUniqueConstraint:
+            tableName: quiz_questions
+            columnNames: quiz_id, question_id
+            constraintName: quiz_questions_unique_quiz_question
+
+  - changeSet:
+      id: create-quiz-attempts-table
+      author: copilot
+      changes:
+        - createTable:
+            tableName: quiz_attempts
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: quiz_attempts_pk
+              - column:
+                  name: finished
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: user_id
+                  type: UUID
+              - column:
+                  name: quiz_id
+                  type: UUID
+              - column:
+                  name: start_time
+                  type: TIMESTAMP
+        - addForeignKeyConstraint:
+            baseTableName: quiz_attempts
+            baseColumnNames: user_id
+            referencedTableName: users
+            referencedColumnNames: id
+            constraintName: quiz_attempts_user_fk
+            onDelete: SET NULL
+        - addForeignKeyConstraint:
+            baseTableName: quiz_attempts
+            baseColumnNames: quiz_id
+            referencedTableName: quizzes
+            referencedColumnNames: id
+            constraintName: quiz_attempts_quiz_fk
+            onDelete: SET NULL
+
+  - changeSet:
+      id: create-attempt-questions-table
+      author: copilot
+      changes:
+        - createTable:
+            tableName: attempt_questions
+            remarks: Ordered questions that belong to a quiz attempt
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: attempt_questions_pk
+              - column:
+                  name: attempt_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: question_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: answered
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: position
+                  type: INT
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: attempt_questions
+            baseColumnNames: attempt_id
+            referencedTableName: quiz_attempts
+            referencedColumnNames: id
+            constraintName: attempt_questions_attempt_fk
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: attempt_questions
+            baseColumnNames: question_id
+            referencedTableName: questions
+            referencedColumnNames: id
+            constraintName: attempt_questions_question_fk
+            onDelete: CASCADE
+        - addUniqueConstraint:
+            tableName: attempt_questions
+            columnNames: attempt_id, position
+            constraintName: attempt_questions_unique_attempt_position
+        - addUniqueConstraint:
+            tableName: attempt_questions
+            columnNames: attempt_id, question_id
+            constraintName: attempt_questions_unique_attempt_question
+
+  - changeSet:
+      id: create-attempt-question-selected-options-table
+      author: copilot
+      changes:
+        - createTable:
+            tableName: attempt_question_selected_options
+            remarks: Selected options for each attempt question
+            columns:
+              - column:
+                  name: attempt_question_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: option_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: attempt_question_selected_options
+            columnNames: attempt_question_id, option_id
+            constraintName: attempt_question_selected_options_pk
+        - addForeignKeyConstraint:
+            baseTableName: attempt_question_selected_options
+            baseColumnNames: attempt_question_id
+            referencedTableName: attempt_questions
+            referencedColumnNames: id
+            constraintName: attempt_question_selected_options_attempt_question_fk
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: attempt_question_selected_options
+            baseColumnNames: option_id
+            referencedTableName: options
+            referencedColumnNames: id
+            constraintName: attempt_question_selected_options_option_fk
+            onDelete: CASCADE
+
+  - changeSet:
+     id: add-duration-to-quizzes
+     author: copilot
+     changes:
+       - addColumn:
+           tableName: quizzes
+           columns:
+             - column:
+                 name: duration
+                 type: BIGINT
+                 remarks: Quiz duration in nanoseconds (Java Duration type)
+
+  - changeSet:
+       id: add-finish-deadline-to-attempts
+       author: copilot
+       changes:
+         - addColumn:
+             tableName: quiz_attempts
+             columns:
+               - column:
+                   name: finish_deadline
+                   type: TIMESTAMP
+                   remarks: Deadline for completing the quiz attempt

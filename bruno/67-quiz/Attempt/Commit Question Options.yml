@@ -1,0 +1,21 @@
+info:
+  name: Commit Question Options
+  type: http
+  seq: 3
+
+http:
+  method: PATCH
+  url: http://localhost:8080/attempt/commit
+  body:
+    type: json
+    data: |-
+      {
+        "attemptId": ""
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

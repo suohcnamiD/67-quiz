@@ -1,11 +1,10 @@
 databaseChangeLog:
   - changeSet:
       id: create-spring-session-tables
-      author: you
+      author: Dimi
       changes:
         - createTable:
             tableName: SPRING_SESSION
-            tableSpace: ~
             remarks: Spring Session JDBC session table
             columns:
               - column:

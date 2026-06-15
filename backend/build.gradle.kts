@@ -33,6 +33,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-security")
+    implementation("org.springframework.boot:spring-boot-starter-hateoas")
     implementation("org.springframework.session:spring-session-jdbc")
     implementation("org.springframework.security:spring-security-config")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2")

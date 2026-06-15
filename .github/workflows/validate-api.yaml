@@ -1,4 +1,4 @@
-name: Generate OpenAPI docs from SpringDoc
+name: Validate API Usage in Frontend
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - '*'
 
 jobs:
-  generate-docs:
+  validate-api-usage:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

@@ -1,0 +1,12 @@
+package dev.six_seven_quiz.quiz.dto.request;
+
+import java.util.UUID;
+
+public record SubmitQuestionSubmissionRequest(
+        UUID attemptId,
+        UUID questionId,
+        UUID optionId,
+        boolean state
+
+) {
+}
