@@ -46,12 +46,17 @@ public class LogInService {
     }
 
     public List<String> loginUser(LoginRequest request, HttpServletRequest httpRequest) throws UserNotAuthenticatedException {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.username(),
-                        request.password()
-                )
-        );
+        Authentication authentication;
+        try {
+            authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            request.username(),
+                            request.password()
+                    )
+            );
+        } catch (Exception e) {
+            throw new UserNotAuthenticatedException();
+        }
 
         if (!authentication.isAuthenticated()) throw new UserNotAuthenticatedException();
 

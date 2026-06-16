@@ -10,7 +10,14 @@ http:
     type: json
     data: |-
       {
-        "attemptId": ""
+        "attemptId": "a9354ae1-42d9-46d5-8441-e5e49642e39b",
+        "actions": [
+          {
+            "optionId": "6353d1f6-2b97-472d-8401-e135ca93f891",
+            "questionId": "1d20a867-e655-4ab7-babc-72df5e44aa46",
+            "selected": true
+          }
+        ]
       }
   auth: inherit
 

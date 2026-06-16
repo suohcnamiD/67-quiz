@@ -3,6 +3,7 @@ package dev.six_seven_quiz.quiz.service;
 import dev.six_seven_quiz.quiz.component.mapper.QuizMapper;
 import dev.six_seven_quiz.quiz.dto.request.CreateQuizRequest;
 import dev.six_seven_quiz.quiz.dto.response.authoring.QuizDto;
+import dev.six_seven_quiz.quiz.dto.response.viewing.QuizSummaryDto;
 import dev.six_seven_quiz.quiz.exception.QuizNotFoundException;
 import dev.six_seven_quiz.quiz.model.Quiz;
 import dev.six_seven_quiz.quiz.repository.QuestionRepository;
@@ -48,15 +49,21 @@ public class QuizService {
         return this.quizToDto(newQuiz, user);
     }
 
-    public Page<QuizDto> getQuizzes(int page, UserDetails userDetails) {
+    public Page<QuizSummaryDto> getQuizzes(int page, UserDetails userDetails) {
         ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
-        return quizRepository.findAll(produceSanitizedPageable(page)).map(quiz -> quizToDto(quiz, user));
+        return quizRepository.findAll(produceSanitizedPageable(page)).map(quiz -> quizToSummary(quiz, user));
     }
 
     private QuizDto quizToDto(Quiz quiz, ApplicationUser user) {
         int questionCount = questionRepository.countByQuiz_QuizId(quiz.getId());
         boolean areYouAuthor = quiz.getAuthor().equals(user);
         return quizMapper.toDto(quiz, questionCount, areYouAuthor);
+    }
+
+    private QuizSummaryDto quizToSummary(Quiz quiz, ApplicationUser user) {
+        int questionCount = questionRepository.countByQuiz_QuizId(quiz.getId());
+        boolean areYouAuthor = quiz.getAuthor().equals(user);
+        return quizMapper.toSummary(quiz, questionCount, areYouAuthor);
     }
 
     private Pageable produceSanitizedPageable(int page) {

@@ -1,13 +1,17 @@
-package dev.six_seven_quiz.quiz.dto.response.attempt;
+package dev.six_seven_quiz.quiz.dto.response.viewing;
 
 import org.springframework.hateoas.server.core.Relation;
 
 import java.util.UUID;
 
 @Relation(collectionRelation = "options", itemRelation = "option")
-public record AttemptOptionDto(
+public record FinishedOptionDto(
         UUID id,
         String text,
+        boolean correct,
         boolean selected
 ) {
+    public boolean isCorrectlySelected() {
+        return correct == selected;
+    }
 }

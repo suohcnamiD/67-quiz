@@ -7,6 +7,7 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Entity
 @Table(name = "quiz_attempts")
@@ -45,7 +46,7 @@ public class Attempt {
     @Column(name = "start_time")
     private LocalDateTime startedAt;
 
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JoinColumn(name = "attempt_id", nullable = false)
     @OrderColumn(name = "position", nullable = false)
     private List<AttemptQuestion> questions;
@@ -72,6 +73,11 @@ public class Attempt {
 
     public void finish() {
         this.finished = true;
+    }
+
+    public int getMaximumScore() {
+        return questions
+                .stream().mapToInt(question -> question.getOptions().size()).sum();
     }
 
     private Optional<AttemptQuestion> findQuestion(UUID questionId) {

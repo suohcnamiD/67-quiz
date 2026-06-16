@@ -2,6 +2,7 @@ package dev.six_seven_quiz.quiz.controller;
 
 import dev.six_seven_quiz.quiz.dto.request.CreateQuizRequest;
 import dev.six_seven_quiz.quiz.dto.response.authoring.QuizDto;
+import dev.six_seven_quiz.quiz.dto.response.viewing.QuizSummaryDto;
 import dev.six_seven_quiz.quiz.service.QuizService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -42,10 +43,10 @@ public class QuizController {
     }
 
     @GetMapping
-    public PagedModel<EntityModel<QuizDto>> getQuizzes(
+    public PagedModel<EntityModel<QuizSummaryDto>> getQuizzes(
             @RequestParam (defaultValue = "0") int page,
             @AuthenticationPrincipal UserDetails userDetails,
-            PagedResourcesAssembler<QuizDto> pagedResourcesAssembler
+            PagedResourcesAssembler<QuizSummaryDto> pagedResourcesAssembler
     ) {
         return pagedResourcesAssembler.toModel(quizService.getQuizzes(page, userDetails));
     }

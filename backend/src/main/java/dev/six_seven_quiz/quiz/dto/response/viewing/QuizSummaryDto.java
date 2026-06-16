@@ -1,11 +1,15 @@
 package dev.six_seven_quiz.quiz.dto.response.viewing;
 
+import org.springframework.hateoas.server.core.Relation;
+
 import java.time.Duration;
 import java.util.UUID;
 
+@Relation(collectionRelation = "quizzes", itemRelation = "quiz")
 public record QuizSummaryDto(
     String name,
     int questionCount,
+    int maximumScore,
     Duration duration,
     UUID id,
     boolean youAreAuthor

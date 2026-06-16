@@ -1,6 +1,6 @@
 package dev.six_seven_quiz.quiz.model;
 
-import dev.six_seven_quiz.quiz.exception.AttemptFinishedException;
+import dev.six_seven_quiz.quiz.dto.response.viewing.FinishedOptionDto;
 import dev.six_seven_quiz.quiz.exception.OptionNotFoundException;
 import jakarta.persistence.*;
 
@@ -32,7 +32,11 @@ public class AttemptQuestion {
     @Column(name = "answered", nullable = false)
     private Boolean answered = false;
 
-    @ManyToMany
+    @ManyToOne
+    @JoinColumn(name = "attempt_id", insertable = false, updatable = false)
+    private Attempt attempt;
+
+    @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "attempt_question_selected_options",
             joinColumns = @JoinColumn(name = "attempt_question_id"),
@@ -48,8 +52,13 @@ public class AttemptQuestion {
         return question.getOptions();
     }
 
-    public int getCorrectlySelectedOptionCount() {
-        return (int) selectedOptions.stream().filter(Option::isCorrect).count();
+    public List<FinishedOptionDto> getFinishedOptions() {
+        return getOptions().stream().map(option -> new FinishedOptionDto(
+            option.getId(),
+            option.getText(),
+            option.isCorrect(),
+            selectedOptions.contains(option)
+        )).toList();
     }
 
     public String getText() {
@@ -66,6 +75,10 @@ public class AttemptQuestion {
 
     public UUID getId() {
         return id;
+    }
+
+    public Attempt getAttempt() {
+        return attempt;
     }
 
     private Optional<Option> findOption(UUID id) {

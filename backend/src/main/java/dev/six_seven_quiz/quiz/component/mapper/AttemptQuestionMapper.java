@@ -2,6 +2,8 @@ package dev.six_seven_quiz.quiz.component.mapper;
 
 import dev.six_seven_quiz.quiz.dto.response.attempt.AttemptOptionDto;
 import dev.six_seven_quiz.quiz.dto.response.attempt.AttemptQuestionDto;
+import dev.six_seven_quiz.quiz.dto.response.viewing.FinishedOptionDto;
+import dev.six_seven_quiz.quiz.dto.response.viewing.FinishedQuestionDto;
 import dev.six_seven_quiz.quiz.model.AttemptQuestion;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -16,4 +18,7 @@ import java.util.List;
 public interface AttemptQuestionMapper {
     @Mapping(source = "options", target = "options")
     AttemptQuestionDto toDto(AttemptQuestion question, List<AttemptOptionDto> options);
+
+    @Mapping(source = "options", target = "options")
+    FinishedQuestionDto toFinishedDto(AttemptQuestion question, List<FinishedOptionDto> options);
 }
