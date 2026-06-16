@@ -1,7 +1,10 @@
 package dev.six_seven_quiz.quiz.component;
 
-import dev.six_seven_quiz.quiz.controller.AttemptController;
-import dev.six_seven_quiz.quiz.exception.*;
+import dev.six_seven_quiz.quiz.controller.QuestionController;
+import dev.six_seven_quiz.quiz.exception.BlankIndexedOptionException;
+import dev.six_seven_quiz.quiz.exception.NoAccessToQuizException;
+import dev.six_seven_quiz.quiz.exception.QuestionNotFoundException;
+import dev.six_seven_quiz.quiz.exception.QuizNotFoundException;
 import dev.six_seven_quiz.shared.dto.Failure;
 import dev.six_seven_quiz.shared.dto.error.ApiError;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -15,9 +18,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.Map;
 
-@RestControllerAdvice(assignableTypes = AttemptController.class)
+@RestControllerAdvice(assignableTypes = QuestionController.class)
 @Order(1)
-public class AttemptExceptionHandler {
+public class QuestionControllerExceptionHandler {
 
     @ExceptionHandler(QuizNotFoundException.class)
     @ApiResponse(responseCode = "404", description = "Resource not found — see errors[].code",
@@ -26,18 +29,11 @@ public class AttemptExceptionHandler {
         return Failure.of(HttpStatus.NOT_FOUND, ApiError.of("QUIZ_NOT_FOUND", Map.of("id", exception.getQuizId()))).toResponseEntity();
     }
 
-    @ExceptionHandler(AttemptNotFoundException.class)
-    @ApiResponse(responseCode = "404", description = "Resource not found — see errors[].code",
-            content = @Content(schema = @Schema(implementation = Failure.class)))
-    public ResponseEntity<Failure> handleAttemptNotFound(AttemptNotFoundException exception) {
-        return Failure.of(HttpStatus.NOT_FOUND, ApiError.of("ATTEMPT_NOT_FOUND", Map.of("id", exception.getAttemptId()))).toResponseEntity();
-    }
-
-    @ExceptionHandler(NoAccessToAttemptException.class)
+    @ExceptionHandler(NoAccessToQuizException.class)
     @ApiResponse(responseCode = "403", description = "Access denied — see errors[].code",
             content = @Content(schema = @Schema(implementation = Failure.class)))
-    public ResponseEntity<Failure> handleNoAccessToAttempt(NoAccessToAttemptException exception) {
-        return Failure.of(HttpStatus.FORBIDDEN, ApiError.of("NO_ACCESS_TO_ATTEMPT", Map.of("id", exception.getAttemptId()))).toResponseEntity();
+    public ResponseEntity<Failure> handleNoAccess(NoAccessToQuizException exception) {
+        return Failure.of(HttpStatus.FORBIDDEN, ApiError.of("NO_ACCESS_TO_QUIZ", Map.of("id", exception.getQuizId()))).toResponseEntity();
     }
 
     @ExceptionHandler(QuestionNotFoundException.class)
@@ -47,17 +43,10 @@ public class AttemptExceptionHandler {
         return Failure.of(HttpStatus.NOT_FOUND, ApiError.of("QUESTION_NOT_FOUND", Map.of("id", exception.getQuestionId()))).toResponseEntity();
     }
 
-    @ExceptionHandler(OptionNotFoundException.class)
-    @ApiResponse(responseCode = "404", description = "Resource not found — see errors[].code",
-            content = @Content(schema = @Schema(implementation = Failure.class)))
-    public ResponseEntity<Failure> handleOptionNotFound(OptionNotFoundException exception) {
-        return Failure.of(HttpStatus.NOT_FOUND, ApiError.of("OPTION_NOT_FOUND", Map.of("id", exception.getOptionId()))).toResponseEntity();
-    }
-
-    @ExceptionHandler(AttemptFinishedException.class)
+    @ExceptionHandler(BlankIndexedOptionException.class)
     @ApiResponse(responseCode = "400", description = "Validation or business rule violation — see errors[].code",
             content = @Content(schema = @Schema(implementation = Failure.class)))
-    public ResponseEntity<Failure> handleAttemptFinished(AttemptFinishedException exception) {
-        return Failure.of(HttpStatus.BAD_REQUEST, ApiError.of("ATTEMPT_ALREADY_FINISHED")).toResponseEntity();
+    public ResponseEntity<Failure> handleBlankIndexedOption(BlankIndexedOptionException exception) {
+        return Failure.of(HttpStatus.BAD_REQUEST, ApiError.of("BLANK_OPTION_TEXT", Map.of("index", exception.getOptionIndex()))).toResponseEntity();
     }
 }

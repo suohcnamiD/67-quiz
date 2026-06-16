@@ -4,6 +4,9 @@ import dev.six_seven_quiz.authentication.AuthenticationController;
 import dev.six_seven_quiz.authentication.exception.*;
 import dev.six_seven_quiz.shared.dto.Failure;
 import dev.six_seven_quiz.shared.dto.error.ApiError;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,11 +20,15 @@ import java.util.Map;
 public class RegistrationExceptionHandler {
 
     @ExceptionHandler(DuplicateUsernameException.class)
+    @ApiResponse(responseCode = "409", description = "Conflict with current resource state — see errors[].code",
+            content = @Content(schema = @Schema(implementation = Failure.class)))
     public ResponseEntity<Failure> handleDuplicateUsernameException(DuplicateUsernameException exception) {
         return Failure.of(HttpStatus.CONFLICT, ApiError.of("USERNAME_ALREADY_TAKEN")).toResponseEntity();
     }
 
     @ExceptionHandler(InvalidUsernameException.class)
+    @ApiResponse(responseCode = "400", description = "Validation or business rule violation — see errors[].code",
+            content = @Content(schema = @Schema(implementation = Failure.class)))
     public ResponseEntity<Failure> handleInvalidUsernameException(InvalidUsernameException exception) {
         return Failure.of(HttpStatus.BAD_REQUEST, ApiError.of(
                 "INVALID_USERNAME"
@@ -29,6 +36,8 @@ public class RegistrationExceptionHandler {
     }
 
     @ExceptionHandler(PasswordTooShortException.class)
+    @ApiResponse(responseCode = "400", description = "Validation or business rule violation — see errors[].code",
+            content = @Content(schema = @Schema(implementation = Failure.class)))
     public ResponseEntity<Failure> handlePasswordTooShortException(PasswordTooShortException exception) {
         return Failure.of(HttpStatus.BAD_REQUEST, ApiError.of(
                 "INVALID_PASSWORD",
@@ -40,6 +49,8 @@ public class RegistrationExceptionHandler {
     }
 
     @ExceptionHandler(UsernameTooShortException.class)
+    @ApiResponse(responseCode = "400", description = "Validation or business rule violation — see errors[].code",
+            content = @Content(schema = @Schema(implementation = Failure.class)))
     public ResponseEntity<Failure> handleUsernameTooShortException(UsernameTooShortException exception) {
         return Failure.of(HttpStatus.BAD_REQUEST, ApiError.of(
                 "INVALID_USERNAME",
@@ -51,6 +62,8 @@ public class RegistrationExceptionHandler {
     }
 
     @ExceptionHandler(UsernameTooLongException.class)
+    @ApiResponse(responseCode = "400", description = "Validation or business rule violation — see errors[].code",
+            content = @Content(schema = @Schema(implementation = Failure.class)))
     public ResponseEntity<Failure> handleUsernameTooLongException(UsernameTooLongException exception) {
         return Failure.of(HttpStatus.BAD_REQUEST, ApiError.of(
                 "INVALID_USERNAME",
