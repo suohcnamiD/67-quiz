@@ -10,6 +10,7 @@ import java.util.UUID;
 @Relation(collectionRelation = "attempts", itemRelation = "attempt")
 public record FinishedAttemptSummaryDto(
         UUID id,
+        QuizSummaryDto quiz,
         LocalDateTime startedAt,
         LocalDateTime finishDeadline,
         List<FinishedQuestionDto> questions,
