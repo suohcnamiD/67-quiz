@@ -7,6 +7,7 @@ import dev.six_seven_quiz.quiz.dto.response.attempt.AttemptInProgressDto;
 import dev.six_seven_quiz.quiz.dto.response.viewing.FinishedAttemptSummaryDto;
 import dev.six_seven_quiz.quiz.dto.response.viewing.FinishedOptionDto;
 import dev.six_seven_quiz.quiz.service.AttemptService;
+import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
 import org.springframework.data.web.PagedResourcesAssembler;
 import org.springframework.hateoas.EntityModel;
@@ -38,7 +39,7 @@ public class AttemptController {
     public PagedModel<EntityModel<AttemptInProgressDto>> getAttemptsInProgress(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestParam (defaultValue = "0") int page,
-            PagedResourcesAssembler<AttemptInProgressDto> assembler
+            @Parameter(hidden = true) PagedResourcesAssembler<AttemptInProgressDto> assembler
     ) {
         return assembler.toModel(attemptService.getAttemptsInProgressAsUser(userDetails, page));
     }
@@ -47,7 +48,7 @@ public class AttemptController {
     public PagedModel<EntityModel<FinishedAttemptSummaryDto>> getFinishedAttempts(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestParam (defaultValue = "0") int page,
-            PagedResourcesAssembler<FinishedAttemptSummaryDto> assembler
+            @Parameter(hidden = true) PagedResourcesAssembler<FinishedAttemptSummaryDto> assembler
     ) {
         return assembler.toModel(attemptService.getFinishedAttemptsAsUser(userDetails, page));
     }
