@@ -5,6 +5,7 @@ import dev.six_seven_quiz.authentication.dto.request.RegistrationRequest;
 import dev.six_seven_quiz.authentication.dto.response.LoginResponse;
 import dev.six_seven_quiz.authentication.service.LogInService;
 import dev.six_seven_quiz.authentication.service.RegistrationService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.annotation.Nullable;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -34,12 +35,14 @@ public class AuthenticationController {
     }
 
     // Automatically logs in the user as well
+    @SecurityRequirements({})
     @PostMapping("/register")
     public ResponseEntity<LoginResponse> register(@Valid @RequestBody RegistrationRequest request, HttpServletRequest httpRequest) {
         List<String> userRoles = registrationService.registerUser(request.username(), request.password(), httpRequest);
         return ResponseEntity.ok(new LoginResponse(userRoles));
     }
 
+    @SecurityRequirements({})
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
         List<String> userRoles = logInService.loginUser(request, httpRequest);
