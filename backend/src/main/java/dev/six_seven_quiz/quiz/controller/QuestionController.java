@@ -5,11 +5,13 @@ import dev.six_seven_quiz.quiz.dto.request.DeleteQuestionRequest;
 import dev.six_seven_quiz.quiz.dto.response.viewing.QuestionSummaryDto;
 import dev.six_seven_quiz.quiz.service.QuestionService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/question")
@@ -28,12 +30,12 @@ public class QuestionController {
         return questionService.addQuizQuestionAsUser(userDetails, request);
     }
 
-    @DeleteMapping
+    @DeleteMapping("/{id}")
     public List<QuestionSummaryDto> deleteQuizQuestion(
 
             @AuthenticationPrincipal UserDetails userDetails,
-            @RequestBody @Valid DeleteQuestionRequest request
+            @PathVariable @NotNull @Valid UUID id
     ) {
-        return questionService.deleteAsUser(userDetails, request);
+        return questionService.deleteAsUser(userDetails, new DeleteQuestionRequest(id));
     }
 }
