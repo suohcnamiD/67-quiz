@@ -3,16 +3,22 @@ package dev.six_seven_quiz.authentication;
 import dev.six_seven_quiz.authentication.dto.request.LoginRequest;
 import dev.six_seven_quiz.authentication.dto.request.RegistrationRequest;
 import dev.six_seven_quiz.authentication.dto.response.LoginResponse;
+import dev.six_seven_quiz.authentication.exception.UserNotAuthenticatedException;
 import dev.six_seven_quiz.authentication.service.LogInService;
 import dev.six_seven_quiz.authentication.service.RegistrationService;
+import dev.six_seven_quiz.shared.dto.Failure;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
-import jakarta.annotation.Nullable;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
@@ -28,12 +34,6 @@ public class AuthenticationController {
         this.registrationService = registrationService;
     }
 
-    @GetMapping("/me")
-    public ResponseEntity<LoginResponse> getAuthenticationState(@AuthenticationPrincipal @Nullable UserDetails userDetails) {
-        logInService.verifyUserAuthenticated(userDetails);
-        return ResponseEntity.ok(new LoginResponse(logInService.getUserRoles(userDetails)));
-    }
-
     // Automatically logs in the user as well
     @SecurityRequirements({})
     @PostMapping("/register")
@@ -44,28 +44,15 @@ public class AuthenticationController {
 
     @SecurityRequirements({})
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "OK",
+                    content = @Content(schema = @Schema(implementation = LoginResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Authentication required — see errors[].code",
+                    content = @Content(schema = @Schema(implementation = Failure.class)))
+    })
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest)
+            throws UserNotAuthenticatedException {
         List<String> userRoles = logInService.loginUser(request, httpRequest);
         return ResponseEntity.ok(new LoginResponse(userRoles));
     }
-
-//    @PostMapping("/register")
-//    public ResponseEntity<?> register(@Valid @RequestBody RegistrationRequest request) {
-//        try {
-//            registrationService.registerWorker(request);
-//        } catch (DuplicateUsernameException e) {
-//            return utilities.buildFailure(HttpStatus.CONFLICT, List.of(
-//                    new Utilities.Error("USERNAME_ALREADY_TAKEN", "The username is already taken", "The username '%s' is already in use".formatted(request.username()))
-//            ));
-//        } catch (InvalidUsernameException e) {
-//            return utilities.buildFailure(HttpStatus.BAD_REQUEST, List.of(
-//                    new Utilities.Error("INVALID_USERNAME", "The username is invalid", "The username '%s' does not meet the required format".formatted(request.username()))
-//            ));
-//        } catch (InvalidRegistrationTokenException e) {
-//            return utilities.buildFailure(HttpStatus.BAD_REQUEST, List.of(
-//                    new Utilities.Error("INVALID_REGISTRATION_TOKEN", "The registration token is invalid", "The provided registration token is invalid or has expired")
-//            ));
-//        }
-//        return utilities.buildSuccess(HttpStatus.CREATED);
-//    }
 }
