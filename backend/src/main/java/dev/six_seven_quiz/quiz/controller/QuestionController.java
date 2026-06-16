@@ -28,7 +28,7 @@ public class QuestionController {
         return questionService.addQuizQuestionAsUser(userDetails, request);
     }
 
-    @DeleteMapping("/question")
+    @DeleteMapping
     public List<QuestionSummaryDto> deleteQuizQuestion(
 
             @AuthenticationPrincipal UserDetails userDetails,
