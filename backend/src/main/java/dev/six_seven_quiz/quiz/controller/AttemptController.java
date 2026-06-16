@@ -3,9 +3,14 @@ package dev.six_seven_quiz.quiz.controller;
 import dev.six_seven_quiz.quiz.dto.request.AttemptQuizRequest;
 import dev.six_seven_quiz.quiz.dto.request.CommitAttemptActionsRequest;
 import dev.six_seven_quiz.quiz.dto.request.FinishAttemptRequest;
-import dev.six_seven_quiz.quiz.dto.response.attempt.AttemptDto;
+import dev.six_seven_quiz.quiz.dto.response.attempt.AttemptInProgressDto;
+import dev.six_seven_quiz.quiz.dto.response.viewing.FinishedAttemptSummaryDto;
+import dev.six_seven_quiz.quiz.dto.response.viewing.FinishedOptionDto;
 import dev.six_seven_quiz.quiz.service.AttemptService;
 import jakarta.validation.Valid;
+import org.springframework.data.web.PagedResourcesAssembler;
+import org.springframework.hateoas.EntityModel;
+import org.springframework.hateoas.PagedModel;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -22,15 +27,33 @@ public class AttemptController {
     }
 
     @PostMapping
-    public AttemptDto attemptQuiz(
+    public AttemptInProgressDto attemptQuiz(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestBody @Valid AttemptQuizRequest request
     ) {
         return attemptService.attemptQuizAsUser(userDetails, request.quizId());
     }
 
+    @GetMapping("/in-progress")
+    public PagedModel<EntityModel<AttemptInProgressDto>> getAttemptsInProgress(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam (defaultValue = "0") int page,
+            PagedResourcesAssembler<AttemptInProgressDto> assembler
+    ) {
+        return assembler.toModel(attemptService.getAttemptsInProgressAsUser(userDetails, page));
+    }
+
+    @GetMapping("/finished")
+    public PagedModel<EntityModel<FinishedAttemptSummaryDto>> getFinishedAttempts(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam (defaultValue = "0") int page,
+            PagedResourcesAssembler<FinishedAttemptSummaryDto> assembler
+    ) {
+        return assembler.toModel(attemptService.getFinishedAttemptsAsUser(userDetails, page));
+    }
+
     @PatchMapping("/finish")
-    public AttemptDto finishAttempt(
+    public FinishedAttemptSummaryDto finishAttempt(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestBody @Valid FinishAttemptRequest request
     ) {
@@ -38,7 +61,7 @@ public class AttemptController {
     }
 
     @PatchMapping("/commit")
-    public AttemptDto commitAttemptActions(
+    public AttemptInProgressDto commitAttemptActions(
              @AuthenticationPrincipal UserDetails userDetails,
              @RequestBody @Valid CommitAttemptActionsRequest request
     ) {

@@ -10,7 +10,7 @@ http:
     type: json
     data: |-
       {
-        "quizId": "33c0724f-7085-4e1d-bb99-229019a61afc"
+        "quizId": "2f31d7fe-31d7-481e-9ebd-09960501fc01"
       }
   auth: inherit
 

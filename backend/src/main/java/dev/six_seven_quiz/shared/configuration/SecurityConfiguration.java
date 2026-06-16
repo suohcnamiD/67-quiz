@@ -1,5 +1,6 @@
 package dev.six_seven_quiz.shared.configuration;
 
+import dev.six_seven_quiz.authentication.exception.UserNotAuthenticatedException;
 import dev.six_seven_quiz.shared.component.Utilities;
 import dev.six_seven_quiz.shared.dto.Failure;
 import dev.six_seven_quiz.user.ApplicationUser;
@@ -99,7 +100,7 @@ public class SecurityConfiguration {
     public UserDetailsService userDetailsService(ApplicationUserRepository applicationUserRepository) {
         return username -> {
             Optional<ApplicationUser> userOptional = applicationUserRepository.findByUsername(username);
-            if (userOptional.isEmpty()) throw new UsernameNotFoundException(username);
+            if (userOptional.isEmpty()) throw new UserNotAuthenticatedException();
             ApplicationUser applicationUser = userOptional.get();
 
             return new User(

@@ -4,14 +4,18 @@ import dev.six_seven_quiz.quiz.component.mapper.*;
 import dev.six_seven_quiz.quiz.dto.request.AttemptAction;
 import dev.six_seven_quiz.quiz.dto.request.CommitAttemptActionsRequest;
 import dev.six_seven_quiz.quiz.dto.request.FinishAttemptRequest;
-import dev.six_seven_quiz.quiz.dto.response.attempt.AttemptDto;
+import dev.six_seven_quiz.quiz.dto.response.attempt.AttemptInProgressDto;
 import dev.six_seven_quiz.quiz.dto.response.attempt.AttemptQuestionDto;
 import dev.six_seven_quiz.quiz.dto.response.attempt.AttemptOptionDto;
+import dev.six_seven_quiz.quiz.dto.response.viewing.FinishedAttemptSummaryDto;
+import dev.six_seven_quiz.quiz.dto.response.viewing.FinishedOptionDto;
+import dev.six_seven_quiz.quiz.dto.response.viewing.FinishedQuestionDto;
 import dev.six_seven_quiz.quiz.exception.AttemptFinishedException;
 import dev.six_seven_quiz.quiz.exception.AttemptNotFoundException;
 import dev.six_seven_quiz.quiz.exception.NoAccessToAttemptException;
 import dev.six_seven_quiz.quiz.exception.QuizNotFoundException;
 import dev.six_seven_quiz.quiz.model.*;
+import dev.six_seven_quiz.quiz.repository.AttemptQuestionRepository;
 import dev.six_seven_quiz.quiz.repository.QuizAttemptRepository;
 import dev.six_seven_quiz.quiz.repository.QuizRepository;
 import dev.six_seven_quiz.user.ApplicationUser;
@@ -19,6 +23,9 @@ import dev.six_seven_quiz.user.ApplicationUserService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.transaction.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
@@ -34,11 +41,16 @@ public class AttemptService {
     private final AttemptMapper attemptMapper;
     private final OptionMapper optionMapper;
     private final AttemptQuestionMapper attemptQuestionMapper;
+    private static final int ATTEMPTS_PER_PAGE = 10;
+
+    private Pageable produceSanitizedPageable(int page) {
+        return PageRequest.of(page, ATTEMPTS_PER_PAGE);
+    }
 
     @PersistenceContext
     private EntityManager entityManager;
 
-    public AttemptService(ApplicationUserService applicationUserService, QuizAttemptRepository quizAttemptRepository, QuizRepository quizRepository, AttemptMapper attemptMapper, OptionMapper optionMapper, AttemptQuestionMapper attemptQuestionMapper) {
+    public AttemptService(ApplicationUserService applicationUserService, QuizAttemptRepository quizAttemptRepository, QuizRepository quizRepository, AttemptMapper attemptMapper, OptionMapper optionMapper, AttemptQuestionMapper attemptQuestionMapper, AttemptQuestionRepository attemptQuestionRepository) {
         this.applicationUserService = applicationUserService;
         this.quizAttemptRepository = quizAttemptRepository;
         this.quizRepository = quizRepository;
@@ -48,7 +60,7 @@ public class AttemptService {
     }
 
     @Transactional
-    public AttemptDto commitAttemptActionsAsUser(UserDetails userDetails, CommitAttemptActionsRequest request) {
+    public AttemptInProgressDto commitAttemptActionsAsUser(UserDetails userDetails, CommitAttemptActionsRequest request) {
         ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
         Attempt attempt = quizAttemptRepository.findById(request.attemptId()).orElseThrow(() -> new AttemptNotFoundException(request.attemptId()));
         validateUserAttemptOwnership(user, attempt);
@@ -65,7 +77,7 @@ public class AttemptService {
     }
 
     @Transactional
-    public AttemptDto attemptQuizAsUser(UserDetails userDetails, UUID quizId) {
+    public AttemptInProgressDto attemptQuizAsUser(UserDetails userDetails, UUID quizId) {
         ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
         Quiz quiz = quizRepository.findById(quizId).orElseThrow(() -> new QuizNotFoundException(quizId));
 
@@ -85,7 +97,23 @@ public class AttemptService {
         if (attempt.isFinished()) throw new AttemptFinishedException();
     }
 
-    private AttemptDto attemptToDto(Attempt attempt) {
+    private FinishedAttemptSummaryDto attemptToFinishedSummary(Attempt attempt) {
+
+        int maximumScore = attempt.getMaximumScore();
+        List<FinishedQuestionDto> finishedQuestions = new ArrayList<>();
+        int score = 0;
+
+        for (AttemptQuestion question : attempt.getQuestions()) {
+            List<FinishedOptionDto> finishedOptions = question.getFinishedOptions();
+            score += finishedOptions.stream().filter(FinishedOptionDto::isCorrectlySelected).mapToInt(_ -> 1).sum();
+            FinishedQuestionDto finishedQuestionDto = attemptQuestionMapper.toFinishedDto(question, finishedOptions);
+            finishedQuestions.add(finishedQuestionDto);
+        }
+
+        return attemptMapper.toFinishedSummary(attempt, finishedQuestions, score, maximumScore);
+    }
+
+    private AttemptInProgressDto attemptToDto(Attempt attempt) {
         List<AttemptQuestionDto> attemptQuestions = attempt.getQuestions().stream().map(question -> {
             List<Option> generalOptions = question.getOptions();
             List<Option> selectedOptions = question.getSelectedOptions();
@@ -101,8 +129,20 @@ public class AttemptService {
         return attemptMapper.toDto(attempt, attemptQuestions);
     }
 
+    public Page<AttemptInProgressDto> getAttemptsInProgressAsUser(UserDetails userDetails, int page) {
+        ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
+        Page<Attempt> attempts = quizAttemptRepository.findByUserAndFinishedIsFalse(user, produceSanitizedPageable(page));
+        return attempts.map(this::attemptToDto);
+    }
+
+    public Page<FinishedAttemptSummaryDto> getFinishedAttemptsAsUser(UserDetails userDetails, int page) {
+        ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
+        Page<Attempt> attempts = quizAttemptRepository.findByUserAndFinishedIsTrue(user, produceSanitizedPageable(page));
+        return attempts.map(this::attemptToFinishedSummary);
+    }
+
     @Transactional
-    public AttemptDto finishAttemptAsUser(UserDetails userDetails, FinishAttemptRequest request) {
+    public FinishedAttemptSummaryDto finishAttemptAsUser(UserDetails userDetails, FinishAttemptRequest request) {
         Attempt attempt = quizAttemptRepository.findById(request.attemptId()).orElseThrow(() -> new AttemptNotFoundException(request.attemptId()));
         ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
         validateUserAttemptOwnership(user, attempt);
@@ -114,6 +154,6 @@ public class AttemptService {
         entityManager.flush();
         entityManager.refresh(attempt);
 
-        return attemptToDto(attempt);
+        return attemptToFinishedSummary(attempt);
     }
 }

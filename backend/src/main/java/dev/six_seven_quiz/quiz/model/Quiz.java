@@ -74,6 +74,11 @@ public class Quiz {
         return new Attempt(user, this, LocalDateTime.now().plus(this.duration));
     }
 
+    public int getMaximumScore() {
+        return questions
+                .stream().mapToInt(question -> question.getOptions().size()).sum();
+    }
+
     public void addQuestion(QuestionData questionData) {
         Question question = new Question(this, questionData.text());
 

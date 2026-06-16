@@ -10,7 +10,7 @@ http:
     type: json
     data: |-
       {
-        "quizId": "2f31d7fe-31d7-481e-9ebd-09960501fc01",
+        "quizId": "80297731-fe93-4838-8b76-5ae7b98e4a3a",
         "text": "What strategy of conflict resolution is applied heavily in Landau?",
         "options": [
           {
