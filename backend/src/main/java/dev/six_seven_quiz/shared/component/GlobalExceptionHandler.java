@@ -2,6 +2,9 @@ package dev.six_seven_quiz.shared.component;
 
 import dev.six_seven_quiz.shared.dto.Failure;
 import dev.six_seven_quiz.shared.dto.error.ApiError;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;

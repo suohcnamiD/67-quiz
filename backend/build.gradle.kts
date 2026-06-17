@@ -41,18 +41,17 @@ dependencies {
     implementation("org.mariadb.jdbc:mariadb-java-client:3.5.8")
 
     implementation("org.mapstruct:mapstruct:1.6.3")
-    // Source: https://mvnrepository.com/artifact/org.mapstruct/mapstruct-processor
     annotationProcessor("org.mapstruct:mapstruct-processor:1.6.3")
 
     testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
     testImplementation("org.springframework.boot:spring-boot-starter-security-test")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
-    runtimeOnly("com.h2database:h2")
 
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
     implementation("jakarta.validation:jakarta.validation-api")
     implementation("jakarta.annotation:jakarta.annotation-api")
+    runtimeOnly("com.h2database:h2")
 }
 
 tasks.withType<Test> {

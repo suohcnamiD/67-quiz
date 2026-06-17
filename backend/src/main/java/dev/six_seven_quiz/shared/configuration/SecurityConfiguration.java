@@ -43,11 +43,12 @@ public class SecurityConfiguration {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authorize -> {
                     authorize
+                            .requestMatchers("/", "/index.html", "/assets/**", "/favicon.ico").permitAll()
                             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                             .requestMatchers("/v3/api-docs").permitAll()
                             .requestMatchers("/v3/api-docs/**").permitAll()
                             .requestMatchers("/swagger-ui/**").permitAll()
-                            .requestMatchers("/authentication/**").permitAll()
+                            .requestMatchers("/api/authentication/**").permitAll()
                             .anyRequest().authenticated();
                 })
 //                .formLogin(AbstractAuthenticationFilterConfigurer::permitAll)
@@ -80,7 +81,7 @@ public class SecurityConfiguration {
                 "http://localhost:5173"
         ));
 
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
 

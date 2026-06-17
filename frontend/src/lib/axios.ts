@@ -2,34 +2,30 @@ import Axios, { AxiosError } from 'axios';
 import type { AxiosRequestConfig } from 'axios';
 
 export const AXIOS_INSTANCE = Axios.create({
-  baseURL: import.meta.env.BASE_URL, // use your own URL or environment variable
+  withCredentials: true,
 });
 
 export interface ApiError {
   code: string;
-  details?: Record<string, string[]>;
+  details?: Record<string, unknown>;
 }
 
-
-AXIOS_INSTANCE.interceptors.response.use(
-  (response) => response,
-  (error: AxiosError<ApiError>) => {
-    if (error.response) {
-      console.error("API Error: " + error.response.data.code);
-    } else {
-      console.error("Unknown Error")
-    }
-  }
-);
+export interface Failure {
+  status: string;
+  errors: ApiError[];
+}
 
 export const customInstance = <T>(
   config: AxiosRequestConfig,
   options?: AxiosRequestConfig,
 ): Promise<T> => {
-  const promise = AXIOS_INSTANCE({
-    ...config,
-    ...options,
-  }).then(({ data }) => data);
-
-  return promise;
+  return AXIOS_INSTANCE({ ...config, ...options }).then(({ data }) => data);
 };
+
+export function firstErrorCode(error: unknown): string | undefined {
+  if (error instanceof AxiosError) {
+    const data = error.response?.data as Failure | undefined;
+    return data?.errors?.[0]?.code;
+  }
+  return undefined;
+}

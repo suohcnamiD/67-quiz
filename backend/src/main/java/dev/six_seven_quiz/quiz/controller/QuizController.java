@@ -4,6 +4,7 @@ import dev.six_seven_quiz.quiz.dto.request.CreateQuizRequest;
 import dev.six_seven_quiz.quiz.dto.response.authoring.QuizDto;
 import dev.six_seven_quiz.quiz.dto.response.viewing.QuizSummaryDto;
 import dev.six_seven_quiz.quiz.service.QuizService;
+import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.data.web.PagedResourcesAssembler;
@@ -16,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/quiz")
+@RequestMapping("/api/quiz")
 public class QuizController {
 
     private final QuizService quizService;
@@ -46,7 +47,7 @@ public class QuizController {
     public PagedModel<EntityModel<QuizSummaryDto>> getQuizzes(
             @RequestParam (defaultValue = "0") int page,
             @AuthenticationPrincipal UserDetails userDetails,
-            PagedResourcesAssembler<QuizSummaryDto> pagedResourcesAssembler
+            @Parameter(hidden = true) PagedResourcesAssembler<QuizSummaryDto> pagedResourcesAssembler
     ) {
         return pagedResourcesAssembler.toModel(quizService.getQuizzes(page, userDetails));
     }
