@@ -23,29 +23,21 @@ import java.util.Map;
 public class QuestionControllerExceptionHandler {
 
     @ExceptionHandler(QuizNotFoundException.class)
-    @ApiResponse(responseCode = "404", description = "Resource not found — see errors[].code",
-            content = @Content(schema = @Schema(implementation = Failure.class)))
     public ResponseEntity<Failure> handleQuizNotFound(QuizNotFoundException exception) {
         return Failure.of(HttpStatus.NOT_FOUND, ApiError.of("QUIZ_NOT_FOUND", Map.of("id", exception.getQuizId()))).toResponseEntity();
     }
 
     @ExceptionHandler(NoAccessToQuizException.class)
-    @ApiResponse(responseCode = "403", description = "Access denied — see errors[].code",
-            content = @Content(schema = @Schema(implementation = Failure.class)))
     public ResponseEntity<Failure> handleNoAccess(NoAccessToQuizException exception) {
         return Failure.of(HttpStatus.FORBIDDEN, ApiError.of("NO_ACCESS_TO_QUIZ", Map.of("id", exception.getQuizId()))).toResponseEntity();
     }
 
     @ExceptionHandler(QuestionNotFoundException.class)
-    @ApiResponse(responseCode = "404", description = "Resource not found — see errors[].code",
-            content = @Content(schema = @Schema(implementation = Failure.class)))
     public ResponseEntity<Failure> handleQuestionNotFound(QuestionNotFoundException exception) {
         return Failure.of(HttpStatus.NOT_FOUND, ApiError.of("QUESTION_NOT_FOUND", Map.of("id", exception.getQuestionId()))).toResponseEntity();
     }
 
     @ExceptionHandler(BlankIndexedOptionException.class)
-    @ApiResponse(responseCode = "400", description = "Validation or business rule violation — see errors[].code",
-            content = @Content(schema = @Schema(implementation = Failure.class)))
     public ResponseEntity<Failure> handleBlankIndexedOption(BlankIndexedOptionException exception) {
         return Failure.of(HttpStatus.BAD_REQUEST, ApiError.of("BLANK_OPTION_TEXT", Map.of("index", exception.getOptionIndex()))).toResponseEntity();
     }

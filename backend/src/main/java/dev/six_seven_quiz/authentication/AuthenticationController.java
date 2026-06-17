@@ -6,11 +6,6 @@ import dev.six_seven_quiz.authentication.dto.response.LoginResponse;
 import dev.six_seven_quiz.authentication.exception.UserNotAuthenticatedException;
 import dev.six_seven_quiz.authentication.service.LogInService;
 import dev.six_seven_quiz.authentication.service.RegistrationService;
-import dev.six_seven_quiz.shared.dto.Failure;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -44,12 +39,6 @@ public class AuthenticationController {
 
     @SecurityRequirements({})
     @PostMapping("/login")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "OK",
-                    content = @Content(schema = @Schema(implementation = LoginResponse.class))),
-            @ApiResponse(responseCode = "401", description = "Authentication required — see errors[].code",
-                    content = @Content(schema = @Schema(implementation = Failure.class)))
-    })
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest)
             throws UserNotAuthenticatedException {
         List<String> userRoles = logInService.loginUser(request, httpRequest);

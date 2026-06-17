@@ -21,15 +21,11 @@ import java.util.Map;
 public class QuizControllerExceptionHandler {
 
     @ExceptionHandler(QuizNotFoundException.class)
-    @ApiResponse(responseCode = "404", description = "Resource not found — see errors[].code",
-            content = @Content(schema = @Schema(implementation = Failure.class)))
     public ResponseEntity<Failure> handleQuizNotFound(QuizNotFoundException exception) {
         return Failure.of(HttpStatus.NOT_FOUND, ApiError.of("QUIZ_NOT_FOUND", Map.of("id", exception.getQuizId()))).toResponseEntity();
     }
 
     @ExceptionHandler(NoAccessToQuizException.class)
-    @ApiResponse(responseCode = "403", description = "Access denied — see errors[].code",
-            content = @Content(schema = @Schema(implementation = Failure.class)))
     public ResponseEntity<Failure> handleNoAccess(NoAccessToQuizException exception) {
         return Failure.of(HttpStatus.FORBIDDEN, ApiError.of("NO_ACCESS_TO_QUIZ", Map.of("id", exception.getQuizId()))).toResponseEntity();
     }

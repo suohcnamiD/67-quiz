@@ -20,43 +20,31 @@ import java.util.Map;
 public class AttemptExceptionHandler {
 
     @ExceptionHandler(QuizNotFoundException.class)
-    @ApiResponse(responseCode = "404", description = "Resource not found — see errors[].code",
-            content = @Content(schema = @Schema(implementation = Failure.class)))
     public ResponseEntity<Failure> handleQuizNotFound(QuizNotFoundException exception) {
         return Failure.of(HttpStatus.NOT_FOUND, ApiError.of("QUIZ_NOT_FOUND", Map.of("id", exception.getQuizId()))).toResponseEntity();
     }
 
     @ExceptionHandler(AttemptNotFoundException.class)
-    @ApiResponse(responseCode = "404", description = "Resource not found — see errors[].code",
-            content = @Content(schema = @Schema(implementation = Failure.class)))
     public ResponseEntity<Failure> handleAttemptNotFound(AttemptNotFoundException exception) {
         return Failure.of(HttpStatus.NOT_FOUND, ApiError.of("ATTEMPT_NOT_FOUND", Map.of("id", exception.getAttemptId()))).toResponseEntity();
     }
 
     @ExceptionHandler(NoAccessToAttemptException.class)
-    @ApiResponse(responseCode = "403", description = "Access denied — see errors[].code",
-            content = @Content(schema = @Schema(implementation = Failure.class)))
     public ResponseEntity<Failure> handleNoAccessToAttempt(NoAccessToAttemptException exception) {
         return Failure.of(HttpStatus.FORBIDDEN, ApiError.of("NO_ACCESS_TO_ATTEMPT", Map.of("id", exception.getAttemptId()))).toResponseEntity();
     }
 
     @ExceptionHandler(QuestionNotFoundException.class)
-    @ApiResponse(responseCode = "404", description = "Resource not found — see errors[].code",
-            content = @Content(schema = @Schema(implementation = Failure.class)))
     public ResponseEntity<Failure> handleQuestionNotFound(QuestionNotFoundException exception) {
         return Failure.of(HttpStatus.NOT_FOUND, ApiError.of("QUESTION_NOT_FOUND", Map.of("id", exception.getQuestionId()))).toResponseEntity();
     }
 
     @ExceptionHandler(OptionNotFoundException.class)
-    @ApiResponse(responseCode = "404", description = "Resource not found — see errors[].code",
-            content = @Content(schema = @Schema(implementation = Failure.class)))
     public ResponseEntity<Failure> handleOptionNotFound(OptionNotFoundException exception) {
         return Failure.of(HttpStatus.NOT_FOUND, ApiError.of("OPTION_NOT_FOUND", Map.of("id", exception.getOptionId()))).toResponseEntity();
     }
 
     @ExceptionHandler(AttemptFinishedException.class)
-    @ApiResponse(responseCode = "400", description = "Validation or business rule violation — see errors[].code",
-            content = @Content(schema = @Schema(implementation = Failure.class)))
     public ResponseEntity<Failure> handleAttemptFinished(AttemptFinishedException exception) {
         return Failure.of(HttpStatus.BAD_REQUEST, ApiError.of("ATTEMPT_ALREADY_FINISHED")).toResponseEntity();
     }

@@ -34,22 +34,16 @@ public class GlobalExceptionHandler {
     private final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
-    @ApiResponse(responseCode = "415", description = "Unsupported media type",
-            content = @Content(schema = @Schema(implementation = Failure.class)))
     public ResponseEntity<Failure> handleMediaTypeNotSupportedException(HttpMediaTypeNotSupportedException exception) {
         return Failure.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).toResponseEntity();
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-    @ApiResponse(responseCode = "405", description = "HTTP method not allowed",
-            content = @Content(schema = @Schema(implementation = Failure.class)))
     public ResponseEntity<Failure> handleMethodNotSupportedException(HttpRequestMethodNotSupportedException exception) {
         return Failure.status(METHOD_NOT_ALLOWED).toResponseEntity();
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    @ApiResponse(responseCode = "400", description = "Validation or business rule violation — see errors[].code",
-            content = @Content(schema = @Schema(implementation = Failure.class)))
     public ResponseEntity<Failure> handleHttpMessageNotReadableException(HttpMessageNotReadableException exception) {
         //logger.warn("Malformed request received", exception);
 
@@ -67,15 +61,11 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(NoHandlerFoundException.class)
-    @ApiResponse(responseCode = "404", description = "Resource not found — see errors[].code",
-            content = @Content(schema = @Schema(implementation = Failure.class)))
     public ResponseEntity<?> handlerNotFoundException(NoHandlerFoundException exception) {
         return Failure.status(NOT_FOUND).toResponseEntity();
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    @ApiResponse(responseCode = "400", description = "Validation or business rule violation — see errors[].code",
-            content = @Content(schema = @Schema(implementation = Failure.class)))
     public ResponseEntity<Failure> handleValidationExceptions(MethodArgumentNotValidException exception) {
         return Failure.of(
                 HttpStatus.BAD_REQUEST,
@@ -90,8 +80,6 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(HandlerMethodValidationException.class)
-    @ApiResponse(responseCode = "400", description = "Validation or business rule violation — see errors[].code",
-            content = @Content(schema = @Schema(implementation = Failure.class)))
     public ResponseEntity<Failure> handleHandlerMethodValidationException(HandlerMethodValidationException exception) {
         return Failure.of(
                 HttpStatus.BAD_REQUEST,
@@ -105,8 +93,6 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    @ApiResponse(responseCode = "500", description = "Unhandled server error",
-            content = @Content(schema = @Schema(implementation = Failure.class)))
     public ResponseEntity<Failure> handleAllExceptions(Exception exception) {
         logger.error("Unhandled exception occurred", exception);
         return Failure.status(INTERNAL_SERVER_ERROR).toResponseEntity();
