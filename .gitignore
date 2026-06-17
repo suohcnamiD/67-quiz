@@ -1,0 +1,8 @@
+.DS_Store
+
+# Generated artifacts (regenerated locally / in CI)
+api/
+frontend/src/api/
+
+# Playwright CLI scratch
+**/.playwright-cli/
