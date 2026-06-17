@@ -43,6 +43,7 @@ public class SecurityConfiguration {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authorize -> {
                     authorize
+                            .requestMatchers("/", "/index.html", "/assets/**", "/favicon.ico").permitAll()
                             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                             .requestMatchers("/v3/api-docs").permitAll()
                             .requestMatchers("/v3/api-docs/**").permitAll()
