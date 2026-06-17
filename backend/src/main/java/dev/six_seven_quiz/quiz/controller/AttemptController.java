@@ -17,7 +17,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/attempt")
+@RequestMapping("/api/attempt")
 public class AttemptController {
 
 

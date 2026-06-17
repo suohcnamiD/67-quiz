@@ -51,20 +51,9 @@ jobs:
       - name: Build jar
         working-directory: backend
         run: |
-          ./gradlew bootJar --no-daemon \
-          -Pstachetopia.packages.publishing.username=stachetopia \
-          -Pstachetopia.packages.publishing.token=${{ secrets.PUBLISHING_TOKEN }} \
-          -Pstachetopia.packages.installing.username=stachetopia \
-          -Pstachetopia.packages.installing.token=${{ secrets.PUBLISHING_TOKEN }}
+          ./gradlew bootJar --no-daemon
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-#      - name: Log in to registry
-#        uses: docker/login-action@v3
-#        with:
-#          registry: dev.home.stachetopia
-#          username: stachetopia
-#          password: ${{ secrets.PUBLISHING_TOKEN }}
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
