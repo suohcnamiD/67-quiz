@@ -69,7 +69,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: dev.home.stachetopia/${{ github.repository }}
+          images: github.com/${{ github.repository }}
           tags: |
             type=sha,prefix=
             type=semver,pattern={{version}}
