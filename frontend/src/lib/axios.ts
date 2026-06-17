@@ -2,7 +2,6 @@ import Axios, { AxiosError } from 'axios';
 import type { AxiosRequestConfig } from 'axios';
 
 export const AXIOS_INSTANCE = Axios.create({
-  baseURL: '/api',
   withCredentials: true,
 });
 

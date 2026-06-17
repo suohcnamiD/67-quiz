@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useGetQuiz, _delete as deleteQuiz } from '@/api/quiz-controller/quiz-controller'
+import { useGetQuiz, _delete as deleteQuiz, getGetQuizQueryKey } from '@/api/quiz-controller/quiz-controller'
 import { addQuizQuestion, deleteQuizQuestion } from '@/api/question-controller/question-controller'
 import { useQueryClient } from '@tanstack/vue-query'
 import { firstErrorCode } from '@/lib/axios'
@@ -58,7 +58,7 @@ async function submitQuestion() {
       options: optionRows.value.map((o) => ({ text: o.text?.trim() ?? '', correct: !!o.correct })),
     })
     resetForm()
-    qc.invalidateQueries({ queryKey: ['quiz', 'authoring', quizId.value] })
+    qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) })
   } catch (e) {
     const code = firstErrorCode(e)
     errorMessage.value = code === 'BLANK_OPTION_TEXT' ? 'Option text cannot be blank.' : code ?? 'Failed to add question.'
@@ -73,7 +73,7 @@ async function removeQuestion(id?: string) {
   removingId.value = id
   try {
     await deleteQuizQuestion(id)
-    qc.invalidateQueries({ queryKey: ['quiz', 'authoring', quizId.value] })
+    qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) })
   } finally {
     removingId.value = null
   }
@@ -85,7 +85,7 @@ async function removeQuiz() {
   router.push('/app')
 }
 
-watch(quizId, () => qc.invalidateQueries({ queryKey: ['quiz', 'authoring', quizId.value] }))
+watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) }))
 </script>
 
 <template>

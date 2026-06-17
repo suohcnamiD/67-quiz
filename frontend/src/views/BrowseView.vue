@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useGetQuizzes, _delete as deleteQuiz } from '@/api/quiz-controller/quiz-controller'
-import { useGetAttemptsInProgress, useGetFinishedAttempts, attemptQuiz } from '@/api/attempt-controller/attempt-controller'
+import { useGetQuizzes, _delete as deleteQuiz, getGetQuizzesQueryKey } from '@/api/quiz-controller/quiz-controller'
+import { useGetAttemptsInProgress, useGetFinishedAttempts, attemptQuiz, getGetAttemptsInProgressQueryKey } from '@/api/attempt-controller/attempt-controller'
 import { useQueryClient } from '@tanstack/vue-query'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
@@ -40,7 +40,7 @@ async function startAttempt(quizId?: string) {
   startingId.value = quizId
   try {
     const attempt = await attemptQuiz({ quizId })
-    qc.invalidateQueries({ queryKey: ['attempt', 'in-progress'] })
+    qc.invalidateQueries({ queryKey: getGetAttemptsInProgressQueryKey() })
     if (attempt.id) router.push(`/app/attempt/${attempt.id}`)
   } finally {
     startingId.value = null
@@ -54,7 +54,7 @@ async function removeQuiz(id?: string) {
   deletingId.value = id
   try {
     await deleteQuiz(id)
-    qc.invalidateQueries({ queryKey: ['quiz'] })
+    qc.invalidateQueries({ queryKey: getGetQuizzesQueryKey() })
   } finally {
     deletingId.value = null
   }

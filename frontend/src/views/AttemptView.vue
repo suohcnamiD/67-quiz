@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useGetAttemptsInProgress, commitAttemptActions, finishAttempt } from '@/api/attempt-controller/attempt-controller'
+import { useGetAttemptsInProgress, commitAttemptActions, finishAttempt, getGetAttemptsInProgressQueryKey, getGetFinishedAttemptsQueryKey } from '@/api/attempt-controller/attempt-controller'
 import { useQueryClient } from '@tanstack/vue-query'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
@@ -54,7 +54,7 @@ async function toggleOption(questionId?: string, optionId?: string, currentlySel
       attemptId: attemptId.value,
       actions: [{ questionId, optionId, selected: !currentlySelected }],
     })
-    qc.invalidateQueries({ queryKey: ['attempt', 'in-progress'] })
+    qc.invalidateQueries({ queryKey: getGetAttemptsInProgressQueryKey() })
   } finally {
     togglingKey.value = null
   }
@@ -66,8 +66,8 @@ async function finish() {
   finishing.value = true
   try {
     await finishAttempt({ attemptId: attemptId.value })
-    qc.invalidateQueries({ queryKey: ['attempt', 'in-progress'] })
-    qc.invalidateQueries({ queryKey: ['attempt', 'finished'] })
+    qc.invalidateQueries({ queryKey: getGetAttemptsInProgressQueryKey() })
+    qc.invalidateQueries({ queryKey: getGetFinishedAttemptsQueryKey() })
     router.push(`/app/attempt/${attemptId.value}/result`)
   } finally {
     finishing.value = false
