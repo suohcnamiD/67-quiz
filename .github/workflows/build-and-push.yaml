@@ -1,0 +1,80 @@
+name: Build & Push Image
+
+on:
+  push:
+    tags:
+      - "v*"
+    branches:
+      - dev
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+
+      - name: Build Frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Copy Frontend Build to Backend
+        run: |
+          mkdir -p backend/src/main/resources/static
+          rm -rf backend/src/main/resources/static/*
+          cp -r frontend/dist/* backend/src/main/resources/static/
+
+      - name: Make gradlew executable
+        shell: bash
+        run: chmod +x backend/gradlew
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - name: Build jar
+        working-directory: backend
+        run: |
+          ./gradlew bootJar --no-daemon \
+          -Pstachetopia.packages.publishing.username=stachetopia \
+          -Pstachetopia.packages.publishing.token=${{ secrets.PUBLISHING_TOKEN }} \
+          -Pstachetopia.packages.installing.username=stachetopia \
+          -Pstachetopia.packages.installing.token=${{ secrets.PUBLISHING_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to registry
+        uses: docker/login-action@v3
+        with:
+          registry: dev.home.stachetopia
+          username: stachetopia
+          password: ${{ secrets.PUBLISHING_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: dev.home.stachetopia/${{ github.repository }}
+          tags: |
+            type=sha,prefix=
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
