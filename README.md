@@ -5,7 +5,6 @@ For ease of use, the workflow in the repository builds and publishes a Docker Im
 Compose:
 ```
 services:
-services:
   db:
     image: mariadb:latest
     environment:
