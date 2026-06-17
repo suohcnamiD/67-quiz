@@ -35,7 +35,6 @@ async function submit() {
   <div class="page">
     <Card>
       <h1 class="headline-lg">Sign in</h1>
-      <p class="subtitle body-md">Resume your run.</p>
       <form class="form" @submit.prevent="submit">
         <Input v-model="username" label="Username" autocomplete="username" />
         <Input v-model="password" label="Password" type="password" autocomplete="current-password" />
@@ -69,6 +68,7 @@ async function submit() {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
+  margin-top: var(--space-lg);
 }
 .form__error {
   color: var(--error);

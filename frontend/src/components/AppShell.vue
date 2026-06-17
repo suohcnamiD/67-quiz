@@ -17,7 +17,7 @@ const logout = () => {
   <div class="shell">
     <header class="topbar">
       <div class="topbar__inner">
-        <RouterLink to="/app" class="brand headline-md">67 Quiz</RouterLink>
+        <RouterLink to="/app" class="brand">67quiz</RouterLink>
         <nav class="nav label-md">
           <RouterLink to="/app" exact-active-class="router-link-active">Browse</RouterLink>
           <RouterLink to="/app/quiz/new" exact-active-class="router-link-active">New quiz</RouterLink>
@@ -57,6 +57,12 @@ const logout = () => {
 }
 .brand {
   color: var(--on-surface);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-style: italic;
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: -0.03em;
 }
 .brand:hover {
   text-decoration: none;

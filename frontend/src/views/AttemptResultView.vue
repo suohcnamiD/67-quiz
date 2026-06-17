@@ -11,7 +11,7 @@ const route = useRoute()
 const router = useRouter()
 const attemptId = computed(() => route.params.attemptId as string)
 
-const { data, isLoading } = useGetFinishedAttempts({ page: 0 })
+const { data, isLoading, isFetching } = useGetFinishedAttempts({ page: 0 })
 const attempt = computed(() =>
   (data.value?._embedded?.attempts ?? []).find((a) => a.id === attemptId.value),
 )
@@ -26,12 +26,12 @@ function questionScore(q: FinishedQuestionDto): { earned: number; max: number } 
 </script>
 
 <template>
-  <div v-if="isLoading" class="empty body-md">Loading…</div>
+  <div v-if="isLoading || (isFetching && !attempt)" class="empty body-md">Loading…</div>
   <div v-else-if="!attempt" class="empty body-md">Result not found.</div>
   <template v-else>
     <header class="head">
       <div>
-        <span class="label-sm muted">Final score</span>
+        <span class="label-sm muted">{{ attempt.quiz?.name ?? 'Untitled quiz' }}</span>
         <p class="headline-xl score">
           {{ attempt.score ?? 0 }} <span class="muted">/ {{ attempt.maximumScore ?? 0 }}</span>
         </p>

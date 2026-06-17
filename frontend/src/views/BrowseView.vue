@@ -34,6 +34,23 @@ function fmtDuration(iso?: string): string {
   return parts.join(' ') || '0s'
 }
 
+function fmtRelative(iso?: string): string {
+  if (!iso) return ''
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return ''
+  const diffSec = Math.round((Date.now() - then) / 1000)
+  const abs = Math.abs(diffSec)
+  if (abs < 45) return 'just now'
+  if (abs < 90) return diffSec >= 0 ? '1 minute ago' : 'in 1 minute'
+  const diffMin = Math.round(diffSec / 60)
+  if (Math.abs(diffMin) < 60) return diffSec >= 0 ? `${diffMin} minutes ago` : `in ${Math.abs(diffMin)} minutes`
+  const diffHr = Math.round(diffSec / 3600)
+  if (Math.abs(diffHr) < 24) return diffSec >= 0 ? `${diffHr} hours ago` : `in ${Math.abs(diffHr)} hours`
+  const diffDay = Math.round(diffSec / 86400)
+  if (Math.abs(diffDay) < 30) return diffSec >= 0 ? `${diffDay} days ago` : `in ${Math.abs(diffDay)} days`
+  return new Date(iso).toLocaleDateString()
+}
+
 const startingId = ref<string | null>(null)
 async function startAttempt(quizId?: string) {
   if (!quizId) return
@@ -69,10 +86,16 @@ async function removeQuiz(id?: string) {
     <div v-if="inProgressItems.length" class="grid">
       <Card v-for="a in inProgressItems" :key="a.id" interactive @click="router.push(`/app/attempt/${a.id}`)">
         <div class="row">
+          <h3 class="headline-md">{{ a.quiz?.name ?? 'Untitled quiz' }}</h3>
           <Chip>In progress</Chip>
-          <span class="label-sm muted">{{ a.questions?.length ?? 0 }} questions</span>
         </div>
-        <p class="meta body-md">Resume your run.</p>
+        <div class="meta-row label-sm">
+          <span>{{ a.questions?.length ?? 0 }} questions</span>
+          <span v-if="a.quiz?.duration">·</span>
+          <span v-if="a.quiz?.duration">{{ fmtDuration(a.quiz.duration) }}</span>
+          <span v-if="a.startedAt">·</span>
+          <span v-if="a.startedAt">Started {{ fmtRelative(a.startedAt) }}</span>
+        </div>
       </Card>
     </div>
     <p v-else class="empty body-md">No active attempts.</p>
@@ -118,10 +141,14 @@ async function removeQuiz(id?: string) {
     <div class="grid">
       <Card v-for="a in finishedItems" :key="a.id" interactive @click="router.push(`/app/attempt/${a.id}/result`)">
         <div class="row">
-          <span class="headline-md">{{ a.score ?? 0 }} / {{ a.maximumScore ?? 0 }}</span>
+          <h3 class="headline-md">{{ a.quiz?.name ?? 'Untitled quiz' }}</h3>
           <Chip tone="success">Finished</Chip>
         </div>
-        <p class="meta body-md">{{ a.questions?.length ?? 0 }} questions</p>
+        <div class="row">
+          <span class="headline-md">{{ a.score ?? 0 }} <span class="muted">/ {{ a.maximumScore ?? 0 }}</span></span>
+          <span class="label-sm muted">{{ a.questions?.length ?? 0 }} questions</span>
+        </div>
+        <p v-if="a.startedAt" class="meta body-md">Attempted {{ fmtRelative(a.startedAt) }}</p>
       </Card>
     </div>
   </section>

@@ -46,10 +46,6 @@ async function submitQuestion() {
     errorMessage.value = 'Question text is required.'
     return
   }
-  if (!optionRows.value.some((o) => o.correct)) {
-    errorMessage.value = 'Mark at least one option as correct.'
-    return
-  }
   submitting.value = true
   try {
     await addQuizQuestion({

@@ -6,7 +6,6 @@ import { useQueryClient } from '@tanstack/vue-query'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
-import Chip from '@/components/Chip.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -39,9 +38,6 @@ function fmtRemaining(ms: number): string {
   return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
 }
 
-const answeredCount = computed(
-  () => (attempt.value?.questions ?? []).filter((q) => q.options?.some((o) => o.selected)).length,
-)
 const totalQuestions = computed(() => attempt.value?.questions?.length ?? 0)
 
 const togglingKey = ref<string | null>(null)
@@ -62,12 +58,14 @@ async function toggleOption(questionId?: string, optionId?: string, currentlySel
 
 const finishing = ref(false)
 async function finish() {
-  if (!confirm('Finish this attempt? You won’t be able to change answers afterward.')) return
+  if (!confirm('Finish this attempt?')) return
   finishing.value = true
   try {
     await finishAttempt({ attemptId: attemptId.value })
-    qc.invalidateQueries({ queryKey: getGetAttemptsInProgressQueryKey() })
-    qc.invalidateQueries({ queryKey: getGetFinishedAttemptsQueryKey() })
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: getGetAttemptsInProgressQueryKey() }),
+      qc.invalidateQueries({ queryKey: getGetFinishedAttemptsQueryKey() }),
+    ])
     router.push(`/app/attempt/${attemptId.value}/result`)
   } finally {
     finishing.value = false
@@ -89,13 +87,13 @@ watch(attempt, (a) => {
       <ProgressBar :value="remainingPct" />
     </div>
     <header class="head">
-      <div class="meta-stack">
-        <span class="label-sm muted">Time remaining</span>
-        <span class="headline-lg time">{{ fmtRemaining(remainingMs) }}</span>
+      <div class="meta-stack title-stack">
+        <span class="label-sm muted">Attempting</span>
+        <h1 class="headline-md">{{ attempt.quiz?.name ?? 'Untitled quiz' }}</h1>
       </div>
       <div class="meta-stack right">
-        <span class="label-sm muted">Answered</span>
-        <span class="headline-md">{{ answeredCount }} / {{ totalQuestions }}</span>
+        <span class="label-sm muted">Time remaining</span>
+        <span class="headline-lg time">{{ fmtRemaining(remainingMs) }}</span>
       </div>
       <Button :loading="finishing" @click="finish">Finish attempt</Button>
     </header>
@@ -105,7 +103,6 @@ watch(attempt, (a) => {
         <Card>
           <div class="qhead">
             <span class="label-sm muted">Question {{ i + 1 }} / {{ totalQuestions }}</span>
-            <Chip v-if="q.options?.some((o) => o.selected)" tone="success">Answered</Chip>
           </div>
           <p class="body-lg q-text">{{ q.text }}</p>
           <ul class="opts">
@@ -149,6 +146,12 @@ watch(attempt, (a) => {
 .meta-stack.right {
   margin-left: auto;
   text-align: right;
+}
+.title-stack h1 {
+  margin: 0;
+}
+.title-stack {
+  margin-right: var(--space-lg);
 }
 .muted {
   color: var(--on-surface-variant);

@@ -42,7 +42,6 @@ async function submit() {
   <div class="page">
     <Card>
       <h1 class="headline-lg">Create account</h1>
-      <p class="subtitle body-md">Step into the arena.</p>
       <form class="form" @submit.prevent="submit">
         <Input v-model="username" label="Username" autocomplete="username" />
         <Input v-model="password" label="Password" type="password" autocomplete="new-password" />
@@ -76,6 +75,7 @@ async function submit() {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
+  margin-top: var(--space-lg);
 }
 .form__error {
   color: var(--error);
