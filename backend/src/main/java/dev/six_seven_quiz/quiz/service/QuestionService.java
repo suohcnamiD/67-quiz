@@ -59,6 +59,7 @@ public class QuestionService {
         return quiz.getQuestions().stream().map(questionMapper::toSummaryDto).toList();
     }
 
+    @Transactional
     public List<QuestionSummaryDto> deleteAsUser(UserDetails userDetails, @Valid DeleteQuestionRequest request) {
         ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
         Question question = questionRepository.findById(request.questionId()).orElseThrow(() -> new QuestionNotFoundException(request.questionId()));
