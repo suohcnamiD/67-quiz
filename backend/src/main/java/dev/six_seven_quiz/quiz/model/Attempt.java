@@ -1,5 +1,6 @@
 package dev.six_seven_quiz.quiz.model;
 
+import dev.six_seven_quiz.quiz.exception.AttemptFinishedException;
 import dev.six_seven_quiz.quiz.exception.QuestionNotFoundException;
 import dev.six_seven_quiz.user.ApplicationUser;
 import jakarta.persistence.*;

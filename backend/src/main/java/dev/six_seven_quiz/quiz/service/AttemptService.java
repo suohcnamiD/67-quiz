@@ -31,6 +31,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -68,6 +69,8 @@ public class AttemptService {
     @Transactional
     public AttemptInProgressDto commitAttemptActionsAsUser(UserDetails userDetails, CommitAttemptActionsRequest request) {
         ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
+        refreshFinishedAttempts(user);
+        entityManager.flush();
         Attempt attempt = quizAttemptRepository.findById(request.attemptId()).orElseThrow(() -> new AttemptNotFoundException(request.attemptId()));
         validateUserAttemptOwnership(user, attempt);
         validateAttemptUnfinished(attempt);
@@ -105,7 +108,9 @@ public class AttemptService {
         if (!attempt.getUser().equals(user)) throw new NoAccessToAttemptException(attempt.getId());
     }
 
-    private void validateAttemptUnfinished(Attempt attempt) {
+    @Transactional
+    protected void validateAttemptUnfinished(Attempt attempt) {
+        if (attempt.getFinishDeadline().isAfter(LocalDateTime.now())) attempt.finish();
         if (attempt.isFinished()) throw new AttemptFinishedException();
     }
 
@@ -141,16 +146,28 @@ public class AttemptService {
         return attemptMapper.toDto(attempt, attemptQuestions, quizToSummary(attempt.getQuiz(), attempt.getUser()));
     }
 
+    @Transactional
     public Page<AttemptInProgressDto> getAttemptsInProgressAsUser(UserDetails userDetails, int page) {
         ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
+        refreshFinishedAttempts(user);
+        entityManager.flush();
         Page<Attempt> attempts = quizAttemptRepository.findByUserAndFinishedIsFalse(user, produceSanitizedPageable(page));
         return attempts.map(this::attemptToDto);
     }
 
+    @Transactional
     public Page<FinishedAttemptSummaryDto> getFinishedAttemptsAsUser(UserDetails userDetails, int page) {
         ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
+        refreshFinishedAttempts(user);
+        entityManager.flush();
         Page<Attempt> attempts = quizAttemptRepository.findByUserAndFinishedIsTrue(user, produceSanitizedPageable(page));
         return attempts.map(this::attemptToFinishedSummary);
+    }
+
+    @Transactional
+    protected void refreshFinishedAttempts(ApplicationUser user) {
+        List<Attempt> unfinishedAttemptsPastDeadline = quizAttemptRepository.findByUser_IdAndFinishedIsFalseAndFinishDeadlineBefore(user.getId(), LocalDateTime.now());
+        unfinishedAttemptsPastDeadline.forEach(Attempt::finish);
     }
 
     @Transactional
@@ -158,6 +175,8 @@ public class AttemptService {
         Attempt attempt = quizAttemptRepository.findById(request.attemptId()).orElseThrow(() -> new AttemptNotFoundException(request.attemptId()));
         ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
         validateUserAttemptOwnership(user, attempt);
+        refreshFinishedAttempts(user);
+        entityManager.flush();
         validateAttemptUnfinished(attempt);
 
         attempt.finish();
