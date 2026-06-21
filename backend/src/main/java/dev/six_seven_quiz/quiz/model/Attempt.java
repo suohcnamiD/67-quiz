@@ -5,7 +5,7 @@ import dev.six_seven_quiz.quiz.exception.QuestionNotFoundException;
 import dev.six_seven_quiz.user.ApplicationUser;
 import jakarta.persistence.*;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -15,10 +15,10 @@ import java.util.stream.IntStream;
 public class Attempt {
 
     public Attempt() {}
-    public Attempt(ApplicationUser user, Quiz quiz, LocalDateTime finishDeadline) {
+    public Attempt(ApplicationUser user, Quiz quiz, Instant finishDeadline) {
         this.user = user;
         this.quiz = quiz;
-        this.startedAt = LocalDateTime.now();
+        this.startedAt = Instant.now();
         this.questions = new ArrayList<>(quiz.getQuestions().stream().map(AttemptQuestion::new).toList());
         this.finishDeadline = finishDeadline;
     }
@@ -34,7 +34,7 @@ public class Attempt {
     private boolean finished = false;
 
     @Column(name = "finish_deadline")
-    private LocalDateTime finishDeadline;
+    private Instant finishDeadline;
 
     @ManyToOne
     @JoinColumn(name = "user_id", referencedColumnName = "id")
@@ -45,7 +45,7 @@ public class Attempt {
     private Quiz quiz;
 
     @Column(name = "start_time")
-    private LocalDateTime startedAt;
+    private Instant startedAt;
 
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JoinColumn(name = "attempt_id", nullable = false)
@@ -60,7 +60,7 @@ public class Attempt {
         return quiz;
     }
 
-    public LocalDateTime getStartedAt() {
+    public Instant getStartedAt() {
         return startedAt;
     }
 
@@ -103,7 +103,7 @@ public class Attempt {
         return id;
     }
 
-    public LocalDateTime getFinishDeadline() {
+    public Instant getFinishDeadline() {
         return finishDeadline;
     }
 }

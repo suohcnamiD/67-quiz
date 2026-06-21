@@ -31,7 +31,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -110,7 +110,7 @@ public class AttemptService {
 
     @Transactional
     protected void validateAttemptUnfinished(Attempt attempt) {
-        if (attempt.getFinishDeadline().isBefore(LocalDateTime.now())) attempt.finish();
+        if (attempt.getFinishDeadline().isBefore(Instant.now())) attempt.finish();
         if (attempt.isFinished()) throw new AttemptFinishedException();
     }
 
@@ -166,7 +166,7 @@ public class AttemptService {
 
     @Transactional
     protected void refreshFinishedAttempts(ApplicationUser user) {
-        List<Attempt> unfinishedAttemptsPastDeadline = quizAttemptRepository.findByUser_IdAndFinishedIsFalseAndFinishDeadlineBefore(user.getId(), LocalDateTime.now());
+        List<Attempt> unfinishedAttemptsPastDeadline = quizAttemptRepository.findByUser_IdAndFinishedIsFalseAndFinishDeadlineBefore(user.getId(), Instant.now());
         unfinishedAttemptsPastDeadline.forEach(Attempt::finish);
     }
 

@@ -9,7 +9,7 @@ import jakarta.persistence.*;
 import dev.six_seven_quiz.user.ApplicationUser;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -71,7 +71,7 @@ public class Quiz {
     }
 
     public Attempt start(ApplicationUser user) {
-        return new Attempt(user, this, LocalDateTime.now().plus(this.duration));
+        return new Attempt(user, this, Instant.now().plus(this.duration));
     }
 
     public int getMaximumScore() {
