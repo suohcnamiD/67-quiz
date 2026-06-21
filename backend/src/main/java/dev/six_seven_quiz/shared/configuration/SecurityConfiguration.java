@@ -49,8 +49,11 @@ public class SecurityConfiguration {
                             .requestMatchers("/v3/api-docs/**").permitAll()
                             .requestMatchers("/swagger-ui/**").permitAll()
                             .requestMatchers("/api/authentication/**").permitAll()
-                            // SPA shell routes — serve index.html, Vue router handles auth redirect
-                            .requestMatchers("/app", "/app/**", "/login", "/register").permitAll()
+                            // SPA shell routes — serve index.html, Vue router handles auth redirect.
+                            // Permit GETs for anything that isn't /api/** so the SPA fallback can render.
+                            .requestMatchers(HttpMethod.GET, "/app", "/app/**", "/login", "/register").permitAll()
+                            .requestMatchers("/api/**").authenticated()
+                            .requestMatchers(HttpMethod.GET, "/**").permitAll()
                             .anyRequest().authenticated();
                 })
 //                .formLogin(AbstractAuthenticationFilterConfigurer::permitAll)
