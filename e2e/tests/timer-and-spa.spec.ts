@@ -41,6 +41,40 @@ async function startAttemptViaApi(page: Page, quizId: string): Promise<string> {
   return body.id as string
 }
 
+async function createQuizViaApi(page: Page, quizName: string, duration: string): Promise<string> {
+  const create = await page.request.post('http://localhost:5173/api/quiz', {
+    data: { quizName, quizDuration: duration },
+    headers: { 'Content-Type': 'application/json' },
+  })
+  expect(create.ok(), `create quiz failed: ${create.status()}`).toBeTruthy()
+  const quiz = await create.json()
+  // Backend requires at least one question to start an attempt? Actually no —
+  // it tolerates empty quizzes for attempts. Add one anyway for realism.
+  const q = await page.request.post('http://localhost:5173/api/question', {
+    data: { quizId: quiz.id, text: 'q', options: [{ text: 'a', correct: true }, { text: 'b', correct: false }] },
+    headers: { 'Content-Type': 'application/json' },
+  })
+  expect(q.ok()).toBeTruthy()
+  return quiz.id as string
+}
+
+test('timer expiry auto-finishes the attempt and bounces to result', async ({ page }) => {
+  await registerAndLogin(page)
+  // A 2-second attempt — long enough to render the AttemptView, short enough
+  // to expire before the test times out.
+  const quizId = await createQuizViaApi(page, `Expire ${Date.now()}`, 'PT2S')
+  const attemptId = await startAttemptViaApi(page, quizId)
+
+  await page.goto(`/app/attempt/${attemptId}`)
+  // We should land on the attempt view briefly, then auto-redirect to /result.
+  await page.waitForURL(new RegExp(`/app/attempt/${attemptId}/result$`), { timeout: 15_000 })
+
+  // The result view should render the score (not raw JSON, not "Loading…").
+  const body = (await page.locator('body').innerText()).trim()
+  expect(body).not.toMatch(/^\{/)
+  await expect(page.getByText(/^Score$/).first()).toBeVisible({ timeout: 5_000 })
+})
+
 test('attempt timer shows ~5 minutes immediately after start (not 00:00)', async ({ page }) => {
   page.on('dialog', async (d) => { await d.accept() })
   await registerAndLogin(page)

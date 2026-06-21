@@ -3,7 +3,7 @@ import { ref, computed, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGetAttemptsInProgress, useGetFinishedAttempts, commitAttemptActions, finishAttempt, getGetAttemptsInProgressQueryKey, getGetFinishedAttemptsQueryKey } from '@/api/attempt-controller/attempt-controller'
 import { useQueryClient } from '@tanstack/vue-query'
-import { errorMessage } from '@/lib/errors'
+import { errorMessage, firstErrorCode } from '@/lib/errors'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
@@ -52,6 +52,7 @@ const errorText = ref<string | null>(null)
 const togglingKey = ref<string | null>(null)
 async function toggleOption(questionId?: string, optionId?: string, currentlySelected?: boolean) {
   if (!questionId || !optionId) return
+  if (remainingMs.value <= 0) return
   const key = `${questionId}:${optionId}`
   togglingKey.value = key
   errorText.value = null
@@ -102,28 +103,47 @@ async function toggleOption(questionId?: string, optionId?: string, currentlySel
 }
 
 const finishing = ref(false)
-async function finish() {
-  if (!confirm('Finish this attempt?')) return
+const autoFinished = ref(false)
+async function finishCore() {
   finishing.value = true
   errorText.value = null
   try {
     await finishAttempt({ attemptId: attemptId.value })
-    await Promise.all([
-      qc.invalidateQueries({ queryKey: getGetAttemptsInProgressQueryKey() }),
-      qc.invalidateQueries({ queryKey: getGetFinishedAttemptsQueryKey() }),
-    ])
-    router.push(`/app/attempt/${attemptId.value}/result`)
   } catch (e) {
-    errorText.value = errorMessage(e)
-  } finally {
-    finishing.value = false
+    // If the backend already auto-finished this attempt (deadline passed),
+    // treat the call as a no-op and still navigate to the result.
+    if (firstErrorCode(e) !== 'ATTEMPT_ALREADY_FINISHED') {
+      errorText.value = errorMessage(e)
+      finishing.value = false
+      return
+    }
   }
+  await Promise.all([
+    qc.invalidateQueries({ queryKey: getGetAttemptsInProgressQueryKey() }),
+    qc.invalidateQueries({ queryKey: getGetFinishedAttemptsQueryKey() }),
+  ])
+  router.push(`/app/attempt/${attemptId.value}/result`)
+  finishing.value = false
+}
+async function finish() {
+  if (!confirm('Finish this attempt?')) return
+  await finishCore()
 }
 
 watch([attempt, isFinished, settled], ([a, fin, s]) => {
   if (s && !a && fin) {
     router.replace(`/app/attempt/${attemptId.value}/result`)
   }
+})
+
+// When the timer runs out, finish on the user's behalf and bounce to result.
+// Fire exactly once — guarded by autoFinished and by the in-flight finishing flag.
+watch(remainingMs, (ms) => {
+  if (ms > 0) return
+  if (autoFinished.value || finishing.value) return
+  if (!attempt.value) return
+  autoFinished.value = true
+  void finishCore()
 })
 </script>
 
