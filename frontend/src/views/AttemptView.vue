@@ -13,7 +13,7 @@ const router = useRouter()
 const qc = useQueryClient()
 const attemptId = computed(() => route.params.attemptId as string)
 
-const { data, isLoading, isFetching } = useGetAttemptsInProgress({ page: 0 })
+const { data, isPending } = useGetAttemptsInProgress({ page: 0 })
 const finished = useGetFinishedAttempts({ page: 0 })
 const attempt = computed(() =>
   (data.value?._embedded?.attempts ?? []).find((a) => a.id === attemptId.value),
@@ -21,9 +21,9 @@ const attempt = computed(() =>
 const isFinished = computed(() =>
   (finished.data.value?._embedded?.attempts ?? []).some((a) => a.id === attemptId.value),
 )
-const settled = computed(
-  () => !isLoading.value && !isFetching.value && !finished.isLoading.value && !finished.isFetching.value,
-)
+// Only show the loading state on initial fetch — background refetches keep the
+// previous data on screen so it doesn't flash to "Loading…" after every commit.
+const settled = computed(() => !isPending.value && !finished.isPending.value)
 
 const now = ref(Date.now())
 const ticker = setInterval(() => (now.value = Date.now()), 1000)
@@ -55,13 +55,46 @@ async function toggleOption(questionId?: string, optionId?: string, currentlySel
   const key = `${questionId}:${optionId}`
   togglingKey.value = key
   errorText.value = null
+  const next = !currentlySelected
+
+  // Optimistic cache update — keeps the UI stable across the commit round-trip.
+  const queryKey = getGetAttemptsInProgressQueryKey({ page: 0 })
+  const previous = qc.getQueryData<typeof data.value>(queryKey)
+  qc.setQueryData<typeof data.value>(queryKey, (old) => {
+    if (!old?._embedded?.attempts) return old
+    return {
+      ...old,
+      _embedded: {
+        ...old._embedded,
+        attempts: old._embedded.attempts.map((a) =>
+          a.id !== attemptId.value
+            ? a
+            : {
+                ...a,
+                questions: (a.questions ?? []).map((q) =>
+                  q.id !== questionId
+                    ? q
+                    : {
+                        ...q,
+                        options: (q.options ?? []).map((o) =>
+                          o.id !== optionId ? o : { ...o, selected: next },
+                        ),
+                      },
+                ),
+              },
+        ),
+      },
+    }
+  })
+
   try {
     await commitAttemptActions({
       attemptId: attemptId.value,
-      actions: [{ questionId, optionId, selected: !currentlySelected }],
+      actions: [{ questionId, optionId, selected: next }],
     })
-    qc.invalidateQueries({ queryKey: getGetAttemptsInProgressQueryKey() })
   } catch (e) {
+    // Roll back the optimistic update.
+    qc.setQueryData(queryKey, previous)
     errorText.value = errorMessage(e)
   } finally {
     togglingKey.value = null

@@ -154,7 +154,10 @@ async function removeQuiz(id?: string) {
           <Chip tone="success">Finished</Chip>
         </div>
         <div class="row">
-          <span class="headline-md">{{ a.score ?? 0 }} <span class="muted">/ {{ a.maximumScore ?? 0 }}</span></span>
+          <div class="score-stack">
+            <span class="label-sm muted">Score</span>
+            <span class="headline-md">{{ a.score ?? 0 }} <span class="muted">/ {{ a.maximumScore ?? 0 }}</span></span>
+          </div>
           <span class="label-sm muted">{{ a.questions?.length ?? 0 }} questions</span>
         </div>
         <p v-if="a.startedAt" class="meta body-md">Attempted {{ fmtRelative(a.startedAt) }}</p>
@@ -203,6 +206,11 @@ async function removeQuiz(id?: string) {
   display: flex;
   gap: var(--space-sm);
   flex-wrap: wrap;
+}
+.score-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
 }
 .empty {
   color: var(--on-surface-variant);

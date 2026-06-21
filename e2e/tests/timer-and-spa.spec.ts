@@ -11,18 +11,16 @@ async function registerAndLogin(page: Page): Promise<string> {
   return username
 }
 
-test('attempt timer shows ~5 minutes immediately after start (not 00:00)', async ({ page }) => {
-  page.on('dialog', async (d) => { await d.accept() })
-  await registerAndLogin(page)
-  const quizName = `TZ ${Date.now()}`
-
-  await page.getByRole('link', { name: /new quiz/i }).click()
-  await page.waitForURL(/\/app\/quiz\/new/)
+async function createQuizWithOneQuestion(page: Page, quizName: string): Promise<string> {
+  // Create quiz via the UI so we exercise the same path, then read the
+  // generated quizId from the URL — that's enough to start an attempt
+  // directly without depending on the global browse list pagination.
+  await page.goto('/app/quiz/new')
   await page.getByLabel('Quiz name').fill(quizName)
   await page.getByLabel(/duration/i).fill('5')
   await page.getByRole('button', { name: 'Create' }).click()
-  await page.waitForURL(/\/app\/quiz\/[^/]+$/, { timeout: 10_000 })
-
+  await page.waitForURL(/\/app\/quiz\/[0-9a-f]{8}-/i, { timeout: 10_000 })
+  const quizId = page.url().split('/').pop()!
   await page.getByLabel('Question text').fill('q?')
   const opts = page.locator('input[placeholder="Option text"]')
   await opts.nth(0).fill('a')
@@ -30,17 +28,26 @@ test('attempt timer shows ~5 minutes immediately after start (not 00:00)', async
   await page.locator('input[type="checkbox"]').nth(1).check()
   await page.getByRole('button', { name: 'Add question' }).click()
   await expect(page.getByText('q?')).toBeVisible({ timeout: 10_000 })
+  return quizId
+}
 
-  await page.getByRole('link', { name: /browse/i }).first().click()
-  await page.waitForURL(/\/app$/)
+async function startAttemptViaApi(page: Page, quizId: string): Promise<string> {
+  const res = await page.request.post('http://localhost:5173/api/attempt', {
+    data: { quizId },
+    headers: { 'Content-Type': 'application/json' },
+  })
+  expect(res.ok(), `start attempt failed: ${res.status()}`).toBeTruthy()
+  const body = await res.json()
+  return body.id as string
+}
 
-  const card = page.locator('article, .card, [class*=card]').filter({ has: page.getByRole('heading', { name: quizName }) }).first()
-  await expect(card).toBeVisible()
-  await card.getByRole('button', { name: /start attempt/i }).click()
-  await page.waitForURL(/\/app\/attempt\/[^/]+$/, { timeout: 10_000 })
+test('attempt timer shows ~5 minutes immediately after start (not 00:00)', async ({ page }) => {
+  page.on('dialog', async (d) => { await d.accept() })
+  await registerAndLogin(page)
+  const quizId = await createQuizWithOneQuestion(page, `TZ ${Date.now()}`)
+  const attemptId = await startAttemptViaApi(page, quizId)
+  await page.goto(`/app/attempt/${attemptId}`)
 
-  // Within 1.5 seconds, the timer should read 04:5x (5-minute quiz).
-  // Bug repro: shows 00:00 because the backend stamp is interpreted as UTC.
   const timer = page.locator('.time')
   await expect(timer).toBeVisible({ timeout: 5_000 })
   const text = (await timer.innerText()).trim()
@@ -54,3 +61,49 @@ test('hitting backend SPA shell paths never returns raw JSON', async ({ request 
     expect(body.startsWith('{'), `path ${path} returned JSON body starting with ${body.slice(0,80)}`).toBe(false)
   }
 })
+
+test('clicking options does not flash "Loading…"', async ({ page }) => {
+  page.on('dialog', async (d) => { await d.accept() })
+  await registerAndLogin(page)
+  const quizId = await createQuizWithOneQuestion(page, `Flash ${Date.now()}`)
+  const attemptId = await startAttemptViaApi(page, quizId)
+  await page.goto(`/app/attempt/${attemptId}`)
+
+  const loading = page.getByText('Loading…')
+  const optionButtons = page.getByRole('button').filter({ hasText: /^[ab]$/ })
+  await expect(optionButtons.first()).toBeVisible({ timeout: 5_000 })
+
+  let flashed = false
+  const watchdog = (async () => {
+    for (let i = 0; i < 30; i++) {
+      if (await loading.count() > 0) { flashed = true; return }
+      await page.waitForTimeout(50)
+    }
+  })()
+
+  await optionButtons.first().click()
+  await page.waitForTimeout(300)
+  await optionButtons.nth(1).click()
+  await page.waitForTimeout(300)
+  await optionButtons.first().click()
+  await watchdog
+
+  expect(flashed, 'Loading… flashed while toggling options').toBe(false)
+})
+
+test('attempt result shows the score with the label "Score"', async ({ page }) => {
+  page.on('dialog', async (d) => { await d.accept() })
+  await registerAndLogin(page)
+  const quizId = await createQuizWithOneQuestion(page, `Score ${Date.now()}`)
+  const attemptId = await startAttemptViaApi(page, quizId)
+  await page.goto(`/app/attempt/${attemptId}`)
+
+  await page.getByRole('button', { name: 'b', exact: true }).click()
+  await page.waitForTimeout(400)
+  await page.getByRole('button', { name: /finish attempt/i }).click()
+  await page.waitForURL(/\/app\/attempt\/[^/]+\/result$/, { timeout: 15_000 })
+
+  await expect(page.getByText(/^Score$/).first()).toBeVisible()
+  await expect(page.getByText(/Score \d+ \/ \d+/).first()).toBeVisible()
+})
+

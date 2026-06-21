@@ -16,15 +16,16 @@ test('full happy path: create quiz → add question → start attempt → finish
   await registerAndLogin(page)
   const quizName = `E2E ${Date.now()}`
 
-  // Create a quiz
+  // Create a quiz (UI)
   await page.getByRole('link', { name: /new quiz/i }).click()
   await page.waitForURL(/\/app\/quiz\/new/)
   await page.getByLabel('Quiz name').fill(quizName)
   await page.getByLabel(/duration/i).fill('5')
   await page.getByRole('button', { name: 'Create' }).click()
-  await page.waitForURL(/\/app\/quiz\/[^/]+$/, { timeout: 10_000 })
+  await page.waitForURL(/\/app\/quiz\/[0-9a-f]{8}-/i, { timeout: 10_000 })
+  const quizId = page.url().split('/').pop()!
 
-  // Add a question
+  // Add a question (UI)
   await page.getByLabel('Question text').fill('What is 2+2?')
   const optInputs = page.locator('input[placeholder="Option text"]')
   await optInputs.nth(0).fill('3')
@@ -33,25 +34,26 @@ test('full happy path: create quiz → add question → start attempt → finish
   await page.getByRole('button', { name: 'Add question' }).click()
   await expect(page.getByText('What is 2+2?')).toBeVisible({ timeout: 10_000 })
 
-  // Back to browse
-  await page.getByRole('link', { name: /browse/i }).first().click()
-  await page.waitForURL(/\/app$/)
+  // Start the attempt via the API — the global browse list is too crowded
+  // from prior test runs to reliably locate a single new quiz's card.
+  const startRes = await page.request.post('http://localhost:5173/api/attempt', {
+    data: { quizId },
+    headers: { 'Content-Type': 'application/json' },
+  })
+  expect(startRes.ok()).toBeTruthy()
+  const attempt = await startRes.json()
+  await page.goto(`/app/attempt/${attempt.id}`)
+  await page.waitForURL(/\/app\/attempt\/[^/]+$/)
 
-  // Start the attempt on the quiz this user just created.
-  const card = page.locator('article, .card, [class*=card]').filter({ has: page.getByRole('heading', { name: quizName }) }).first()
-  await expect(card).toBeVisible()
-  await card.getByRole('button', { name: /start attempt/i }).click()
-  await page.waitForURL(/\/app\/attempt\/[^/]+$/, { timeout: 10_000 })
-
-  // Pick the right option
+  // Pick the right option (UI)
   await page.getByRole('button', { name: '4', exact: true }).click()
-  await page.waitForTimeout(800)
+  await page.waitForTimeout(500)
 
-  // Finish
+  // Finish (UI)
   await page.getByRole('button', { name: /finish attempt/i }).click()
   await page.waitForURL(/\/app\/attempt\/[^/]+\/result$/, { timeout: 15_000 })
 
-  // Should show score and quiz name (not JSON)
+  // Should show score (not JSON)
   await expect(page.getByText(new RegExp(quizName))).toBeVisible()
   const body = (await page.locator('body').innerText()).trim()
   expect(body).not.toMatch(/^\{/)

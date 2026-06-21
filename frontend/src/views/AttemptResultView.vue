@@ -11,7 +11,7 @@ const route = useRoute()
 const router = useRouter()
 const attemptId = computed(() => route.params.attemptId as string)
 
-const { data, isLoading, isFetching } = useGetFinishedAttempts({ page: 0 })
+const { data, isPending } = useGetFinishedAttempts({ page: 0 })
 const attempt = computed(() =>
   (data.value?._embedded?.attempts ?? []).find((a) => a.id === attemptId.value),
 )
@@ -26,7 +26,7 @@ function questionScore(q: FinishedQuestionDto): { earned: number; max: number } 
 </script>
 
 <template>
-  <div v-if="isLoading || (isFetching && !attempt)" class="empty body-md">Loading…</div>
+  <div v-if="isPending" class="empty body-md">Loading…</div>
   <Card v-else-if="!attempt" class="notfound">
     <h1 class="headline-md">Result not found</h1>
     <p class="body-md muted">This attempt doesn't exist, isn't finished yet, or you don't have access to it.</p>
@@ -36,9 +36,12 @@ function questionScore(q: FinishedQuestionDto): { earned: number; max: number } 
     <header class="head">
       <div>
         <span class="label-sm muted">{{ attempt.quiz?.name ?? 'Untitled quiz' }}</span>
-        <p class="headline-xl score">
-          {{ attempt.score ?? 0 }} <span class="muted">/ {{ attempt.maximumScore ?? 0 }}</span>
-        </p>
+        <div class="score-block">
+          <span class="label-md score-label">Score</span>
+          <p class="headline-xl score">
+            {{ attempt.score ?? 0 }} <span class="muted">/ {{ attempt.maximumScore ?? 0 }}</span>
+          </p>
+        </div>
       </div>
       <Button variant="ghost" @click="router.push('/app')">Back to browse</Button>
     </header>
@@ -49,7 +52,7 @@ function questionScore(q: FinishedQuestionDto): { earned: number; max: number } 
           <div class="qhead">
             <span class="label-sm muted">Question {{ i + 1 }}</span>
             <span class="qhead__score label-md">
-              {{ questionScore(q).earned }} / {{ questionScore(q).max }}
+              Score {{ questionScore(q).earned }} / {{ questionScore(q).max }}
             </span>
           </div>
           <p class="body-lg q-text">{{ q.text }}</p>
@@ -85,8 +88,19 @@ function questionScore(q: FinishedQuestionDto): { earned: number; max: number } 
   gap: var(--space-md);
   margin-bottom: var(--space-xl);
 }
-.score {
+.score-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
   margin: var(--space-xs) 0 var(--space-xs);
+}
+.score-label {
+  color: var(--on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.score {
+  margin: 0;
 }
 .muted {
   color: var(--on-surface-variant);
