@@ -57,6 +57,27 @@ public class QuizService {
         return quizRepository.findAll(produceSanitizedPageable(page)).map(quiz -> quizToSummary(quiz, user));
     }
 
+    /**
+     * Quizzes authored by {@code author}. {@code viewer} drives the
+     * {@code youAreAuthor} flag on the summary — so the same listing reads
+     * differently on someone else's profile vs. your own.
+     */
+    public Page<QuizSummaryDto> getQuizzesByAuthor(ApplicationUser author, ApplicationUser viewer, int page) {
+        return quizRepository
+                .findByAuthorOrderByNameAsc(author, produceSanitizedPageable(page))
+                .map(quiz -> quizToSummary(quiz, viewer));
+    }
+
+    /**
+     * Substring search on quiz name. {@code viewer} is used the same way as
+     * above to populate {@code youAreAuthor}.
+     */
+    public Page<QuizSummaryDto> searchQuizzesByName(String needle, ApplicationUser viewer, int page, int pageSize) {
+        return quizRepository
+                .findByNameContainingIgnoreCaseOrderByNameAsc(needle, PageRequest.of(page, pageSize))
+                .map(quiz -> quizToSummary(quiz, viewer));
+    }
+
     private QuizDto quizToDto(Quiz quiz, ApplicationUser user) {
         int questionCount = questionRepository.countByQuiz_QuizId(quiz.getId());
         boolean areYouAuthor = quiz.getAuthor().equals(user);

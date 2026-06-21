@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useQueryClient } from '@tanstack/vue-query'
 import {
   useGetOwnProfile,
+  useGetQuizzesByAuthor,
   updateOwnProfile,
   uploadAvatar,
   deleteAvatar,
@@ -16,11 +17,20 @@ import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import Input from '@/components/Input.vue'
 import Avatar from '@/components/Avatar.vue'
+import QuizCard from '@/components/QuizCard.vue'
 
 const router = useRouter()
 const qc = useQueryClient()
 const auth = useAuthStore()
 const { data, isPending } = useGetOwnProfile()
+
+// Quizzes I authored, fetched once the profile resolves (we need my username).
+const myUsername = computed(() => data.value?.username ?? '')
+const authoredQuizzes = useGetQuizzesByAuthor(myUsername, computed(() => ({ page: 0 })), {
+  query: { enabled: computed(() => !!myUsername.value) },
+})
+const authored = computed(() => authoredQuizzes.data.value?._embedded?.quizzes ?? [])
+const authoredError = ref<string | null>(null)
 
 const displayName = ref('')
 const bio = ref('')
@@ -135,7 +145,7 @@ const profile = computed(() => data.value)
       </div>
     </header>
 
-    <section class="stats">
+    <section class="stats" aria-label="Profile statistics">
       <div class="stat">
         <span class="stat__value">{{ profile.quizzesAuthored ?? 0 }}</span>
         <span class="stat__label label-sm">Quizzes authored</span>
@@ -152,7 +162,28 @@ const profile = computed(() => data.value)
       </div>
     </section>
 
-    <p v-if="errorText" class="banner label-md">{{ errorText }}</p>
+    <section class="authored" aria-labelledby="my-quizzes-heading">
+      <header class="authored__head">
+        <h2 id="my-quizzes-heading" class="headline-md">Your quizzes</h2>
+        <Button variant="ghost" @click="router.push('/app/quiz/new')">+ New quiz</Button>
+      </header>
+      <p v-if="authoredError" class="banner label-md" role="alert">{{ authoredError }}</p>
+      <p v-if="authoredQuizzes.isLoading.value" class="empty body-md">Loading…</p>
+      <p v-else-if="!authored.length" class="empty body-md">
+        You haven't authored any quizzes yet — start one.
+      </p>
+      <div v-else class="grid">
+        <QuizCard
+          v-for="q in authored"
+          :key="q.id"
+          :quiz="q"
+          :show-author="false"
+          @error="authoredError = $event"
+        />
+      </div>
+    </section>
+
+    <p v-if="errorText" class="banner label-md" role="alert">{{ errorText }}</p>
 
     <Card class="edit">
       <h2 class="edit__title">Edit profile</h2>
@@ -266,6 +297,22 @@ const profile = computed(() => data.value)
   background: var(--error-container);
   color: var(--on-error-container);
   border-radius: var(--radius);
+}
+
+.authored {
+  margin-bottom: var(--space-xl);
+}
+.authored__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-md);
 }
 
 .edit {

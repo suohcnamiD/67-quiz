@@ -1,9 +1,14 @@
 package dev.six_seven_quiz.user.profile.controller;
 
+import dev.six_seven_quiz.quiz.dto.response.viewing.QuizSummaryDto;
 import dev.six_seven_quiz.user.profile.dto.UpdateProfileRequest;
 import dev.six_seven_quiz.user.profile.dto.UserProfileDto;
 import dev.six_seven_quiz.user.profile.service.UserProfileService;
+import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
+import org.springframework.data.web.PagedResourcesAssembler;
+import org.springframework.hateoas.EntityModel;
+import org.springframework.hateoas.PagedModel;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +21,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -71,5 +77,17 @@ public class UserProfileController {
                 .contentType(MediaType.IMAGE_JPEG)
                 .header(HttpHeaders.CACHE_CONTROL, "max-age=300, public")
                 .body(bytes);
+    }
+
+    @GetMapping("/{username}/quizzes")
+    public PagedModel<EntityModel<QuizSummaryDto>> getQuizzesByAuthor(
+            @PathVariable String username,
+            @RequestParam(defaultValue = "0") int page,
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Parameter(hidden = true) PagedResourcesAssembler<QuizSummaryDto> pagedResourcesAssembler
+    ) {
+        return pagedResourcesAssembler.toModel(
+                userProfileService.getAuthoredQuizzes(username, userDetails, page)
+        );
     }
 }

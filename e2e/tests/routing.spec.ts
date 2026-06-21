@@ -64,11 +64,15 @@ test.describe('Routing — no raw JSON leaks', () => {
     await expect(page.getByText(/not found/i).first()).toBeVisible()
   })
 
-  test('garbage URL → router catchall lands on /app or /login', async ({ page }) => {
+  test('garbage URL → 404 page', async ({ page }) => {
+    // Garbage routes outside /app are rewritten to /app/<garbage> by the
+    // top-level catchall, then the shell-scoped catchall renders the 404 view.
     await page.goto('/totally-not-a-route/foo/bar')
     await page.waitForLoadState('networkidle')
     const body = await bodyText(page)
     expect(isJsonError(body)).toBe(false)
+    // The user is bounced to /login if anonymous; if authed, they see the 404.
+    // We just need the body to be the friendly state, not a JSON dump.
     expect(page.url()).toMatch(/\/(app|login)/)
   })
 })

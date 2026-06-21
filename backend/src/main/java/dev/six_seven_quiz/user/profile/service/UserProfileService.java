@@ -1,8 +1,10 @@
 package dev.six_seven_quiz.user.profile.service;
 
+import dev.six_seven_quiz.quiz.dto.response.viewing.QuizSummaryDto;
 import dev.six_seven_quiz.quiz.model.Attempt;
 import dev.six_seven_quiz.quiz.repository.QuizAttemptRepository;
 import dev.six_seven_quiz.quiz.repository.QuizRepository;
+import dev.six_seven_quiz.quiz.service.QuizService;
 import dev.six_seven_quiz.user.ApplicationUser;
 import dev.six_seven_quiz.user.ApplicationUserRepository;
 import dev.six_seven_quiz.user.ApplicationUserService;
@@ -12,6 +14,7 @@ import dev.six_seven_quiz.user.profile.dto.UserProfileDto;
 import dev.six_seven_quiz.user.profile.exception.InvalidDisplayNameException;
 import dev.six_seven_quiz.user.profile.exception.UnknownUsernameException;
 import jakarta.transaction.Transactional;
+import org.springframework.data.domain.Page;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -31,6 +34,7 @@ public class UserProfileService {
     private final QuizAttemptRepository quizAttemptRepository;
     private final UserProfileMapper userProfileMapper;
     private final AvatarStorageService avatarStorageService;
+    private final QuizService quizService;
 
     public UserProfileService(
             ApplicationUserService applicationUserService,
@@ -38,7 +42,8 @@ public class UserProfileService {
             QuizRepository quizRepository,
             QuizAttemptRepository quizAttemptRepository,
             UserProfileMapper userProfileMapper,
-            AvatarStorageService avatarStorageService
+            AvatarStorageService avatarStorageService,
+            QuizService quizService
     ) {
         this.applicationUserService = applicationUserService;
         this.applicationUserRepository = applicationUserRepository;
@@ -46,6 +51,7 @@ public class UserProfileService {
         this.quizAttemptRepository = quizAttemptRepository;
         this.userProfileMapper = userProfileMapper;
         this.avatarStorageService = avatarStorageService;
+        this.quizService = quizService;
     }
 
     @Transactional
@@ -110,6 +116,14 @@ public class UserProfileService {
         ApplicationUser user = applicationUserRepository.findByUsername(username)
                 .orElseThrow(() -> new UnknownUsernameException(username));
         return avatarStorageService.read(user);
+    }
+
+    @Transactional
+    public Page<QuizSummaryDto> getAuthoredQuizzes(String username, UserDetails callerDetails, int page) {
+        ApplicationUser caller = applicationUserService.getAuthenticatedUserFromDetails(callerDetails);
+        ApplicationUser target = applicationUserRepository.findByUsername(username)
+                .orElseThrow(() -> new UnknownUsernameException(username));
+        return quizService.getQuizzesByAuthor(target, caller, page);
     }
 
     private UserProfileDto toProfile(ApplicationUser target, ApplicationUser caller) {

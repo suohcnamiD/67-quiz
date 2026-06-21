@@ -28,9 +28,14 @@ const router = createRouter({
         { path: 'attempt/:attemptId/result', name: 'attempt-result', component: () => import('@/views/AttemptResultView.vue') },
         { path: 'profile', name: 'profile', component: () => import('@/views/ProfileView.vue') },
         { path: 'users/:username', name: 'user-profile', component: () => import('@/views/UserProfileView.vue') },
+        // Anything else under /app is a real 404 — show the page inside the shell.
+        { path: ':pathMatch(.*)*', name: 'app-not-found', component: () => import('@/views/NotFoundView.vue') },
       ],
     },
-    { path: '/:pathMatch(.*)*', redirect: '/app' },
+    // Top-level catchall: route everything else to /app so the auth guard +
+    // shell-scoped 404 take over. (e.g. /something-random redirects to
+    // /app/something-random which then renders NotFoundView.)
+    { path: '/:pathMatch(.*)*', redirect: (to) => `/app${to.path}` },
   ],
 })
 

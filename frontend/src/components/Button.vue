@@ -84,4 +84,8 @@ defineProps<{
     transform: rotate(360deg);
   }
 }
+@media (prefers-reduced-motion: reduce) {
+  .btn { transition: none; }
+  .btn__spinner { animation-duration: 1800ms; }
+}
 </style>

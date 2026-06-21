@@ -47,6 +47,13 @@ function close() {
   emit('close')
 }
 
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    e.preventDefault()
+    close()
+  }
+}
+
 onMounted(() => {
   // Trigger the entrance animation on the next frame so the initial-mount
   // transform takes effect.
@@ -68,13 +75,16 @@ onMounted(() => {
   }
   countTimer = requestAnimationFrame(tick)
 
-  // Auto-dismiss after 3.5s, but let the user click to dismiss earlier.
+  // Auto-dismiss after 3.5s, but let the user click or press Escape to
+  // dismiss earlier.
   dismissTimer = window.setTimeout(close, 3500)
+  window.addEventListener('keydown', onKeydown)
 })
 
 onUnmounted(() => {
   if (countTimer) cancelAnimationFrame(countTimer)
   if (dismissTimer) clearTimeout(dismissTimer)
+  window.removeEventListener('keydown', onKeydown)
 })
 </script>
 

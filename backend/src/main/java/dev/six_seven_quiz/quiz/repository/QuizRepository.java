@@ -14,4 +14,8 @@ public interface QuizRepository extends JpaRepository<Quiz, UUID> {
     Page<Quiz> findAll(@NonNull Pageable pageable);
 
     int countByAuthor(ApplicationUser author);
+
+    Page<Quiz> findByAuthorOrderByNameAsc(ApplicationUser author, Pageable pageable);
+
+    Page<Quiz> findByNameContainingIgnoreCaseOrderByNameAsc(String name, Pageable pageable);
 }

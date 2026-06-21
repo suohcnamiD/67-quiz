@@ -47,7 +47,7 @@ test('profile page renders own stats and lets you edit the display name', async 
 test('public profile route is readable for any user', async ({ page }) => {
   const username = await registerAndLogin(page)
   await page.goto(`/app/users/${username}`)
-  await expect(page.getByRole('heading', { name: username })).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByRole('heading', { name: username, exact: true })).toBeVisible({ timeout: 10_000 })
   // It's you, so the "This is you" affordance shows.
   await expect(page.getByText(/This is you/)).toBeVisible()
 })
@@ -88,8 +88,9 @@ test('quiz card author chip links to the author profile', async ({ page }) => {
   const authorName = await chip.locator('.author__name').innerText()
   await chip.click()
   await page.waitForURL(/\/app\/users\/[^/]+$/, { timeout: 10_000 })
-  // The destination shows the same name in the hero heading.
-  await expect(page.getByRole('heading', { name: new RegExp(authorName) })).toBeVisible({ timeout: 10_000 })
+  // The destination shows the same name in the hero heading (h1). The
+  // "Quizzes by …" h2 also contains the name — disambiguate by h1.
+  await expect(page.locator('h1', { hasText: authorName }).first()).toBeVisible({ timeout: 10_000 })
   // The freshly registered user isn't the author, so no "This is you" affordance.
   expect(page.url()).not.toContain(`/users/${username}`)
 })

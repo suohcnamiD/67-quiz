@@ -135,8 +135,25 @@ const logout = () => {
     padding-left: var(--margin-mobile);
     padding-right: var(--margin-mobile);
   }
+  .topbar__inner {
+    gap: var(--space-md);
+  }
+  .nav {
+    gap: var(--space-sm);
+  }
   .me__name {
     display: none;
+  }
+}
+@media (max-width: 480px) {
+  /* On really narrow screens the brand + nav + avatar + sign-out won't all
+   * fit; drop the brand link's visible weight so the right-side actions get
+   * room. The brand is still the AppShell home link. */
+  .brand {
+    font-size: 18px;
+  }
+  .me {
+    padding: 2px;
   }
 }
 </style>

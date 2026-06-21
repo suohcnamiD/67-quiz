@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useGetProfileByUsername } from '@/api/user-profile-controller/user-profile-controller'
+import {
+  useGetProfileByUsername,
+  useGetQuizzesByAuthor,
+} from '@/api/user-profile-controller/user-profile-controller'
 import { useAuthStore } from '@/stores/auth'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import Avatar from '@/components/Avatar.vue'
+import QuizCard from '@/components/QuizCard.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -14,6 +18,10 @@ const username = computed(() => route.params.username as string)
 
 const { data, isPending, isError } = useGetProfileByUsername(username)
 const profile = computed(() => data.value)
+
+const authoredQuizzes = useGetQuizzesByAuthor(username, computed(() => ({ page: 0 })))
+const authored = computed(() => authoredQuizzes.data.value?._embedded?.quizzes ?? [])
+const cardError = ref<string | null>(null)
 </script>
 
 <template>
@@ -42,7 +50,7 @@ const profile = computed(() => data.value)
       </div>
     </header>
 
-    <section class="stats">
+    <section class="stats" aria-label="Profile statistics">
       <div class="stat">
         <span class="stat__value">{{ profile.quizzesAuthored ?? 0 }}</span>
         <span class="stat__label label-sm">Quizzes authored</span>
@@ -56,6 +64,28 @@ const profile = computed(() => data.value)
           {{ profile.averageScorePercent != null ? `${profile.averageScorePercent}%` : '—' }}
         </span>
         <span class="stat__label label-sm">Average score</span>
+      </div>
+    </section>
+
+    <section class="authored" aria-labelledby="authored-heading">
+      <header class="authored__head">
+        <h2 id="authored-heading" class="headline-md">
+          Quizzes by {{ profile.displayName ?? profile.username }}
+        </h2>
+      </header>
+      <p v-if="cardError" class="banner label-md" role="alert">{{ cardError }}</p>
+      <p v-if="authoredQuizzes.isLoading.value" class="empty body-md">Loading…</p>
+      <p v-else-if="!authored.length" class="empty body-md">
+        {{ profile.displayName ?? profile.username }} hasn't authored any quizzes yet.
+      </p>
+      <div v-else class="grid">
+        <QuizCard
+          v-for="q in authored"
+          :key="q.id"
+          :quiz="q"
+          :show-author="false"
+          @error="cardError = $event"
+        />
       </div>
     </section>
 
@@ -140,6 +170,25 @@ const profile = computed(() => data.value)
 
 .bottom-actions {
   margin-top: var(--space-lg);
+}
+
+.authored {
+  margin-bottom: var(--space-xl);
+}
+.authored__head {
+  margin-bottom: var(--space-md);
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-md);
+}
+.banner {
+  margin: 0 0 var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--error-container);
+  color: var(--on-error-container);
+  border-radius: var(--radius);
 }
 
 @media (max-width: 640px) {
