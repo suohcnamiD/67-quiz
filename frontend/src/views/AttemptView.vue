@@ -118,11 +118,14 @@ async function finishCore() {
       return
     }
   }
+  // Navigate first, then invalidate. If we invalidated before navigating,
+  // the in-progress query would drop this attempt and the AttemptView
+  // would briefly render "Attempt not found" between frames.
+  router.push(`/app/attempt/${attemptId.value}/result`)
   await Promise.all([
     qc.invalidateQueries({ queryKey: getGetAttemptsInProgressQueryKey() }),
     qc.invalidateQueries({ queryKey: getGetFinishedAttemptsQueryKey() }),
   ])
-  router.push(`/app/attempt/${attemptId.value}/result`)
   finishing.value = false
 }
 async function finish() {
@@ -193,6 +196,7 @@ watch(remainingMs, (ms) => {
       </li>
     </ol>
   </template>
+  <div v-else-if="finishing || autoFinished" class="empty body-md">Loading…</div>
   <Card v-else class="notfound">
     <h1 class="headline-md">Attempt not found</h1>
     <p class="body-md muted">This attempt doesn't exist or you don't have access to it.</p>
