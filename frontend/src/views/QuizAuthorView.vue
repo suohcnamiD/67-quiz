@@ -93,7 +93,11 @@ watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.v
 
 <template>
   <div v-if="quiz.isLoading.value" class="empty body-md">Loading…</div>
-  <div v-else-if="!quiz.data.value" class="empty body-md">Quiz not found.</div>
+  <Card v-else-if="quiz.isError.value || !quiz.data.value" class="notfound">
+    <h1 class="headline-md">Quiz not found</h1>
+    <p class="body-md muted">This quiz doesn't exist or you don't have access to it.</p>
+    <Button @click="router.push('/app')">Back to browse</Button>
+  </Card>
   <template v-else>
     <header class="head">
       <div>
@@ -256,6 +260,15 @@ watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.v
 }
 .empty {
   color: var(--on-surface-variant);
+}
+.notfound {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  align-items: flex-start;
+}
+.notfound h1 {
+  margin: 0;
 }
 .muted {
   color: var(--on-surface-variant);

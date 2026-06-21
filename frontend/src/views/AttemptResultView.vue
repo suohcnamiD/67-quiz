@@ -27,7 +27,11 @@ function questionScore(q: FinishedQuestionDto): { earned: number; max: number } 
 
 <template>
   <div v-if="isLoading || (isFetching && !attempt)" class="empty body-md">Loading…</div>
-  <div v-else-if="!attempt" class="empty body-md">Result not found.</div>
+  <Card v-else-if="!attempt" class="notfound">
+    <h1 class="headline-md">Result not found</h1>
+    <p class="body-md muted">This attempt doesn't exist, isn't finished yet, or you don't have access to it.</p>
+    <Button @click="router.push('/app')">Back to browse</Button>
+  </Card>
   <template v-else>
     <header class="head">
       <div>
@@ -141,5 +145,14 @@ function questionScore(q: FinishedQuestionDto): { earned: number; max: number } 
 }
 .empty {
   color: var(--on-surface-variant);
+}
+.notfound {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  align-items: flex-start;
+}
+.notfound h1 {
+  margin: 0;
 }
 </style>

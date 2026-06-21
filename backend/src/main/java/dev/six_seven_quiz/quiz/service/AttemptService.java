@@ -110,7 +110,7 @@ public class AttemptService {
 
     @Transactional
     protected void validateAttemptUnfinished(Attempt attempt) {
-        if (attempt.getFinishDeadline().isAfter(LocalDateTime.now())) attempt.finish();
+        if (attempt.getFinishDeadline().isBefore(LocalDateTime.now())) attempt.finish();
         if (attempt.isFinished()) throw new AttemptFinishedException();
     }
 

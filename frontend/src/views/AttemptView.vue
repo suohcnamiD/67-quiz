@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useGetAttemptsInProgress, commitAttemptActions, finishAttempt, getGetAttemptsInProgressQueryKey, getGetFinishedAttemptsQueryKey } from '@/api/attempt-controller/attempt-controller'
+import { useGetAttemptsInProgress, useGetFinishedAttempts, commitAttemptActions, finishAttempt, getGetAttemptsInProgressQueryKey, getGetFinishedAttemptsQueryKey } from '@/api/attempt-controller/attempt-controller'
 import { useQueryClient } from '@tanstack/vue-query'
 import { errorMessage } from '@/lib/errors'
 import Card from '@/components/Card.vue'
@@ -13,9 +13,16 @@ const router = useRouter()
 const qc = useQueryClient()
 const attemptId = computed(() => route.params.attemptId as string)
 
-const { data, isLoading } = useGetAttemptsInProgress({ page: 0 })
+const { data, isLoading, isFetching } = useGetAttemptsInProgress({ page: 0 })
+const finished = useGetFinishedAttempts({ page: 0 })
 const attempt = computed(() =>
   (data.value?._embedded?.attempts ?? []).find((a) => a.id === attemptId.value),
+)
+const isFinished = computed(() =>
+  (finished.data.value?._embedded?.attempts ?? []).some((a) => a.id === attemptId.value),
+)
+const settled = computed(
+  () => !isLoading.value && !isFetching.value && !finished.isLoading.value && !finished.isFetching.value,
 )
 
 const now = ref(Date.now())
@@ -80,16 +87,15 @@ async function finish() {
   }
 }
 
-watch(attempt, (a) => {
-  // If the attempt isn't in the in-progress list, it may already be finished — bounce to result.
-  if (!isLoading.value && !a && data.value) {
+watch([attempt, isFinished, settled], ([a, fin, s]) => {
+  if (s && !a && fin) {
     router.replace(`/app/attempt/${attemptId.value}/result`)
   }
 })
 </script>
 
 <template>
-  <div v-if="isLoading" class="empty body-md">Loading…</div>
+  <div v-if="!settled" class="empty body-md">Loading…</div>
   <template v-else-if="attempt">
     <div class="bar">
       <ProgressBar :value="remainingPct" />
@@ -134,6 +140,11 @@ watch(attempt, (a) => {
       </li>
     </ol>
   </template>
+  <Card v-else class="notfound">
+    <h1 class="headline-md">Attempt not found</h1>
+    <p class="body-md muted">This attempt doesn't exist or you don't have access to it.</p>
+    <Button @click="router.push('/app')">Back to browse</Button>
+  </Card>
 </template>
 
 <style scoped>
@@ -246,5 +257,14 @@ watch(attempt, (a) => {
 }
 .empty {
   color: var(--on-surface-variant);
+}
+.notfound {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  align-items: flex-start;
+}
+.notfound h1 {
+  margin: 0;
 }
 </style>
