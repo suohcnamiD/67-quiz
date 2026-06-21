@@ -2,6 +2,7 @@ package dev.six_seven_quiz.quiz.component;
 
 import dev.six_seven_quiz.quiz.controller.QuestionController;
 import dev.six_seven_quiz.quiz.exception.BlankIndexedOptionException;
+import dev.six_seven_quiz.quiz.exception.InvalidQuestionShapeException;
 import dev.six_seven_quiz.quiz.exception.NoAccessToQuizException;
 import dev.six_seven_quiz.quiz.exception.QuestionNotFoundException;
 import dev.six_seven_quiz.quiz.exception.QuizNotFoundException;
@@ -40,5 +41,13 @@ public class QuestionControllerExceptionHandler {
     @ExceptionHandler(BlankIndexedOptionException.class)
     public ResponseEntity<Failure> handleBlankIndexedOption(BlankIndexedOptionException exception) {
         return Failure.of(HttpStatus.BAD_REQUEST, ApiError.of("BLANK_OPTION_TEXT", Map.of("index", exception.getOptionIndex()))).toResponseEntity();
+    }
+
+    @ExceptionHandler(InvalidQuestionShapeException.class)
+    public ResponseEntity<Failure> handleInvalidShape(InvalidQuestionShapeException exception) {
+        return Failure.of(
+                HttpStatus.BAD_REQUEST,
+                ApiError.of("INVALID_QUESTION_SHAPE", Map.of("reason", exception.getReason()))
+        ).toResponseEntity();
     }
 }

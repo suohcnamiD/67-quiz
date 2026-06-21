@@ -9,7 +9,11 @@ import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import Input from '@/components/Input.vue'
 import Chip from '@/components/Chip.vue'
-import type { OptionData } from '@/api/openAPIDefinition.schemas'
+import type { OptionData, AddQuestionRequest } from '@/api/openAPIDefinition.schemas'
+
+type QuestionType = AddQuestionRequest['type']
+const SINGLE: QuestionType = 'SINGLE_CHOICE'
+const MULTI: QuestionType = 'MULTI_CHOICE'
 
 const route = useRoute()
 const router = useRouter()
@@ -19,6 +23,7 @@ const quizId = computed(() => route.params.quizId as string)
 const quiz = useGetQuiz(quizId)
 
 const questionText = ref('')
+const questionType = ref<QuestionType>(MULTI)
 const optionRows = ref<OptionData[]>([
   { text: '', correct: false },
   { text: '', correct: false },
@@ -34,10 +39,35 @@ function removeOption(i: number) {
 }
 function resetForm() {
   questionText.value = ''
+  questionType.value = MULTI
   optionRows.value = [
     { text: '', correct: false },
     { text: '', correct: false },
   ]
+}
+
+// When the author flips to single-choice, leave at most one option marked correct.
+// Picking another "correct" radio later will unset the others (handled via @change).
+watch(questionType, (next) => {
+  if (next === SINGLE) {
+    let kept = false
+    for (const row of optionRows.value) {
+      if (row.correct && !kept) {
+        kept = true
+      } else {
+        row.correct = false
+      }
+    }
+  }
+})
+
+function setSingleCorrect(i: number) {
+  // Radio behaviour for single-choice: clicking row i marks it correct and
+  // unticks everyone else.
+  for (let j = 0; j < optionRows.value.length; j++) {
+    const row = optionRows.value[j]
+    if (row) row.correct = j === i
+  }
 }
 
 async function submitQuestion() {
@@ -46,11 +76,19 @@ async function submitQuestion() {
     errorText.value = 'Question text is required.'
     return
   }
+  if (questionType.value === SINGLE) {
+    const correctCount = optionRows.value.filter((o) => o.correct).length
+    if (correctCount !== 1) {
+      errorText.value = 'Single-choice questions need exactly one correct option.'
+      return
+    }
+  }
   submitting.value = true
   try {
     await addQuizQuestion({
       quizId: quizId.value,
       text: questionText.value.trim(),
+      type: questionType.value,
       options: optionRows.value.map((o) => ({ text: o.text?.trim() ?? '', correct: !!o.correct })),
     })
     resetForm()
@@ -88,6 +126,10 @@ async function removeQuiz() {
   }
 }
 
+function typeLabel(t: QuestionType | undefined | null): string {
+  return t === SINGLE ? 'Single choice' : 'Multi select'
+}
+
 watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) }))
 </script>
 
@@ -121,7 +163,10 @@ watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.v
         <li v-for="(q, i) in quiz.data.value.questions ?? []" :key="q.id">
           <Card>
             <div class="qhead">
-              <span class="label-sm muted">Q{{ i + 1 }}</span>
+              <div class="qhead__title">
+                <span class="label-sm muted">Q{{ i + 1 }}</span>
+                <Chip>{{ typeLabel(q.type) }}</Chip>
+              </div>
               <Button variant="danger" :loading="removingId === q.id" @click="removeQuestion(q.id)">Remove</Button>
             </div>
             <p class="body-lg">{{ q.text }}</p>
@@ -140,6 +185,27 @@ watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.v
       <h2 class="headline-md">Add a question</h2>
       <Card>
         <form class="form" @submit.prevent="submitQuestion">
+          <div class="type-picker" role="radiogroup" aria-label="Question type">
+            <button
+              type="button"
+              :class="['type-pill', { 'type-pill--on': questionType === MULTI }]"
+              @click="questionType = MULTI"
+            >
+              Multi select
+            </button>
+            <button
+              type="button"
+              :class="['type-pill', { 'type-pill--on': questionType === SINGLE }]"
+              @click="questionType = SINGLE"
+            >
+              Single choice
+            </button>
+          </div>
+          <p class="type-hint label-sm muted">
+            <template v-if="questionType === SINGLE">Worth 1 point. Pick one correct option.</template>
+            <template v-else>+1 point per correctly classified option.</template>
+          </p>
+
           <Input v-model="questionText" label="Question text" />
           <div class="opts-form">
             <p class="label-md muted">Options</p>
@@ -151,7 +217,18 @@ watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.v
                 class="opt-row__text"
               />
               <label class="opt-row__correct label-sm">
-                <input type="checkbox" v-model="o.correct" />
+                <input
+                  v-if="questionType === MULTI"
+                  type="checkbox"
+                  v-model="o.correct"
+                />
+                <input
+                  v-else
+                  type="radio"
+                  name="single-correct"
+                  :checked="o.correct"
+                  @change="setSingleCorrect(i)"
+                />
                 Correct
               </label>
               <Button variant="ghost" :disabled="optionRows.length <= 2" @click="removeOption(i)">×</Button>
@@ -200,7 +277,13 @@ watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.v
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: var(--space-sm);
   margin-bottom: var(--space-sm);
+}
+.qhead__title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
 }
 .opts {
   list-style: none;
@@ -228,6 +311,36 @@ watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.v
 }
 .form__error {
   color: var(--error);
+}
+.type-picker {
+  display: inline-flex;
+  background: var(--surface-container-high);
+  border: 1px solid var(--outline-variant);
+  border-radius: 999px;
+  padding: 4px;
+  gap: 4px;
+  width: fit-content;
+}
+.type-pill {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: var(--on-surface-variant);
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.type-pill:hover {
+  color: var(--on-surface);
+}
+.type-pill--on {
+  background: var(--surface-container-low);
+  color: var(--on-surface);
+}
+.type-hint {
+  margin: 0;
 }
 .opts-form {
   display: flex;

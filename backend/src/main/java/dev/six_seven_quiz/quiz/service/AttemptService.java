@@ -118,14 +118,12 @@ public class AttemptService {
     }
 
     private FinishedAttemptSummaryDto attemptToFinishedSummary(Attempt attempt) {
-
         int maximumScore = attempt.getMaximumScore();
+        int score = attempt.getEarnedScore();
         List<FinishedQuestionDto> finishedQuestions = new ArrayList<>();
-        int score = 0;
 
         for (AttemptQuestion question : attempt.getQuestions()) {
             List<FinishedOptionDto> finishedOptions = question.getFinishedOptions();
-            score += finishedOptions.stream().filter(FinishedOptionDto::isCorrectlySelected).mapToInt(_ -> 1).sum();
             FinishedQuestionDto finishedQuestionDto = attemptQuestionMapper.toFinishedDto(question, finishedOptions);
             finishedQuestions.add(finishedQuestionDto);
         }

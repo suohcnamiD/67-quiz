@@ -77,8 +77,11 @@ public class Attempt {
     }
 
     public int getMaximumScore() {
-        return questions
-                .stream().mapToInt(question -> question.getOptions().size()).sum();
+        return questions.stream().mapToInt(AttemptQuestion::getMaximumScore).sum();
+    }
+
+    public int getEarnedScore() {
+        return questions.stream().mapToInt(AttemptQuestion::getEarnedScore).sum();
     }
 
     private Optional<AttemptQuestion> findQuestion(UUID questionId) {
@@ -91,6 +94,11 @@ public class Attempt {
 
     public void selectOption(UUID questionId, UUID optionId) {
         AttemptQuestion question = findQuestion(questionId).orElseThrow(() -> new QuestionNotFoundException(questionId));
+        // Single-choice questions enforce at most one selection at the model
+        // layer so a misbehaving client can't accumulate picks.
+        if (question.getType() == QuestionType.SINGLE_CHOICE) {
+            question.clearSelections();
+        }
         question.selectOption(optionId);
     }
 

@@ -19,6 +19,7 @@ const COPY: Record<string, string> = {
   BLANK_OPTION_TEXT: 'Option text cannot be blank.',
   // Domain — questions
   QUESTION_NOT_FOUND: 'That question could not be found.',
+  INVALID_QUESTION_SHAPE: 'Single-choice questions need exactly one correct option, and every question needs at least two options.',
   // Domain — attempts
   ATTEMPT_NOT_FOUND: 'That attempt could not be found.',
   NO_ACCESS_TO_ATTEMPT: 'You don’t have access to this attempt.',

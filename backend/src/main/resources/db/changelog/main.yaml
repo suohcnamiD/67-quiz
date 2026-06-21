@@ -8,3 +8,6 @@ databaseChangeLog:
   - include:
       file: 002-user-profiles.yaml
       relativeToChangelogFile: true
+  - include:
+      file: 003-question-types.yaml
+      relativeToChangelogFile: true

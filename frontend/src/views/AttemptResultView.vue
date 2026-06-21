@@ -18,6 +18,10 @@ const attempt = computed(() =>
 
 function questionScore(q: FinishedQuestionDto): { earned: number; max: number } {
   const opts = q.options ?? []
+  if (q.type === 'SINGLE_CHOICE') {
+    const picked = opts.find((o) => o.selected)
+    return { earned: picked?.correct ? 1 : 0, max: 1 }
+  }
   return {
     earned: opts.filter((o) => o.correctlySelected).length,
     max: opts.length,
@@ -37,25 +41,43 @@ const tone = computed<'great' | 'good' | 'tried'>(() => {
   return 'tried'
 })
 
+// Per-option visual state. For multi-choice this is the same as before. For
+// single-choice the question is binary at the question level, so:
+//   - the picked option is the one that earns or costs the point ('correct'/'wrong')
+//   - every other option is neutral ('skipped'), even the correct one if the
+//     user picked something else — single-choice doesn't penalise non-picks.
 type OptState = 'correct' | 'wrong' | 'missed' | 'skipped'
-function optState(o: FinishedOptionDto): OptState {
+function optState(o: FinishedOptionDto, q: FinishedQuestionDto): OptState {
+  if (q.type === 'SINGLE_CHOICE') {
+    if (!o.selected) return 'skipped'
+    return o.correct ? 'correct' : 'wrong'
+  }
   if (o.correct && o.selected) return 'correct'
   if (!o.correct && o.selected) return 'wrong'
   if (o.correct && !o.selected) return 'missed'
   return 'skipped'
 }
 // The chip just says "+1 you got the point" (green) or "0 you didn't" (red).
-// The left-side checkbox already shows whether the user picked the option.
-const optMeta: Record<OptState, { score: '+1' | '0'; tone: 'win' | 'lose' }> = {
+// Skipped options on single-choice are neutral (no chip shown).
+const optMeta: Record<OptState, { score: '+1' | '0' | null; tone: 'win' | 'lose' | 'neutral' }> = {
   correct: { score: '+1', tone: 'win' },
   skipped: { score: '+1', tone: 'win' },
   wrong:   { score: '0',  tone: 'lose' },
   missed:  { score: '0',  tone: 'lose' },
 }
+function chipFor(o: FinishedOptionDto, q: FinishedQuestionDto): { score: '+1' | '0' | null; tone: 'win' | 'lose' | 'neutral' } {
+  const state = optState(o, q)
+  if (q.type === 'SINGLE_CHOICE' && state === 'skipped') {
+    // Don't show "+1 for skipping" on every non-picked option — the question is
+    // worth 1 point total and only the picked option drives it.
+    return { score: null, tone: 'neutral' }
+  }
+  return optMeta[state]
+}
 // Stable ordering: things you got right first, then things you got wrong.
 const sortRank: Record<OptState, number> = { correct: 0, skipped: 1, missed: 2, wrong: 3 }
 function sortedOptions(q: FinishedQuestionDto): FinishedOptionDto[] {
-  return [...(q.options ?? [])].sort((a, b) => sortRank[optState(a)] - sortRank[optState(b)])
+  return [...(q.options ?? [])].sort((a, b) => sortRank[optState(a, q)] - sortRank[optState(b, q)])
 }
 
 const justFinished = ref(route.query.just === '1')
@@ -128,7 +150,7 @@ watch([justFinished, attempt], ([just, a]) => {
           <li
             v-for="o in sortedOptions(q)"
             :key="o.id"
-            :class="['opt', `opt--${optState(o)}`, `opt--${optMeta[optState(o)].tone}`, { 'opt--picked': o.selected }]"
+            :class="['opt', `opt--${optState(o, q)}`, `opt--${chipFor(o, q).tone}`, { 'opt--picked': o.selected }]"
           >
             <span class="opt__pick" :aria-label="o.selected ? 'You picked this' : 'You did not pick this'">
               <span class="opt__pick-box">
@@ -136,7 +158,7 @@ watch([justFinished, attempt], ([just, a]) => {
               </span>
             </span>
             <span class="opt__text">{{ o.text }}</span>
-            <span class="opt__chip">{{ optMeta[optState(o)].score }}</span>
+            <span v-if="chipFor(o, q).score !== null" class="opt__chip">{{ chipFor(o, q).score }}</span>
           </li>
         </ul>
       </li>
@@ -400,6 +422,12 @@ watch([justFinished, attempt], ([just, a]) => {
   --opt-bg: color-mix(in srgb, var(--on-error-container) 12%, var(--surface-container-low));
   --opt-border: color-mix(in srgb, var(--on-error-container) 45%, transparent);
   --opt-accent: var(--on-error-container);
+}
+.opt--neutral {
+  /* Used for single-choice options the user didn't pick — no score signal. */
+  --opt-bg: var(--surface-container-low);
+  --opt-border: var(--outline-variant);
+  --opt-accent: var(--on-surface-variant);
 }
 
 /* Skipped distractors are technically wins but visually quieter so the

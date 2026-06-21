@@ -50,15 +50,26 @@ const totalQuestions = computed(() => attempt.value?.questions?.length ?? 0)
 
 const errorText = ref<string | null>(null)
 const togglingKey = ref<string | null>(null)
-async function toggleOption(questionId?: string, optionId?: string, currentlySelected?: boolean) {
+async function toggleOption(
+  questionId: string | undefined,
+  optionId: string | undefined,
+  currentlySelected: boolean | undefined,
+  questionType: 'SINGLE_CHOICE' | 'MULTI_CHOICE' | undefined,
+) {
   if (!questionId || !optionId) return
   if (remainingMs.value <= 0) return
+  const isSingle = questionType === 'SINGLE_CHOICE'
+  // Single-choice clicks on the already-picked option are a no-op — once you've
+  // picked, you can only switch, not unselect.
+  if (isSingle && currentlySelected) return
+  const next = isSingle ? true : !currentlySelected
   const key = `${questionId}:${optionId}`
   togglingKey.value = key
   errorText.value = null
-  const next = !currentlySelected
 
   // Optimistic cache update — keeps the UI stable across the commit round-trip.
+  // For single-choice, set the picked option to selected and clear all siblings;
+  // the backend does the same when it processes the action.
   const queryKey = getGetAttemptsInProgressQueryKey({ page: 0 })
   const previous = qc.getQueryData<typeof data.value>(queryKey)
   qc.setQueryData<typeof data.value>(queryKey, (old) => {
@@ -77,9 +88,10 @@ async function toggleOption(questionId?: string, optionId?: string, currentlySel
                     ? q
                     : {
                         ...q,
-                        options: (q.options ?? []).map((o) =>
-                          o.id !== optionId ? o : { ...o, selected: next },
-                        ),
+                        options: (q.options ?? []).map((o) => {
+                          if (isSingle) return { ...o, selected: o.id === optionId }
+                          return o.id !== optionId ? o : { ...o, selected: next }
+                        }),
                       },
                 ),
               },
@@ -175,15 +187,22 @@ watch(remainingMs, (ms) => {
         <Card>
           <div class="qhead">
             <span class="label-sm muted">Question {{ i + 1 }} / {{ totalQuestions }}</span>
+            <span class="label-sm muted qhead__rule">
+              {{ q.type === 'SINGLE_CHOICE' ? 'Single answer' : 'Select all that apply' }}
+            </span>
           </div>
           <p class="body-lg q-text">{{ q.text }}</p>
           <ul class="opts">
             <li v-for="o in q.options ?? []" :key="o.id">
               <button
                 type="button"
-                :class="['opt', { 'opt--selected': o.selected }]"
+                :class="[
+                  'opt',
+                  { 'opt--selected': o.selected },
+                  q.type === 'SINGLE_CHOICE' ? 'opt--radio' : 'opt--checkbox',
+                ]"
                 :disabled="togglingKey === `${q.id}:${o.id}`"
-                @click="toggleOption(q.id, o.id, o.selected)"
+                @click="toggleOption(q.id, o.id, o.selected, q.type)"
               >
                 <span class="opt__marker">
                   <span v-if="o.selected" class="opt__dot" />
@@ -299,6 +318,13 @@ watch(remainingMs, (ms) => {
   border: 1px solid var(--outline);
   border-radius: var(--radius);
   flex-shrink: 0;
+}
+/* Round marker for single-choice (radio) options. */
+.opt--radio .opt__marker {
+  border-radius: 50%;
+}
+.opt--radio .opt__dot {
+  border-radius: 50%;
 }
 .opt--selected .opt__marker {
   border-color: var(--primary-container);

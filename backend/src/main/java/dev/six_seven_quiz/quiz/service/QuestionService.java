@@ -52,7 +52,7 @@ public class QuestionService {
         Quiz quiz = quizRepository.findById(request.quizId()).orElseThrow(() -> new QuizNotFoundException(request.quizId()));
         QuizValidator.requireOwner(quiz, user);
 
-        quiz.addQuestion(new QuestionData(request.text(), request.options()));
+        quiz.addQuestion(new QuestionData(request.text(), request.type(), request.options()));
 
         quiz = quizRepository.save(quiz);
 

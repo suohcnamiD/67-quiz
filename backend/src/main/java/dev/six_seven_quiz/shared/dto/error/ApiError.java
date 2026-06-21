@@ -15,6 +15,7 @@ public record ApiError(
                         "NO_ACCESS_TO_ATTEMPT",
                         "ATTEMPT_ALREADY_FINISHED",
                         "BLANK_OPTION_TEXT",
+                        "INVALID_QUESTION_SHAPE",
                         "USERNAME_ALREADY_TAKEN",
                         "INVALID_USERNAME",
                         "INVALID_PASSWORD",

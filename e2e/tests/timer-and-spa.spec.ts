@@ -51,7 +51,12 @@ async function createQuizViaApi(page: Page, quizName: string, duration: string):
   // Backend requires at least one question to start an attempt? Actually no —
   // it tolerates empty quizzes for attempts. Add one anyway for realism.
   const q = await page.request.post('http://localhost:5173/api/question', {
-    data: { quizId: quiz.id, text: 'q', options: [{ text: 'a', correct: true }, { text: 'b', correct: false }] },
+    data: {
+      quizId: quiz.id,
+      text: 'q',
+      type: 'MULTI_CHOICE',
+      options: [{ text: 'a', correct: true }, { text: 'b', correct: false }],
+    },
     headers: { 'Content-Type': 'application/json' },
   })
   expect(q.ok()).toBeTruthy()
@@ -174,6 +179,7 @@ test('finished attempt shows clear correct/wrong cues', async ({ page }) => {
     data: {
       quizId: quiz.id,
       text: 'q',
+      type: 'MULTI_CHOICE',
       options: [
         { text: 'right', correct: true },
         { text: 'wrong', correct: false },

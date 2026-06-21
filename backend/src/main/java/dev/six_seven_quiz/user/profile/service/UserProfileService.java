@@ -1,8 +1,6 @@
 package dev.six_seven_quiz.user.profile.service;
 
 import dev.six_seven_quiz.quiz.model.Attempt;
-import dev.six_seven_quiz.quiz.model.AttemptQuestion;
-import dev.six_seven_quiz.quiz.dto.response.viewing.FinishedOptionDto;
 import dev.six_seven_quiz.quiz.repository.QuizAttemptRepository;
 import dev.six_seven_quiz.quiz.repository.QuizRepository;
 import dev.six_seven_quiz.user.ApplicationUser;
@@ -137,13 +135,7 @@ public class UserProfileService {
         for (Attempt attempt : attempts) {
             int max = attempt.getMaximumScore();
             if (max == 0) continue; // Skip attempts on empty quizzes — they'd divide by zero.
-            int score = 0;
-            for (AttemptQuestion q : attempt.getQuestions()) {
-                for (FinishedOptionDto o : q.getFinishedOptions()) {
-                    if (o.isCorrectlySelected()) score++;
-                }
-            }
-            sumPercent += (100.0 * score) / max;
+            sumPercent += (100.0 * attempt.getEarnedScore()) / max;
             counted++;
         }
         if (counted == 0) return null;

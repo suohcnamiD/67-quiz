@@ -5,7 +5,6 @@ import jakarta.persistence.*;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -15,11 +14,13 @@ public class Question {
     public Question() {}
     public Question(
             Quiz quiz,
-            String text
+            String text,
+            QuestionType type
     ) {
         this.quiz = quiz;
         this.options = new ArrayList<>();
         this.text = text;
+        this.type = type;
     }
 
     @Id
@@ -32,6 +33,10 @@ public class Question {
 
     @Column(name = "text", nullable = false)
     private String text;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type", nullable = false)
+    private QuestionType type = QuestionType.MULTI_CHOICE;
 
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<Option> options;
@@ -58,5 +63,13 @@ public class Question {
 
     public String getText() {
         return text;
+    }
+
+    public QuestionType getType() {
+        return type;
+    }
+
+    public void setType(QuestionType type) {
+        this.type = type;
     }
 }
