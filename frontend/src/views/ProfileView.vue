@@ -13,16 +13,17 @@ import {
 } from '@/api/user-profile-controller/user-profile-controller'
 import { useAuthStore } from '@/stores/auth'
 import { errorMessage } from '@/lib/errors'
-import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import Input from '@/components/Input.vue'
 import Avatar from '@/components/Avatar.vue'
 import QuizCard from '@/components/QuizCard.vue'
+import Modal from '@/components/Modal.vue'
 
 const router = useRouter()
 const qc = useQueryClient()
 const auth = useAuthStore()
 const { data, isPending } = useGetOwnProfile()
+const profile = computed(() => data.value)
 
 // Quizzes I authored, fetched once the profile resolves (we need my username).
 const myUsername = computed(() => data.value?.username ?? '')
@@ -31,31 +32,29 @@ const authoredQuizzes = useGetQuizzesByAuthor(myUsername, computed(() => ({ page
 })
 const authored = computed(() => authoredQuizzes.data.value?._embedded?.quizzes ?? [])
 const authoredError = ref<string | null>(null)
-
-const displayName = ref('')
-const bio = ref('')
-
-// Seed the form whenever fresh profile data arrives. We don't want to clobber
-// in-flight edits, so only run when the form fields are still empty.
-watch(
-  data,
-  (snapshot) => {
-    if (!snapshot) return
-    if (!displayName.value) displayName.value = snapshot.displayName ?? ''
-    if (!bio.value) bio.value = snapshot.bio ?? ''
-  },
-  { immediate: true },
-)
-
 const errorText = ref<string | null>(null)
-const savingProfile = ref(false)
-async function saveProfile() {
-  errorText.value = null
-  savingProfile.value = true
+
+// --- Details modal (display name + bio) ---------------------------------
+const detailsOpen = ref(false)
+const detailsName = ref('')
+const detailsBio = ref('')
+const savingDetails = ref(false)
+const detailsError = ref<string | null>(null)
+
+function openDetailsModal() {
+  detailsName.value = profile.value?.displayName ?? profile.value?.username ?? ''
+  detailsBio.value = profile.value?.bio ?? ''
+  detailsError.value = null
+  detailsOpen.value = true
+}
+
+async function saveDetails() {
+  detailsError.value = null
+  savingDetails.value = true
   try {
     const updated = await updateOwnProfile({
-      displayName: displayName.value.trim(),
-      bio: bio.value,
+      displayName: detailsName.value.trim(),
+      bio: detailsBio.value,
     })
     auth.applyProfileSnapshot({
       username: updated.username,
@@ -66,23 +65,35 @@ async function saveProfile() {
     if (updated.username) {
       qc.invalidateQueries({ queryKey: getGetProfileByUsernameQueryKey(updated.username) })
     }
+    detailsOpen.value = false
   } catch (e) {
-    errorText.value = errorMessage(e)
+    detailsError.value = errorMessage(e)
   } finally {
-    savingProfile.value = false
+    savingDetails.value = false
   }
 }
 
-const fileInput = ref<HTMLInputElement | null>(null)
+// --- Avatar modal --------------------------------------------------------
+const avatarOpen = ref(false)
+const avatarError = ref<string | null>(null)
 const uploadingAvatar = ref(false)
-async function pickAvatar() {
+const removingAvatar = ref(false)
+const fileInput = ref<HTMLInputElement | null>(null)
+
+function openAvatarModal() {
+  avatarError.value = null
+  avatarOpen.value = true
+}
+
+function pickAvatar() {
   fileInput.value?.click()
 }
+
 async function onFilePicked(event: Event) {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
   if (!file) return
-  errorText.value = null
+  avatarError.value = null
   uploadingAvatar.value = true
   try {
     const updated = await uploadAvatar({ file })
@@ -96,18 +107,19 @@ async function onFilePicked(event: Event) {
     if (updated.username) {
       qc.invalidateQueries({ queryKey: getGetProfileByUsernameQueryKey(updated.username) })
     }
+    // Close the modal on success so the user sees their new avatar on the hero.
+    avatarOpen.value = false
   } catch (e) {
-    errorText.value = errorMessage(e)
+    avatarError.value = errorMessage(e)
   } finally {
     uploadingAvatar.value = false
     if (fileInput.value) fileInput.value.value = ''
   }
 }
 
-const removingAvatar = ref(false)
 async function removeAvatar() {
   if (!confirm('Remove your avatar?')) return
-  errorText.value = null
+  avatarError.value = null
   removingAvatar.value = true
   try {
     const updated = await deleteAvatar()
@@ -117,31 +129,51 @@ async function removeAvatar() {
     if (updated.username) {
       qc.invalidateQueries({ queryKey: getGetProfileByUsernameQueryKey(updated.username) })
     }
+    avatarOpen.value = false
   } catch (e) {
-    errorText.value = errorMessage(e)
+    avatarError.value = errorMessage(e)
   } finally {
     removingAvatar.value = false
   }
 }
 
-const profile = computed(() => data.value)
+// When the user opens the avatar modal via keyboard (Enter on the avatar
+// button), focus should land on the upload action; the dialog itself takes
+// focus first, that's fine.
+watch(detailsOpen, (open) => {
+  if (!open) detailsError.value = null
+})
+watch(avatarOpen, (open) => {
+  if (!open) avatarError.value = null
+})
 </script>
 
 <template>
   <div v-if="isPending" class="empty body-md">Loading…</div>
   <template v-else-if="profile">
     <header class="head">
-      <Avatar
-        :username="profile.username"
-        :display-name="profile.displayName"
-        :version="auth.avatarVersion"
-        :initials-only="!profile.hasAvatar"
-        :size="96"
-      />
+      <button
+        type="button"
+        class="avatar-button"
+        :aria-label="profile.hasAvatar ? 'Change avatar' : 'Upload avatar'"
+        @click="openAvatarModal"
+      >
+        <Avatar
+          :username="profile.username"
+          :display-name="profile.displayName"
+          :version="auth.avatarVersion"
+          :initials-only="!profile.hasAvatar"
+          :size="96"
+        />
+        <span class="avatar-button__overlay" aria-hidden="true">Edit</span>
+      </button>
       <div class="head__main">
         <h1 class="head__name">{{ profile.displayName ?? profile.username }}</h1>
         <p class="head__handle muted">@{{ profile.username }}</p>
         <p v-if="profile.bio" class="head__bio body-md">{{ profile.bio }}</p>
+      </div>
+      <div class="head__actions">
+        <Button variant="ghost" @click="openDetailsModal">Edit profile</Button>
       </div>
     </header>
 
@@ -185,46 +217,58 @@ const profile = computed(() => data.value)
 
     <p v-if="errorText" class="banner label-md" role="alert">{{ errorText }}</p>
 
-    <Card class="edit">
-      <h2 class="edit__title">Edit profile</h2>
-      <form class="form" @submit.prevent="saveProfile">
-        <Input v-model="displayName" label="Display name" />
-        <Input v-model="bio" label="Bio" placeholder="Short blurb about you" />
-        <div class="form__actions">
-          <Button type="submit" :loading="savingProfile">Save</Button>
-        </div>
-      </form>
-    </Card>
-
-    <Card class="edit">
-      <h2 class="edit__title">Avatar</h2>
-      <p class="muted body-md">
-        Pick a PNG, JPEG or WebP up to 2 MB. We'll crop it to a square and store
-        a 256×256 copy.
-      </p>
-      <div class="avatar-actions">
-        <Button :loading="uploadingAvatar" @click="pickAvatar">
-          {{ profile.hasAvatar ? 'Replace avatar' : 'Upload avatar' }}
-        </Button>
-        <Button
-          v-if="profile.hasAvatar"
-          variant="ghost"
-          :loading="removingAvatar"
-          @click="removeAvatar"
-        >Remove</Button>
-      </div>
-      <input
-        ref="fileInput"
-        type="file"
-        accept="image/png,image/jpeg,image/webp"
-        class="file-input"
-        @change="onFilePicked"
-      />
-    </Card>
-
     <div class="bottom-actions">
       <Button variant="ghost" @click="router.push('/app')">Back to browse</Button>
     </div>
+
+    <!-- Modals — only one open at a time. -->
+    <Modal :open="detailsOpen" title="Edit profile" @close="detailsOpen = false">
+      <form id="details-form" class="form" @submit.prevent="saveDetails">
+        <Input v-model="detailsName" label="Display name" />
+        <Input v-model="detailsBio" label="Bio" placeholder="Short blurb about you" />
+        <p v-if="detailsError" class="banner label-md" role="alert">{{ detailsError }}</p>
+      </form>
+      <template #footer>
+        <Button variant="ghost" @click="detailsOpen = false">Cancel</Button>
+        <Button type="submit" form="details-form" :loading="savingDetails">Save</Button>
+      </template>
+    </Modal>
+
+    <Modal :open="avatarOpen" title="Change avatar" @close="avatarOpen = false">
+      <div class="avatar-modal">
+        <Avatar
+          :username="profile.username"
+          :display-name="profile.displayName"
+          :version="auth.avatarVersion"
+          :initials-only="!profile.hasAvatar"
+          :size="120"
+        />
+        <p class="muted body-md">
+          Pick a PNG, JPEG or WebP up to 2 MB. We'll crop it to a square and
+          store a 256×256 copy.
+        </p>
+        <p v-if="avatarError" class="banner label-md" role="alert">{{ avatarError }}</p>
+        <input
+          ref="fileInput"
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          class="file-input"
+          @change="onFilePicked"
+        />
+      </div>
+      <template #footer>
+        <Button
+          v-if="profile.hasAvatar"
+          variant="danger"
+          :loading="removingAvatar"
+          @click="removeAvatar"
+        >Remove</Button>
+        <Button variant="ghost" @click="avatarOpen = false">Cancel</Button>
+        <Button :loading="uploadingAvatar" @click="pickAvatar">
+          {{ profile.hasAvatar ? 'Replace…' : 'Upload…' }}
+        </Button>
+      </template>
+    </Modal>
   </template>
 </template>
 
@@ -245,6 +289,8 @@ const profile = computed(() => data.value)
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+  flex: 1;
+  min-width: 0;
 }
 .head__name {
   margin: 0;
@@ -261,6 +307,42 @@ const profile = computed(() => data.value)
   margin: var(--space-xs) 0 0;
   color: var(--on-surface-variant);
   max-width: 36rem;
+}
+.head__actions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+/* Clickable avatar with a hover-revealed "Edit" overlay. */
+.avatar-button {
+  position: relative;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  line-height: 0;
+}
+.avatar-button:hover .avatar-button__overlay,
+.avatar-button:focus-visible .avatar-button__overlay {
+  opacity: 1;
+}
+.avatar-button__overlay {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity 120ms ease;
 }
 
 .stats {
@@ -315,34 +397,28 @@ const profile = computed(() => data.value)
   gap: var(--space-md);
 }
 
-.edit {
-  margin-bottom: var(--space-md);
+.bottom-actions {
+  margin-top: var(--space-lg);
 }
-.edit__title {
-  margin: 0 0 var(--space-md);
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: var(--on-surface);
-}
+
+/* Modal form layout */
 .form {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
 }
-.form__actions {
+.avatar-modal {
   display: flex;
-  justify-content: flex-end;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
+  text-align: center;
 }
-.avatar-actions {
-  display: flex;
-  gap: var(--space-sm);
-  margin-top: var(--space-md);
+.avatar-modal .muted {
+  max-width: 28rem;
 }
 .file-input {
   display: none;
-}
-.bottom-actions {
-  margin-top: var(--space-lg);
 }
 
 @media (max-width: 640px) {
@@ -352,6 +428,9 @@ const profile = computed(() => data.value)
   .head {
     flex-direction: column;
     align-items: flex-start;
+  }
+  .head__actions {
+    width: 100%;
   }
 }
 </style>

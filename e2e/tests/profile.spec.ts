@@ -36,11 +36,15 @@ test('profile page renders own stats and lets you edit the display name', async 
   await expect(page.getByText('Attempts taken')).toBeVisible()
   await expect(page.getByText('Average score')).toBeVisible()
 
+  // Open the edit-profile modal and change the display name.
   const newName = `Display ${Date.now() % 1000}`
+  await page.getByRole('button', { name: 'Edit profile' }).click()
+  await expect(page.getByRole('dialog', { name: 'Edit profile' })).toBeVisible()
   await page.getByLabel('Display name').fill(newName)
   await page.getByRole('button', { name: 'Save' }).click()
-  // Header and AppShell pick up the new name without a refresh.
-  await expect(page.getByRole('heading', { name: newName })).toBeVisible({ timeout: 10_000 })
+  // The dialog closes; header + AppShell pick up the new name.
+  await expect(page.getByRole('dialog', { name: 'Edit profile' })).toBeHidden()
+  await expect(page.getByRole('heading', { name: newName, exact: true })).toBeVisible({ timeout: 10_000 })
   await expect(page.locator('.me__name').first()).toHaveText(newName)
 })
 
@@ -55,17 +59,20 @@ test('public profile route is readable for any user', async ({ page }) => {
 test('avatar upload changes the AppShell image src', async ({ page }) => {
   await registerAndLogin(page)
   await page.goto('/app/profile')
-  await expect(page.getByRole('button', { name: 'Upload avatar' })).toBeVisible({ timeout: 10_000 })
+  // The avatar is now a button that opens the upload modal.
+  await page.getByRole('button', { name: /upload avatar|change avatar/i }).click()
+  await expect(page.getByRole('dialog', { name: 'Change avatar' })).toBeVisible()
 
-  // Drive the hidden <input type="file"> directly.
+  // Drive the hidden <input type="file"> directly so we don't need to open
+  // the OS file picker.
   await page.locator('input[type="file"]').setInputFiles({
     name: 'avatar.png',
     mimeType: 'image/png',
     buffer: TINY_RED_PNG,
   })
 
-  // After upload, the button text flips and the AppShell <img> resolves.
-  await expect(page.getByRole('button', { name: 'Replace avatar' })).toBeVisible({ timeout: 15_000 })
+  // After upload the modal closes and the AppShell <img> resolves.
+  await expect(page.getByRole('dialog', { name: 'Change avatar' })).toBeHidden({ timeout: 15_000 })
   const shellImg = page.locator('.me img')
   await expect(shellImg).toBeVisible({ timeout: 10_000 })
   const src = await shellImg.getAttribute('src')
