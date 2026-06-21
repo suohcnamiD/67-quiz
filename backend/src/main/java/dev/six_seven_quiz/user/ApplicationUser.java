@@ -36,6 +36,12 @@ public class ApplicationUser {
     @Column(name = "password", nullable = false)
     private String password;
 
+    @Column(name = "avatar_path")
+    private String avatarPath;
+
+    @Column(name = "bio", length = 280)
+    private String bio;
+
 
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
@@ -63,6 +69,26 @@ public class ApplicationUser {
 
     public String getDisplayName() {
         return displayName;
+    }
+
+    public void setDisplayName(String displayName) {
+        this.displayName = displayName;
+    }
+
+    public String getAvatarPath() {
+        return avatarPath;
+    }
+
+    public void setAvatarPath(String avatarPath) {
+        this.avatarPath = avatarPath;
+    }
+
+    public String getBio() {
+        return bio;
+    }
+
+    public void setBio(String bio) {
+        this.bio = bio;
     }
 
     @Override

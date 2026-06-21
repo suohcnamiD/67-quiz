@@ -15,4 +15,8 @@ public interface QuizAttemptRepository extends JpaRepository<Attempt, UUID> {
     Page<Attempt> findByUserAndFinishedIsFalse(ApplicationUser user, Pageable pageable);
 
     List<Attempt> findByUser_IdAndFinishedIsFalseAndFinishDeadlineBefore(UUID userId, Instant finishDeadline);
+
+    int countByUserAndFinishedIsTrue(ApplicationUser user);
+
+    List<Attempt> findAllByUserAndFinishedIsTrue(ApplicationUser user);
 }

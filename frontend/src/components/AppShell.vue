@@ -2,6 +2,7 @@
 import { useAuthStore } from '@/stores/auth'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
 import Button from './Button.vue'
+import Avatar from './Avatar.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -23,7 +24,21 @@ const logout = () => {
           <RouterLink to="/app/quiz/new" exact-active-class="router-link-active">New quiz</RouterLink>
         </nav>
         <div class="actions">
-          <span v-if="auth.isAuthenticated()" class="label-sm muted">Signed in</span>
+          <RouterLink
+            v-if="auth.isAuthenticated()"
+            to="/app/profile"
+            class="me"
+            :title="`Signed in as ${auth.displayName ?? auth.username}`"
+          >
+            <Avatar
+              :username="auth.username"
+              :display-name="auth.displayName"
+              :version="auth.avatarVersion"
+              :initials-only="!auth.hasAvatar"
+              :size="32"
+            />
+            <span class="me__name label-md">{{ auth.displayName ?? auth.username }}</span>
+          </RouterLink>
           <Button variant="ghost" @click="logout">Sign out</Button>
         </div>
       </div>
@@ -85,8 +100,27 @@ const logout = () => {
   align-items: center;
   gap: var(--space-md);
 }
-.muted {
-  color: var(--on-surface-variant);
+.me {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 4px 10px 4px 4px;
+  border-radius: 999px;
+  color: var(--on-surface);
+  background: var(--surface-container-high);
+  text-decoration: none;
+  transition: background-color 120ms ease;
+}
+.me:hover {
+  background: var(--surface-container);
+  text-decoration: none;
+}
+.me__name {
+  font-weight: 600;
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .content {
   max-width: 1200px;
@@ -100,6 +134,9 @@ const logout = () => {
   .content {
     padding-left: var(--margin-mobile);
     padding-right: var(--margin-mobile);
+  }
+  .me__name {
+    display: none;
   }
 }
 </style>

@@ -5,3 +5,6 @@ databaseChangeLog:
   - include:
       file: 001-domain.yaml
       relativeToChangelogFile: true
+  - include:
+      file: 002-user-profiles.yaml
+      relativeToChangelogFile: true

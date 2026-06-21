@@ -26,6 +26,8 @@ const router = createRouter({
         { path: 'quiz/:quizId', name: 'quiz-author', component: () => import('@/views/QuizAuthorView.vue') },
         { path: 'attempt/:attemptId', name: 'attempt', component: () => import('@/views/AttemptView.vue') },
         { path: 'attempt/:attemptId/result', name: 'attempt-result', component: () => import('@/views/AttemptResultView.vue') },
+        { path: 'profile', name: 'profile', component: () => import('@/views/ProfileView.vue') },
+        { path: 'users/:username', name: 'user-profile', component: () => import('@/views/UserProfileView.vue') },
       ],
     },
     { path: '/:pathMatch(.*)*', redirect: '/app' },

@@ -8,6 +8,7 @@ import { errorMessage } from '@/lib/errors'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import Chip from '@/components/Chip.vue'
+import Avatar from '@/components/Avatar.vue'
 
 const router = useRouter()
 const qc = useQueryClient()
@@ -122,6 +123,20 @@ async function removeQuiz(id?: string) {
           <h3 class="headline-md">{{ q.name }}</h3>
           <Chip v-if="q.youAreAuthor">Your quiz</Chip>
         </div>
+        <RouterLink
+          v-if="q.author?.username"
+          :to="{ name: 'user-profile', params: { username: q.author.username } }"
+          class="author"
+          @click.stop
+        >
+          <Avatar
+            :username="q.author.username"
+            :display-name="q.author.displayName"
+            :initials-only="!q.author.hasAvatar"
+            :size="20"
+          />
+          <span class="author__name label-sm">{{ q.author.displayName ?? q.author.username }}</span>
+        </RouterLink>
         <div class="meta-row label-sm">
           <span>{{ q.questionCount ?? 0 }} questions</span>
           <span>·</span>
@@ -206,6 +221,30 @@ async function removeQuiz(id?: string) {
   display: flex;
   gap: var(--space-sm);
   flex-wrap: wrap;
+}
+.author {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0 0 var(--space-sm);
+  padding: 2px 8px 2px 2px;
+  border-radius: 999px;
+  color: var(--on-surface-variant);
+  background: var(--surface-container-high);
+  text-decoration: none;
+  transition: background-color 120ms ease;
+  width: fit-content;
+}
+.author:hover {
+  background: var(--surface-container);
+  text-decoration: none;
+  color: var(--on-surface);
+}
+.author__name {
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 600;
 }
 .score-stack {
   display: flex;

@@ -22,6 +22,7 @@ import dev.six_seven_quiz.quiz.repository.QuizAttemptRepository;
 import dev.six_seven_quiz.quiz.repository.QuizRepository;
 import dev.six_seven_quiz.user.ApplicationUser;
 import dev.six_seven_quiz.user.ApplicationUserService;
+import dev.six_seven_quiz.user.profile.component.mapper.UserProfileMapper;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.transaction.Transactional;
@@ -47,6 +48,7 @@ public class AttemptService {
     private static final int ATTEMPTS_PER_PAGE = 10;
     private final QuestionRepository questionRepository;
     private final QuizMapper quizMapper;
+    private final UserProfileMapper userProfileMapper;
 
     private Pageable produceSanitizedPageable(int page) {
         return PageRequest.of(page, ATTEMPTS_PER_PAGE);
@@ -55,7 +57,7 @@ public class AttemptService {
     @PersistenceContext
     private EntityManager entityManager;
 
-    public AttemptService(ApplicationUserService applicationUserService, QuizAttemptRepository quizAttemptRepository, QuizRepository quizRepository, AttemptMapper attemptMapper, OptionMapper optionMapper, AttemptQuestionMapper attemptQuestionMapper, AttemptQuestionRepository attemptQuestionRepository, QuestionRepository questionRepository, QuizMapper quizMapper) {
+    public AttemptService(ApplicationUserService applicationUserService, QuizAttemptRepository quizAttemptRepository, QuizRepository quizRepository, AttemptMapper attemptMapper, OptionMapper optionMapper, AttemptQuestionMapper attemptQuestionMapper, AttemptQuestionRepository attemptQuestionRepository, QuestionRepository questionRepository, QuizMapper quizMapper, UserProfileMapper userProfileMapper) {
         this.applicationUserService = applicationUserService;
         this.quizAttemptRepository = quizAttemptRepository;
         this.quizRepository = quizRepository;
@@ -64,6 +66,7 @@ public class AttemptService {
         this.attemptQuestionMapper = attemptQuestionMapper;
         this.questionRepository = questionRepository;
         this.quizMapper = quizMapper;
+        this.userProfileMapper = userProfileMapper;
     }
 
     @Transactional
@@ -101,7 +104,7 @@ public class AttemptService {
     private QuizSummaryDto quizToSummary(Quiz quiz, ApplicationUser user) {
         int questionCount = questionRepository.countByQuiz_QuizId(quiz.getId());
         boolean areYouAuthor = quiz.getAuthor().equals(user);
-        return quizMapper.toSummary(quiz, questionCount, areYouAuthor);
+        return quizMapper.toSummary(quiz, questionCount, areYouAuthor, userProfileMapper.toAuthorSummary(quiz.getAuthor()));
     }
 
     private void validateUserAttemptOwnership(ApplicationUser user, Attempt attempt) {

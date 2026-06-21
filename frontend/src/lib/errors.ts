@@ -30,6 +30,13 @@ const COPY: Record<string, string> = {
   INVALID_PASSWORD: 'That password doesn’t meet the requirements.',
   UNAUTHORIZED: 'Wrong username or password.',
   FORBIDDEN: 'You don’t have permission to do that.',
+  // Profile
+  USER_NOT_FOUND: 'That user could not be found.',
+  INVALID_DISPLAY_NAME: 'Display name must be 1–32 characters.',
+  INVALID_BIO: 'Bio must be at most 280 characters.',
+  INVALID_IMAGE: 'That image couldn’t be read. Use a PNG, JPEG, or WebP.',
+  AVATAR_TOO_LARGE: 'That image is over 2 MB. Pick a smaller one.',
+  AVATAR_NOT_FOUND: 'No avatar has been set.',
   // Generic / framework
   VALIDATION_ERROR: 'Some fields are missing or invalid.',
   INVALID_FORMAT: 'A field has the wrong format.',

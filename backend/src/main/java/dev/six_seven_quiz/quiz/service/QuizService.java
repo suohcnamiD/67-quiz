@@ -12,6 +12,7 @@ import dev.six_seven_quiz.quiz.repository.QuizRepository;
 import dev.six_seven_quiz.quiz.validator.QuizValidator;
 import dev.six_seven_quiz.user.ApplicationUser;
 import dev.six_seven_quiz.user.ApplicationUserService;
+import dev.six_seven_quiz.user.profile.component.mapper.UserProfileMapper;
 import jakarta.transaction.Transactional;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.data.domain.Page;
@@ -31,12 +32,14 @@ public class QuizService {
     private final QuizRepository quizRepository;
     private final QuizMapper quizMapper;
     private final QuestionRepository questionRepository;
+    private final UserProfileMapper userProfileMapper;
 
-    public QuizService(ApplicationUserService applicationUserService, QuizRepository quizRepository, QuizMapper quizMapper, QuizAttemptRepository quizAttemptRepository, QuestionRepository questionRepository) {
+    public QuizService(ApplicationUserService applicationUserService, QuizRepository quizRepository, QuizMapper quizMapper, QuizAttemptRepository quizAttemptRepository, QuestionRepository questionRepository, UserProfileMapper userProfileMapper) {
         this.applicationUserService = applicationUserService;
         this.quizRepository = quizRepository;
         this.quizMapper = quizMapper;
         this.questionRepository = questionRepository;
+        this.userProfileMapper = userProfileMapper;
     }
 
     public QuizDto createQuiz(UserDetails userDetails, CreateQuizRequest request) {
@@ -63,7 +66,7 @@ public class QuizService {
     private QuizSummaryDto quizToSummary(Quiz quiz, ApplicationUser user) {
         int questionCount = questionRepository.countByQuiz_QuizId(quiz.getId());
         boolean areYouAuthor = quiz.getAuthor().equals(user);
-        return quizMapper.toSummary(quiz, questionCount, areYouAuthor);
+        return quizMapper.toSummary(quiz, questionCount, areYouAuthor, userProfileMapper.toAuthorSummary(quiz.getAuthor()));
     }
 
     private Pageable produceSanitizedPageable(int page) {

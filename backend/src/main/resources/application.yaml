@@ -17,6 +17,10 @@ spring:
         enabled: false
     resources:
       add-mappings: true
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 2MB
   datasource:
     url: ${DATABASE_URL:jdbc:mariadb://${DATABASE_HOST:localhost}:${DATABASE_PORT:3306}/${DATABASE_NAME:main}}
     username: ${DATABASE_USERNAME:user}
@@ -24,6 +28,10 @@ spring:
   liquibase:
     enabled: true
     change-log: classpath:/db/changelog/main.yaml
+
+app:
+  uploads:
+    dir: ${APP_UPLOADS_DIR:./uploads}
 
 server:
   servlet:

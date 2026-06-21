@@ -13,3 +13,7 @@ frontend/src/api/
 # Backend test runner output
 backend/test-results/
 backend/build/
+
+# Uploaded user files (avatars, etc.) — local dev only
+uploads/
+backend/uploads/
