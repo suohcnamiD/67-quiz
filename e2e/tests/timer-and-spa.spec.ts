@@ -85,7 +85,8 @@ test('timer expiry auto-finishes the attempt and bounces to result', async ({ pa
   // The result view should render the score (not raw JSON, not "Loading…").
   const body = (await page.locator('body').innerText()).trim()
   expect(body).not.toMatch(/^\{/)
-  await expect(page.getByText(/^Score$/).first()).toBeVisible({ timeout: 5_000 })
+  // Result hero shows a percent and pts; per-question card shows Score badge.
+  await expect(page.getByText(/^\d+%$/).first()).toBeVisible({ timeout: 5_000 })
   await watchdog
   expect(flashedNotFound, '"Attempt not found" flashed during auto-finish').toBe(false)
 })
@@ -152,7 +153,58 @@ test('attempt result shows the score with the label "Score"', async ({ page }) =
   await page.getByRole('button', { name: /finish attempt/i }).click()
   await page.waitForURL(/\/app\/attempt\/[^/]+\/result$/, { timeout: 15_000 })
 
-  await expect(page.getByText(/^Score$/).first()).toBeVisible()
-  await expect(page.getByText(/Score \d+ \/ \d+/).first()).toBeVisible()
+  // Dismiss celebration overlay if it appears.
+  const overlay = page.getByRole('dialog')
+  if (await overlay.count()) await overlay.locator('..').click({ force: true }).catch(() => {})
+
+  // Hero shows the percentage and pts. Per-question card shows a "Score" badge.
+  await expect(page.getByText(/^\d+%$/).first()).toBeVisible()
+  await expect(page.getByText(/\d+ \/ \d+ pts/).first()).toBeVisible()
+  await expect(page.getByText(/Score/).first()).toBeVisible()
+})
+
+test('finished attempt shows clear correct/wrong cues', async ({ page }) => {
+  await registerAndLogin(page)
+  // Create a quiz with 1 correct + 1 distractor option.
+  const create = await page.request.post('http://localhost:5173/api/quiz', {
+    data: { quizName: `Cues ${Date.now()}`, quizDuration: 'PT5M' },
+    headers: { 'Content-Type': 'application/json' },
+  })
+  const quiz = await create.json()
+  await page.request.post('http://localhost:5173/api/question', {
+    data: {
+      quizId: quiz.id,
+      text: 'q',
+      options: [
+        { text: 'right', correct: true },
+        { text: 'wrong', correct: false },
+      ],
+    },
+    headers: { 'Content-Type': 'application/json' },
+  })
+  const attemptId = await startAttemptViaApi(page, quiz.id)
+
+  // Commit one correct + one wrong pick directly via API.
+  const attemptRes = await page.request.get(`http://localhost:5173/api/attempt/in-progress?page=0`)
+  const attemptsJson = await attemptRes.json()
+  const a = attemptsJson._embedded.attempts.find((x: { id: string }) => x.id === attemptId)
+  const rightOpt = a.questions[0].options.find((o: { text: string }) => o.text === 'right').id
+  const wrongOpt = a.questions[0].options.find((o: { text: string }) => o.text === 'wrong').id
+  await page.request.patch('http://localhost:5173/api/attempt/commit', {
+    data: { attemptId, actions: [{ questionId: a.questions[0].id, optionId: rightOpt, selected: true }] },
+    headers: { 'Content-Type': 'application/json' },
+  })
+  await page.request.patch('http://localhost:5173/api/attempt/finish', {
+    data: { attemptId },
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+  await page.goto(`/app/attempt/${attemptId}/result`)
+  // Each state must produce a visible chip.
+  await expect(page.getByText('Correct').first()).toBeVisible()
+  // The "wrong" option was a distractor we left unselected → 'Distractor' chip.
+  await expect(page.getByText('Distractor').first()).toBeVisible()
+  // sanity: the correct option's row has the green visual state class
+  await expect(page.locator('.opt--correct').first()).toBeVisible()
 })
 

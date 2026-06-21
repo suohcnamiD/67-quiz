@@ -53,8 +53,12 @@ test('full happy path: create quiz → add question → start attempt → finish
   await page.getByRole('button', { name: /finish attempt/i }).click()
   await page.waitForURL(/\/app\/attempt\/[^/]+\/result$/, { timeout: 15_000 })
 
+  // Dismiss the celebration popup so we can assert on the underlying page.
+  const popup = page.getByRole('dialog')
+  if (await popup.count()) await popup.locator('..').click({ force: true }).catch(() => {})
+
   // Should show score (not JSON)
-  await expect(page.getByText(new RegExp(quizName))).toBeVisible()
+  await expect(page.getByRole('heading', { name: /score/i }).or(page.getByText('Score').first())).toBeVisible()
   const body = (await page.locator('body').innerText()).trim()
   expect(body).not.toMatch(/^\{/)
 })

@@ -121,7 +121,7 @@ async function finishCore() {
   // Navigate first, then invalidate. If we invalidated before navigating,
   // the in-progress query would drop this attempt and the AttemptView
   // would briefly render "Attempt not found" between frames.
-  router.push(`/app/attempt/${attemptId.value}/result`)
+  router.push({ path: `/app/attempt/${attemptId.value}/result`, query: { just: '1' } })
   await Promise.all([
     qc.invalidateQueries({ queryKey: getGetAttemptsInProgressQueryKey() }),
     qc.invalidateQueries({ queryKey: getGetFinishedAttemptsQueryKey() }),
