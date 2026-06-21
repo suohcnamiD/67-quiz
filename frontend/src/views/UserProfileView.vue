@@ -22,6 +22,10 @@ const profile = computed(() => data.value)
 const authoredQuizzes = useGetQuizzesByAuthor(username, computed(() => ({ page: 0 })))
 const authored = computed(() => authoredQuizzes.data.value?._embedded?.quizzes ?? [])
 const cardError = ref<string | null>(null)
+
+function scrollToAuthored() {
+  document.getElementById('authored-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 </script>
 
 <template>
@@ -51,10 +55,16 @@ const cardError = ref<string | null>(null)
     </header>
 
     <section class="stats" aria-label="Profile statistics">
-      <div class="stat">
+      <button
+        type="button"
+        class="stat stat--link"
+        :disabled="(profile.quizzesAuthored ?? 0) === 0"
+        :aria-label="`${profile.quizzesAuthored ?? 0} quizzes authored — jump to list`"
+        @click="scrollToAuthored"
+      >
         <span class="stat__value">{{ profile.quizzesAuthored ?? 0 }}</span>
         <span class="stat__label label-sm">Quizzes authored</span>
-      </div>
+      </button>
       <div class="stat">
         <span class="stat__value">{{ profile.attemptsTaken ?? 0 }}</span>
         <span class="stat__label label-sm">Attempts taken</span>
@@ -67,7 +77,7 @@ const cardError = ref<string | null>(null)
       </div>
     </section>
 
-    <section class="authored" aria-labelledby="authored-heading">
+    <section id="authored-section" class="authored" aria-labelledby="authored-heading">
       <header class="authored__head">
         <h2 id="authored-heading" class="headline-md">
           Quizzes by {{ profile.displayName ?? profile.username }}
@@ -154,6 +164,25 @@ const cardError = ref<string | null>(null)
   background: var(--surface-container);
   border: 1px solid var(--outline-variant);
   border-radius: var(--radius-lg);
+  text-align: left;
+}
+.stat--link {
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease;
+}
+.stat--link:not(:disabled):hover {
+  border-color: var(--outline);
+  background: var(--surface-container-high);
+}
+.stat--link:not(:disabled):active {
+  transform: translateY(1px);
+}
+.stat--link:disabled {
+  cursor: default;
+  opacity: 0.85;
 }
 .stat__value {
   font-size: 2rem;

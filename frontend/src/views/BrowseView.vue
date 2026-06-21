@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useGetQuizzes } from '@/api/quiz-controller/quiz-controller'
 import {
   useGetAttemptsInProgress,
@@ -15,6 +15,7 @@ import QuizCard from '@/components/QuizCard.vue'
 import UserCard from '@/components/UserCard.vue'
 
 const router = useRouter()
+const route = useRoute()
 const errorText = ref<string | null>(null)
 
 const page = ref(0)
@@ -26,6 +27,24 @@ const items = computed(() => quizzes.data.value?._embedded?.quizzes ?? [])
 const inProgressItems = computed(() => inProgress.data.value?._embedded?.attempts ?? [])
 const finishedItems = computed(() => finished.data.value?._embedded?.attempts ?? [])
 const totalPages = computed(() => quizzes.data.value?.page?.totalPages ?? 1)
+
+// Hash-anchor scroll: when we arrive at /app#past-results (e.g. from the
+// profile's "Attempts taken" stat) the past-results section may not be in the
+// DOM yet — it's behind v-if and the finished-attempts query is still in
+// flight. Watch both signals and scroll once the target exists.
+function scrollToHashTarget() {
+  const id = route.hash.replace(/^#/, '')
+  if (!id) return
+  const el = document.getElementById(id)
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+onMounted(() => {
+  void nextTick(scrollToHashTarget)
+})
+watch(
+  [() => route.hash, finishedItems],
+  () => void nextTick(scrollToHashTarget),
+)
 
 // Search — debounced so we don't fire a request per keystroke. The backend
 // already short-circuits anything under 2 chars to empty results.
@@ -183,7 +202,7 @@ function fmtRelative(iso?: string): string {
       </div>
     </section>
 
-    <section v-if="finishedItems.length" class="section" aria-labelledby="past-heading">
+    <section v-if="finishedItems.length" id="past-results" class="section" aria-labelledby="past-heading">
       <header class="section__head">
         <h2 id="past-heading" class="headline-md">Past results</h2>
       </header>

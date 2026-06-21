@@ -146,6 +146,10 @@ watch(detailsOpen, (open) => {
 watch(avatarOpen, (open) => {
   if (!open) avatarError.value = null
 })
+
+function scrollToAuthored() {
+  document.getElementById('authored-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 </script>
 
 <template>
@@ -178,14 +182,26 @@ watch(avatarOpen, (open) => {
     </header>
 
     <section class="stats" aria-label="Profile statistics">
-      <div class="stat">
+      <button
+        type="button"
+        class="stat stat--link"
+        :disabled="(profile.quizzesAuthored ?? 0) === 0"
+        :aria-label="`${profile.quizzesAuthored ?? 0} quizzes authored — jump to list`"
+        @click="scrollToAuthored"
+      >
         <span class="stat__value">{{ profile.quizzesAuthored ?? 0 }}</span>
         <span class="stat__label label-sm">Quizzes authored</span>
-      </div>
-      <div class="stat">
+      </button>
+      <button
+        type="button"
+        class="stat stat--link"
+        :disabled="(profile.attemptsTaken ?? 0) === 0"
+        :aria-label="`${profile.attemptsTaken ?? 0} attempts taken — jump to past results`"
+        @click="router.push({ path: '/app', hash: '#past-results' })"
+      >
         <span class="stat__value">{{ profile.attemptsTaken ?? 0 }}</span>
         <span class="stat__label label-sm">Attempts taken</span>
-      </div>
+      </button>
       <div class="stat">
         <span class="stat__value">
           {{ profile.averageScorePercent != null ? `${profile.averageScorePercent}%` : '—' }}
@@ -194,7 +210,7 @@ watch(avatarOpen, (open) => {
       </div>
     </section>
 
-    <section class="authored" aria-labelledby="my-quizzes-heading">
+    <section id="authored-section" class="authored" aria-labelledby="my-quizzes-heading">
       <header class="authored__head">
         <h2 id="my-quizzes-heading" class="headline-md">Your quizzes</h2>
         <Button variant="ghost" @click="router.push('/app/quiz/new')">+ New quiz</Button>
@@ -359,6 +375,25 @@ watch(avatarOpen, (open) => {
   background: var(--surface-container);
   border: 1px solid var(--outline-variant);
   border-radius: var(--radius-lg);
+  text-align: left;
+}
+.stat--link {
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease;
+}
+.stat--link:not(:disabled):hover {
+  border-color: var(--outline);
+  background: var(--surface-container-high);
+}
+.stat--link:not(:disabled):active {
+  transform: translateY(1px);
+}
+.stat--link:disabled {
+  cursor: default;
+  opacity: 0.85;
 }
 .stat__value {
   font-size: 2rem;

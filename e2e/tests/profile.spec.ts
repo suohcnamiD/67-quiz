@@ -101,3 +101,37 @@ test('quiz card author chip links to the author profile', async ({ page }) => {
   // The freshly registered user isn't the author, so no "This is you" affordance.
   expect(page.url()).not.toContain(`/users/${username}`)
 })
+
+test('"Quizzes authored" stat is a button that disabled at zero', async ({ page }) => {
+  await registerAndLogin(page)
+  await page.goto('/app/profile')
+  const stat = page.getByRole('button', { name: /quizzes authored/i })
+  await expect(stat).toBeVisible()
+  await expect(stat).toBeDisabled()
+})
+
+test('"Attempts taken" stat navigates to Browse#past-results when there are attempts', async ({ page }) => {
+  // Sign in as sampler (has authored quizzes; we'll have them complete one).
+  await page.goto('/login')
+  await page.locator('input[autocomplete="username"]').fill('sampler')
+  await page.locator('input[autocomplete="current-password"]').fill('Passw0rd1')
+  await page.locator('button[type="submit"]').click()
+  await page.waitForURL(/\/app/, { timeout: 10_000 })
+
+  // Find a sampler quiz and finish an attempt via API so the Past-results
+  // section actually renders.
+  const quizzes = await (await page.request.get('http://localhost:5173/api/users/sampler/quizzes?page=0')).json()
+  const quizId = quizzes._embedded.quizzes[0].id
+  const startRes = await page.request.post('http://localhost:5173/api/attempt', {
+    data: { quizId }, headers: { 'Content-Type': 'application/json' },
+  })
+  const attempt = await startRes.json()
+  await page.request.patch('http://localhost:5173/api/attempt/finish', {
+    data: { attemptId: attempt.id }, headers: { 'Content-Type': 'application/json' },
+  })
+
+  await page.goto('/app/profile')
+  await page.getByRole('button', { name: /attempts taken/i }).click()
+  await page.waitForURL(/\/app(?:\?.*)?#past-results$/, { timeout: 10_000 })
+  await expect(page.getByRole('heading', { name: 'Past results' })).toBeVisible()
+})
