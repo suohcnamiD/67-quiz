@@ -30,11 +30,11 @@ const percent = computed(() => {
   return (attempt.value!.score ?? 0) / max
 })
 const percentLabel = computed(() => `${Math.round(percent.value * 100)}%`)
-const verdict = computed(() => {
+const tone = computed<'great' | 'good' | 'tried'>(() => {
   const p = percent.value
-  if (p >= 0.85) return { label: 'Brilliant', tone: 'great' as const }
-  if (p >= 0.5) return { label: 'Solid work', tone: 'good' as const }
-  return { label: 'Keep practising', tone: 'tried' as const }
+  if (p >= 0.85) return 'great'
+  if (p >= 0.5) return 'good'
+  return 'tried'
 })
 
 type OptState = 'correct' | 'wrong' | 'missed' | 'skipped'
@@ -76,11 +76,10 @@ watch([justFinished, attempt], ([just, a]) => {
     <Button @click="router.push('/app')">Back to browse</Button>
   </Card>
   <template v-else>
-    <Card :class="['hero', `hero--${verdict.tone}`]">
+    <Card :class="['hero', `hero--${tone}`]">
       <div class="hero__main">
         <span class="label-sm hero__eyebrow">Result</span>
         <h1 class="hero__title">{{ attempt.quiz?.name ?? 'Untitled quiz' }}</h1>
-        <p class="hero__verdict">{{ verdict.label }}</p>
         <p class="hero__points label-md">
           {{ attempt.score ?? 0 }} of {{ attempt.maximumScore ?? 0 }} points
         </p>
@@ -173,7 +172,6 @@ watch([justFinished, attempt], ([just, a]) => {
 /* ----- Hero ----- */
 .hero {
   --ring-color: var(--outline);
-  --hero-accent: var(--on-surface);
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
@@ -181,9 +179,9 @@ watch([justFinished, attempt], ([just, a]) => {
   margin-bottom: var(--space-md);
   padding: var(--space-xl);
 }
-.hero--great { --ring-color: var(--on-secondary-container); --hero-accent: var(--on-secondary-container); }
-.hero--good  { --ring-color: var(--on-surface);             --hero-accent: var(--on-surface); }
-.hero--tried { --ring-color: var(--on-error-container);     --hero-accent: var(--on-error-container); }
+.hero--great { --ring-color: var(--on-secondary-container); }
+.hero--good  { --ring-color: var(--on-surface); }
+.hero--tried { --ring-color: var(--on-error-container); }
 
 .hero__main {
   display: flex;
@@ -198,23 +196,16 @@ watch([justFinished, attempt], ([just, a]) => {
 }
 .hero__title {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.75rem;
   font-weight: 800;
   letter-spacing: -0.01em;
   color: var(--on-surface);
 }
-.hero__verdict {
-  margin: var(--space-sm) 0 0;
-  font-weight: 800;
-  font-size: 2rem;
-  line-height: 1;
-  letter-spacing: -0.02em;
-  color: var(--hero-accent);
-}
 .hero__points {
-  margin: var(--space-sm) 0 0;
+  margin: var(--space-md) 0 0;
   color: var(--on-surface-variant);
   font-variant-numeric: tabular-nums;
+  font-size: 1rem;
 }
 
 .hero__score {
@@ -224,16 +215,16 @@ watch([justFinished, attempt], ([just, a]) => {
 }
 .hero__ring {
   position: relative;
-  width: 144px;
-  height: 144px;
+  width: 220px;
+  height: 220px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .hero__ring-inner {
-  width: 116px;
-  height: 116px;
+  width: 184px;
+  height: 184px;
   border-radius: 50%;
   background: var(--surface-container);
   display: flex;
@@ -241,16 +232,24 @@ watch([justFinished, attempt], ([just, a]) => {
   justify-content: center;
 }
 .hero__percent {
-  font-size: 2.25rem;
+  font-size: 3.5rem;
   font-weight: 800;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
   color: var(--on-surface);
+  line-height: 1;
 }
 
 @media (max-width: 640px) {
-  .hero { grid-template-columns: 1fr; gap: var(--space-lg); text-align: left; }
+  .hero {
+    grid-template-columns: 1fr;
+    gap: var(--space-lg);
+    text-align: left;
+  }
   .hero__score { justify-content: flex-start; }
+  .hero__ring { width: 180px; height: 180px; }
+  .hero__ring-inner { width: 148px; height: 148px; }
+  .hero__percent { font-size: 2.75rem; }
 }
 
 /* ----- Floating top action ----- */
