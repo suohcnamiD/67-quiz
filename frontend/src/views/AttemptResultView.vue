@@ -44,17 +44,16 @@ function optState(o: FinishedOptionDto): OptState {
   if (o.correct && !o.selected) return 'missed'
   return 'skipped'
 }
-// Labels lead with what the *user* did, not what the option is — otherwise
-// "Correct" and "Wrong" don't tell you whether you picked the option.
-const optMeta: Record<OptState, { label: string; symbol: string }> = {
-  correct: { label: 'You picked — correct',   symbol: '✓' },
-  wrong:   { label: 'You picked — wrong',     symbol: '✗' },
-  missed:  { label: 'You skipped — was correct', symbol: '!' },
-  skipped: { label: 'You skipped',            symbol: '' },
+// The chip just says "+1 you got the point" (green) or "0 you didn't" (red).
+// The left-side checkbox already shows whether the user picked the option.
+const optMeta: Record<OptState, { score: '+1' | '0'; tone: 'win' | 'lose' }> = {
+  correct: { score: '+1', tone: 'win' },
+  skipped: { score: '+1', tone: 'win' },
+  wrong:   { score: '0',  tone: 'lose' },
+  missed:  { score: '0',  tone: 'lose' },
 }
-// Stable ordering so the same question doesn't reshuffle between renders:
-// correct picks first, then missed, then wrong picks, then skipped.
-const sortRank: Record<OptState, number> = { correct: 0, missed: 1, wrong: 2, skipped: 3 }
+// Stable ordering: things you got right first, then things you got wrong.
+const sortRank: Record<OptState, number> = { correct: 0, skipped: 1, missed: 2, wrong: 3 }
 function sortedOptions(q: FinishedQuestionDto): FinishedOptionDto[] {
   return [...(q.options ?? [])].sort((a, b) => sortRank[optState(a)] - sortRank[optState(b)])
 }
@@ -130,7 +129,7 @@ watch([justFinished, attempt], ([just, a]) => {
           <li
             v-for="o in sortedOptions(q)"
             :key="o.id"
-            :class="['opt', `opt--${optState(o)}`, { 'opt--picked': o.selected }]"
+            :class="['opt', `opt--${optState(o)}`, `opt--${optMeta[optState(o)].tone}`, { 'opt--picked': o.selected }]"
           >
             <span class="opt__pick" :aria-label="o.selected ? 'You picked this' : 'You did not pick this'">
               <span class="opt__pick-box">
@@ -138,10 +137,7 @@ watch([justFinished, attempt], ([just, a]) => {
               </span>
             </span>
             <span class="opt__text">{{ o.text }}</span>
-            <span class="opt__chip">
-              <span v-if="optMeta[optState(o)].symbol" class="opt__chip-symbol" aria-hidden="true">{{ optMeta[optState(o)].symbol }}</span>
-              {{ optMeta[optState(o)].label }}
-            </span>
+            <span class="opt__chip">{{ optMeta[optState(o)].score }}</span>
           </li>
         </ul>
       </li>
@@ -347,8 +343,7 @@ watch([justFinished, attempt], ([just, a]) => {
   color: var(--opt-fg);
 }
 
-/* Filled checkbox if the user picked this option, hollow otherwise.
-   This is what tells the reader what *they* did, independent of correctness. */
+/* The checkbox communicates what the user did, independent of correctness. */
 .opt__pick {
   display: inline-flex;
   align-items: center;
@@ -370,14 +365,10 @@ watch([justFinished, attempt], ([just, a]) => {
   border-color: var(--opt-accent);
 }
 .opt__pick-tick {
-  color: var(--opt-bg);
+  color: #000;
   font-weight: 800;
   font-size: 0.8rem;
   line-height: 1;
-}
-.opt--picked.opt--correct .opt__pick-tick,
-.opt--picked.opt--wrong .opt__pick-tick {
-  color: #000;
 }
 
 .opt__text {
@@ -385,60 +376,42 @@ watch([justFinished, attempt], ([just, a]) => {
   color: var(--opt-fg);
 }
 
+/* The chip communicates the point outcome only. +1 / 0 — that's it. */
 .opt__chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px 4px 8px;
+  justify-content: center;
+  min-width: 32px;
+  padding: 3px 10px;
   border-radius: 999px;
   background: var(--opt-accent);
   color: #000;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  font-size: 0.75rem;
-  white-space: nowrap;
-}
-.opt__chip-symbol {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.25);
-  color: inherit;
-  font-size: 0.7rem;
   font-weight: 800;
-  line-height: 1;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
 }
 
-.opt--correct {
-  --opt-bg: color-mix(in srgb, var(--on-secondary-container) 14%, var(--surface-container-low));
-  --opt-border: color-mix(in srgb, var(--on-secondary-container) 50%, transparent);
+/* Outcome tones drive the chip + surface tint. */
+.opt--win {
+  --opt-bg: color-mix(in srgb, var(--on-secondary-container) 12%, var(--surface-container-low));
+  --opt-border: color-mix(in srgb, var(--on-secondary-container) 40%, transparent);
   --opt-accent: var(--on-secondary-container);
 }
-.opt--wrong {
+.opt--lose {
   --opt-bg: color-mix(in srgb, var(--on-error-container) 12%, var(--surface-container-low));
-  --opt-border: color-mix(in srgb, var(--on-error-container) 50%, transparent);
+  --opt-border: color-mix(in srgb, var(--on-error-container) 45%, transparent);
   --opt-accent: var(--on-error-container);
 }
-.opt--missed {
-  --opt-bg: var(--surface-container-low);
-  --opt-border: color-mix(in srgb, var(--on-secondary-container) 35%, transparent);
-  --opt-accent: var(--on-secondary-container);
-}
+
+/* Skipped distractors are technically wins but visually quieter so the
+   reader's eye is drawn to picks and mistakes first. */
 .opt--skipped {
-  --opt-bg: transparent;
+  --opt-bg: var(--surface-container-low);
   --opt-border: var(--outline-variant);
-  --opt-accent: var(--on-surface-variant);
-  --opt-fg: var(--on-surface-variant);
 }
 .opt--skipped .opt__chip {
   background: transparent;
-  border: 1px solid var(--outline-variant);
-  color: var(--on-surface-variant);
-}
-.opt--skipped .opt__chip-symbol {
-  display: none;
+  color: var(--on-secondary-container);
+  border: 1px solid color-mix(in srgb, var(--on-secondary-container) 40%, transparent);
 }
 </style>

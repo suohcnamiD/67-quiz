@@ -199,10 +199,13 @@ test('finished attempt shows clear correct/wrong cues', async ({ page }) => {
   })
 
   await page.goto(`/app/attempt/${attemptId}/result`)
-  // Both states must read explicitly in terms of the user's action.
-  await expect(page.getByText(/You picked — correct/i).first()).toBeVisible()
-  await expect(page.getByText(/You skipped$/).first()).toBeVisible()
-  // sanity: the correct option's row has the green visual state class
-  await expect(page.locator('.opt--correct').first()).toBeVisible()
+  // Each row reads a +1 or 0 chip and a filled/hollow checkbox.
+  // The user picked "right" → that row earns +1 with the box ticked.
+  // They skipped the distractor "wrong" → that row also earns +1 (skipped correctly)
+  // but should be muted (.opt--skipped, outline-only chip).
+  const pickedRight = page.locator('.opt--picked.opt--win').first()
+  await expect(pickedRight).toBeVisible()
+  await expect(pickedRight.locator('.opt__chip')).toHaveText('+1')
+  await expect(page.locator('.opt--skipped').first()).toBeVisible()
 })
 
