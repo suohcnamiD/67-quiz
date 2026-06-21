@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useGetQuiz, _delete as deleteQuiz, getGetQuizQueryKey } from '@/api/quiz-controller/quiz-controller'
 import { addQuizQuestion, deleteQuizQuestion } from '@/api/question-controller/question-controller'
 import { useQueryClient } from '@tanstack/vue-query'
-import { firstErrorCode } from '@/lib/axios'
+import { errorMessage } from '@/lib/errors'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import Input from '@/components/Input.vue'
@@ -24,7 +24,7 @@ const optionRows = ref<OptionData[]>([
   { text: '', correct: false },
 ])
 const submitting = ref(false)
-const errorMessage = ref<string | null>(null)
+const errorText = ref<string | null>(null)
 
 function addOption() {
   optionRows.value.push({ text: '', correct: false })
@@ -41,9 +41,9 @@ function resetForm() {
 }
 
 async function submitQuestion() {
-  errorMessage.value = null
+  errorText.value = null
   if (!questionText.value.trim()) {
-    errorMessage.value = 'Question text is required.'
+    errorText.value = 'Question text is required.'
     return
   }
   submitting.value = true
@@ -56,8 +56,7 @@ async function submitQuestion() {
     resetForm()
     qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) })
   } catch (e) {
-    const code = firstErrorCode(e)
-    errorMessage.value = code === 'BLANK_OPTION_TEXT' ? 'Option text cannot be blank.' : code ?? 'Failed to add question.'
+    errorText.value = errorMessage(e)
   } finally {
     submitting.value = false
   }
@@ -67,9 +66,12 @@ const removingId = ref<string | null>(null)
 async function removeQuestion(id?: string) {
   if (!id) return
   removingId.value = id
+  errorText.value = null
   try {
     await deleteQuizQuestion(id)
     qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) })
+  } catch (e) {
+    errorText.value = errorMessage(e)
   } finally {
     removingId.value = null
   }
@@ -77,8 +79,13 @@ async function removeQuestion(id?: string) {
 
 async function removeQuiz() {
   if (!confirm('Delete this quiz? This cannot be undone.')) return
-  await deleteQuiz(quizId.value)
-  router.push('/app')
+  errorText.value = null
+  try {
+    await deleteQuiz(quizId.value)
+    router.push('/app')
+  } catch (e) {
+    errorText.value = errorMessage(e)
+  }
 }
 
 watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) }))
@@ -147,7 +154,7 @@ watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.v
             </div>
             <Button variant="ghost" type="button" @click="addOption">+ Add option</Button>
           </div>
-          <p v-if="errorMessage" class="form__error label-md">{{ errorMessage }}</p>
+          <p v-if="errorText" class="form__error label-md">{{ errorText }}</p>
           <Button type="submit" :loading="submitting">Add question</Button>
         </form>
       </Card>

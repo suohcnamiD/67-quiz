@@ -3,6 +3,7 @@ import { ref, computed, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGetAttemptsInProgress, commitAttemptActions, finishAttempt, getGetAttemptsInProgressQueryKey, getGetFinishedAttemptsQueryKey } from '@/api/attempt-controller/attempt-controller'
 import { useQueryClient } from '@tanstack/vue-query'
+import { errorMessage } from '@/lib/errors'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
@@ -40,17 +41,21 @@ function fmtRemaining(ms: number): string {
 
 const totalQuestions = computed(() => attempt.value?.questions?.length ?? 0)
 
+const errorText = ref<string | null>(null)
 const togglingKey = ref<string | null>(null)
 async function toggleOption(questionId?: string, optionId?: string, currentlySelected?: boolean) {
   if (!questionId || !optionId) return
   const key = `${questionId}:${optionId}`
   togglingKey.value = key
+  errorText.value = null
   try {
     await commitAttemptActions({
       attemptId: attemptId.value,
       actions: [{ questionId, optionId, selected: !currentlySelected }],
     })
     qc.invalidateQueries({ queryKey: getGetAttemptsInProgressQueryKey() })
+  } catch (e) {
+    errorText.value = errorMessage(e)
   } finally {
     togglingKey.value = null
   }
@@ -60,6 +65,7 @@ const finishing = ref(false)
 async function finish() {
   if (!confirm('Finish this attempt?')) return
   finishing.value = true
+  errorText.value = null
   try {
     await finishAttempt({ attemptId: attemptId.value })
     await Promise.all([
@@ -67,6 +73,8 @@ async function finish() {
       qc.invalidateQueries({ queryKey: getGetFinishedAttemptsQueryKey() }),
     ])
     router.push(`/app/attempt/${attemptId.value}/result`)
+  } catch (e) {
+    errorText.value = errorMessage(e)
   } finally {
     finishing.value = false
   }
@@ -97,6 +105,8 @@ watch(attempt, (a) => {
       </div>
       <Button :loading="finishing" @click="finish">Finish attempt</Button>
     </header>
+
+    <p v-if="errorText" class="banner label-md">{{ errorText }}</p>
 
     <ol class="qlist">
       <li v-for="(q, i) in attempt.questions ?? []" :key="q.id">
@@ -158,6 +168,13 @@ watch(attempt, (a) => {
 }
 .time {
   font-variant-numeric: tabular-nums;
+}
+.banner {
+  margin: 0 0 var(--space-lg);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--error-container);
+  color: var(--on-error-container);
+  border-radius: var(--radius);
 }
 .qlist {
   list-style: none;

@@ -4,12 +4,14 @@ import { useRouter } from 'vue-router'
 import { useGetQuizzes, _delete as deleteQuiz, getGetQuizzesQueryKey } from '@/api/quiz-controller/quiz-controller'
 import { useGetAttemptsInProgress, useGetFinishedAttempts, attemptQuiz, getGetAttemptsInProgressQueryKey } from '@/api/attempt-controller/attempt-controller'
 import { useQueryClient } from '@tanstack/vue-query'
+import { errorMessage } from '@/lib/errors'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import Chip from '@/components/Chip.vue'
 
 const router = useRouter()
 const qc = useQueryClient()
+const errorText = ref<string | null>(null)
 
 const page = ref(0)
 
@@ -55,10 +57,13 @@ const startingId = ref<string | null>(null)
 async function startAttempt(quizId?: string) {
   if (!quizId) return
   startingId.value = quizId
+  errorText.value = null
   try {
     const attempt = await attemptQuiz({ quizId })
     qc.invalidateQueries({ queryKey: getGetAttemptsInProgressQueryKey() })
     if (attempt.id) router.push(`/app/attempt/${attempt.id}`)
+  } catch (e) {
+    errorText.value = errorMessage(e)
   } finally {
     startingId.value = null
   }
@@ -69,9 +74,12 @@ async function removeQuiz(id?: string) {
   if (!id) return
   if (!confirm('Delete this quiz? This cannot be undone.')) return
   deletingId.value = id
+  errorText.value = null
   try {
     await deleteQuiz(id)
     qc.invalidateQueries({ queryKey: getGetQuizzesQueryKey() })
+  } catch (e) {
+    errorText.value = errorMessage(e)
   } finally {
     deletingId.value = null
   }
@@ -79,6 +87,7 @@ async function removeQuiz(id?: string) {
 </script>
 
 <template>
+  <p v-if="errorText" class="banner label-md">{{ errorText }}</p>
   <section class="section">
     <header class="section__head">
       <h2 class="headline-md">Continue</h2>
@@ -155,6 +164,13 @@ async function removeQuiz(id?: string) {
 </template>
 
 <style scoped>
+.banner {
+  margin: 0 0 var(--space-lg);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--error-container);
+  color: var(--on-error-container);
+  border-radius: var(--radius);
+}
 .section {
   margin-bottom: var(--space-xl);
 }

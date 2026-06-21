@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { createQuiz } from '@/api/quiz-controller/quiz-controller'
-import { firstErrorCode } from '@/lib/axios'
+import { errorMessage } from '@/lib/errors'
 import Button from '@/components/Button.vue'
 import Input from '@/components/Input.vue'
 import Card from '@/components/Card.vue'
@@ -11,17 +11,17 @@ const router = useRouter()
 const name = ref('')
 const minutes = ref('15')
 const submitting = ref(false)
-const errorMessage = ref<string | null>(null)
+const errorText = ref<string | null>(null)
 
 async function submit() {
-  errorMessage.value = null
+  errorText.value = null
   const mins = Number(minutes.value)
   if (!name.value.trim()) {
-    errorMessage.value = 'Give the quiz a name.'
+    errorText.value = 'Give the quiz a name.'
     return
   }
   if (!Number.isFinite(mins) || mins <= 0) {
-    errorMessage.value = 'Duration must be a positive number of minutes.'
+    errorText.value = 'Duration must be a positive number of minutes.'
     return
   }
   submitting.value = true
@@ -32,8 +32,7 @@ async function submit() {
     })
     if (quiz.id) router.push(`/app/quiz/${quiz.id}`)
   } catch (e) {
-    const code = firstErrorCode(e)
-    errorMessage.value = code ?? 'Could not create quiz.'
+    errorText.value = errorMessage(e)
   } finally {
     submitting.value = false
   }
@@ -48,7 +47,7 @@ async function submit() {
       <form class="form" @submit.prevent="submit">
         <Input v-model="name" label="Quiz name" placeholder="e.g. Trivia Showdown" />
         <Input v-model="minutes" label="Duration (minutes)" type="number" />
-        <p v-if="errorMessage" class="form__error label-md">{{ errorMessage }}</p>
+        <p v-if="errorText" class="form__error label-md">{{ errorText }}</p>
         <div class="actions">
           <Button variant="ghost" @click="router.push('/app')">Cancel</Button>
           <Button type="submit" :loading="submitting">Create</Button>
