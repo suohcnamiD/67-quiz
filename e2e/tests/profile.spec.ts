@@ -110,6 +110,26 @@ test('"Quizzes authored" stat is a button that disabled at zero', async ({ page 
   await expect(stat).toBeDisabled()
 })
 
+test('"Quizzes authored" stat flashes the authored section when clicked', async ({ page }) => {
+  // Sampler has authored quizzes, so the stat is enabled.
+  await page.goto('/login')
+  await page.locator('input[autocomplete="username"]').fill('sampler')
+  await page.locator('input[autocomplete="current-password"]').fill('Passw0rd1')
+  await page.locator('button[type="submit"]').click()
+  await page.waitForURL(/\/app/, { timeout: 10_000 })
+
+  await page.goto('/app/profile')
+  await page.waitForLoadState('networkidle')
+  const stat = page.getByRole('button', { name: /quizzes authored/i })
+  await expect(stat).not.toBeDisabled()
+
+  const section = page.locator('#authored-section')
+  await expect(section).not.toHaveClass(/flash-target/)
+  await stat.click()
+  // The helper toggles the class on; the animation removes it after ~1s.
+  await expect(section).toHaveClass(/flash-target/, { timeout: 1000 })
+})
+
 test('"Attempts taken" stat navigates to Browse#past-results when there are attempts', async ({ page }) => {
   // Sign in as sampler (has authored quizzes; we'll have them complete one).
   await page.goto('/login')

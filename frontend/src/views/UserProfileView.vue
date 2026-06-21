@@ -6,6 +6,7 @@ import {
   useGetQuizzesByAuthor,
 } from '@/api/user-profile-controller/user-profile-controller'
 import { useAuthStore } from '@/stores/auth'
+import { scrollAndFlash } from '@/lib/scrollAndFlash'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import Avatar from '@/components/Avatar.vue'
@@ -24,7 +25,7 @@ const authored = computed(() => authoredQuizzes.data.value?._embedded?.quizzes ?
 const cardError = ref<string | null>(null)
 
 function scrollToAuthored() {
-  document.getElementById('authored-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  scrollAndFlash('authored-section')
 }
 </script>
 

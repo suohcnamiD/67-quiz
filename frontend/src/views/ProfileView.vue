@@ -13,6 +13,7 @@ import {
 } from '@/api/user-profile-controller/user-profile-controller'
 import { useAuthStore } from '@/stores/auth'
 import { errorMessage } from '@/lib/errors'
+import { scrollAndFlash } from '@/lib/scrollAndFlash'
 import Button from '@/components/Button.vue'
 import Input from '@/components/Input.vue'
 import Avatar from '@/components/Avatar.vue'
@@ -148,7 +149,7 @@ watch(avatarOpen, (open) => {
 })
 
 function scrollToAuthored() {
-  document.getElementById('authored-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  scrollAndFlash('authored-section')
 }
 </script>
 
