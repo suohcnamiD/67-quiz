@@ -159,8 +159,7 @@ test('attempt result shows the score with the label "Score"', async ({ page }) =
 
   // Hero shows the percentage and pts. Per-question card shows a "Score" badge.
   await expect(page.getByText(/^\d+%$/).first()).toBeVisible()
-  await expect(page.getByText(/\d+ \/ \d+ pts/).first()).toBeVisible()
-  await expect(page.getByText(/Score/).first()).toBeVisible()
+  await expect(page.getByText(/of \d+ points/).first()).toBeVisible()
 })
 
 test('finished attempt shows clear correct/wrong cues', async ({ page }) => {
@@ -200,10 +199,9 @@ test('finished attempt shows clear correct/wrong cues', async ({ page }) => {
   })
 
   await page.goto(`/app/attempt/${attemptId}/result`)
-  // Each state must produce a visible chip.
-  await expect(page.getByText('Correct').first()).toBeVisible()
-  // The "wrong" option was a distractor we left unselected → 'Distractor' chip.
-  await expect(page.getByText('Distractor').first()).toBeVisible()
+  // Both states must read explicitly in terms of the user's action.
+  await expect(page.getByText(/You picked — correct/i).first()).toBeVisible()
+  await expect(page.getByText(/You skipped$/).first()).toBeVisible()
   // sanity: the correct option's row has the green visual state class
   await expect(page.locator('.opt--correct').first()).toBeVisible()
 })

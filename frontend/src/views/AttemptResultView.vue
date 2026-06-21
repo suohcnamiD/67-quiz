@@ -24,7 +24,6 @@ function questionScore(q: FinishedQuestionDto): { earned: number; max: number } 
   }
 }
 
-// Verdict for the hero block.
 const percent = computed(() => {
   const max = attempt.value?.maximumScore ?? 0
   if (!max) return 0
@@ -33,12 +32,11 @@ const percent = computed(() => {
 const percentLabel = computed(() => `${Math.round(percent.value * 100)}%`)
 const verdict = computed(() => {
   const p = percent.value
-  if (p >= 0.85) return { label: 'Brilliant', tone: 'great' }
-  if (p >= 0.5) return { label: 'Solid work', tone: 'good' }
-  return { label: 'Keep practising', tone: 'tried' }
+  if (p >= 0.85) return { label: 'Brilliant', tone: 'great' as const }
+  if (p >= 0.5) return { label: 'Solid work', tone: 'good' as const }
+  return { label: 'Keep practising', tone: 'tried' as const }
 })
 
-// Per-option visual state.
 type OptState = 'correct' | 'wrong' | 'missed' | 'skipped'
 function optState(o: FinishedOptionDto): OptState {
   if (o.correct && o.selected) return 'correct'
@@ -46,16 +44,21 @@ function optState(o: FinishedOptionDto): OptState {
   if (o.correct && !o.selected) return 'missed'
   return 'skipped'
 }
+// Labels lead with what the *user* did, not what the option is — otherwise
+// "Correct" and "Wrong" don't tell you whether you picked the option.
 const optMeta: Record<OptState, { label: string; symbol: string }> = {
-  correct: { label: 'Correct', symbol: '✓' },
-  wrong: { label: 'Wrong', symbol: '✗' },
-  missed: { label: 'Missed', symbol: '–' },
-  skipped: { label: 'Distractor', symbol: '·' },
+  correct: { label: 'You picked — correct',   symbol: '✓' },
+  wrong:   { label: 'You picked — wrong',     symbol: '✗' },
+  missed:  { label: 'You skipped — was correct', symbol: '!' },
+  skipped: { label: 'You skipped',            symbol: '' },
+}
+// Stable ordering so the same question doesn't reshuffle between renders:
+// correct picks first, then missed, then wrong picks, then skipped.
+const sortRank: Record<OptState, number> = { correct: 0, missed: 1, wrong: 2, skipped: 3 }
+function sortedOptions(q: FinishedQuestionDto): FinishedOptionDto[] {
+  return [...(q.options ?? [])].sort((a, b) => sortRank[optState(a)] - sortRank[optState(b)])
 }
 
-// Show the celebration once when arriving from a fresh finish (?just=1).
-// Strip the flag from the URL after capturing it so a refresh doesn't replay
-// it and the user can share/bookmark the result URL cleanly.
 const justFinished = ref(route.query.just === '1')
 if (justFinished.value) {
   router.replace({ path: route.path, query: { ...route.query, just: undefined } })
@@ -76,9 +79,12 @@ watch([justFinished, attempt], ([just, a]) => {
   <template v-else>
     <Card :class="['hero', `hero--${verdict.tone}`]">
       <div class="hero__main">
-        <span class="label-sm muted">Result</span>
-        <h1 class="headline-md hero__title">{{ attempt.quiz?.name ?? 'Untitled quiz' }}</h1>
+        <span class="label-sm hero__eyebrow">Result</span>
+        <h1 class="hero__title">{{ attempt.quiz?.name ?? 'Untitled quiz' }}</h1>
         <p class="hero__verdict">{{ verdict.label }}</p>
+        <p class="hero__points label-md">
+          {{ attempt.score ?? 0 }} of {{ attempt.maximumScore ?? 0 }} points
+        </p>
       </div>
       <div class="hero__score">
         <div
@@ -89,52 +95,55 @@ watch([justFinished, attempt], ([just, a]) => {
         >
           <div class="hero__ring-inner">
             <span class="hero__percent">{{ percentLabel }}</span>
-            <span class="hero__points label-sm muted">
-              {{ attempt.score ?? 0 }} / {{ attempt.maximumScore ?? 0 }} pts
-            </span>
           </div>
         </div>
       </div>
-      <div class="hero__action">
-        <Button variant="ghost" @click="router.push('/app')">Back to browse</Button>
-      </div>
     </Card>
 
+    <div class="actions">
+      <Button variant="ghost" @click="router.push('/app')">Back to browse</Button>
+    </div>
+
     <ol class="qlist">
-      <li v-for="(q, i) in attempt.questions ?? []" :key="q.id">
-        <Card>
-          <div class="qhead">
-            <div class="qhead__title">
-              <span class="label-sm muted">Question {{ i + 1 }} of {{ attempt.questions?.length ?? 0 }}</span>
-              <p class="body-lg q-text">{{ q.text }}</p>
-            </div>
-            <div
-              :class="[
-                'qhead__score',
-                {
-                  'qhead__score--full': questionScore(q).earned === questionScore(q).max,
-                  'qhead__score--zero': questionScore(q).earned === 0,
-                },
-              ]"
-            >
-              <span class="label-sm">Score</span>
-              <span class="qhead__score-value">
-                {{ questionScore(q).earned }} <span class="muted">/ {{ questionScore(q).max }}</span>
-              </span>
-            </div>
+      <li v-for="(q, i) in attempt.questions ?? []" :key="q.id" class="question">
+        <header class="qhead">
+          <div class="qhead__title">
+            <span class="label-sm muted">Question {{ i + 1 }} of {{ attempt.questions?.length ?? 0 }}</span>
+            <p class="q-text">{{ q.text }}</p>
           </div>
-          <ul class="opts">
-            <li
-              v-for="o in q.options ?? []"
-              :key="o.id"
-              :class="['opt', `opt--${optState(o)}`]"
-            >
-              <span class="opt__icon" aria-hidden="true">{{ optMeta[optState(o)].symbol }}</span>
-              <span class="opt__text">{{ o.text }}</span>
-              <span class="opt__chip label-sm">{{ optMeta[optState(o)].label }}</span>
-            </li>
-          </ul>
-        </Card>
+          <div
+            :class="[
+              'qhead__score',
+              {
+                'qhead__score--full': questionScore(q).earned === questionScore(q).max,
+                'qhead__score--zero': questionScore(q).earned === 0,
+              },
+            ]"
+            :title="`${questionScore(q).earned} of ${questionScore(q).max} points`"
+          >
+            <span class="qhead__score-value">{{ questionScore(q).earned }}</span>
+            <span class="qhead__score-divider">/</span>
+            <span class="qhead__score-max">{{ questionScore(q).max }}</span>
+          </div>
+        </header>
+        <ul class="opts">
+          <li
+            v-for="o in sortedOptions(q)"
+            :key="o.id"
+            :class="['opt', `opt--${optState(o)}`, { 'opt--picked': o.selected }]"
+          >
+            <span class="opt__pick" :aria-label="o.selected ? 'You picked this' : 'You did not pick this'">
+              <span class="opt__pick-box">
+                <span v-if="o.selected" class="opt__pick-tick">✓</span>
+              </span>
+            </span>
+            <span class="opt__text">{{ o.text }}</span>
+            <span class="opt__chip">
+              <span v-if="optMeta[optState(o)].symbol" class="opt__chip-symbol" aria-hidden="true">{{ optMeta[optState(o)].symbol }}</span>
+              {{ optMeta[optState(o)].label }}
+            </span>
+          </li>
+        </ul>
       </li>
     </ol>
 
@@ -165,34 +174,52 @@ watch([justFinished, attempt], ([just, a]) => {
   color: var(--on-surface-variant);
 }
 
-/* Hero */
+/* ----- Hero ----- */
 .hero {
   --ring-color: var(--outline);
+  --hero-accent: var(--on-surface);
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  gap: var(--space-lg);
-  margin-bottom: var(--space-xl);
+  gap: var(--space-xl);
+  margin-bottom: var(--space-md);
+  padding: var(--space-xl);
 }
-.hero--great { --ring-color: var(--on-secondary-container); }
-.hero--good  { --ring-color: var(--on-primary-container); }
-.hero--tried { --ring-color: var(--outline); }
+.hero--great { --ring-color: var(--on-secondary-container); --hero-accent: var(--on-secondary-container); }
+.hero--good  { --ring-color: var(--on-surface);             --hero-accent: var(--on-surface); }
+.hero--tried { --ring-color: var(--on-error-container);     --hero-accent: var(--on-error-container); }
+
 .hero__main {
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+  min-width: 0;
+}
+.hero__eyebrow {
+  color: var(--on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 .hero__title {
   margin: 0;
-}
-.hero__verdict {
-  margin: var(--space-xs) 0 0;
-  font-weight: 700;
-  font-size: 1.25rem;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
   color: var(--on-surface);
 }
-.hero--great .hero__verdict { color: var(--on-secondary-container); }
-.hero--good  .hero__verdict { color: var(--on-primary-container); }
+.hero__verdict {
+  margin: var(--space-sm) 0 0;
+  font-weight: 800;
+  font-size: 2rem;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--hero-accent);
+}
+.hero__points {
+  margin: var(--space-sm) 0 0;
+  color: var(--on-surface-variant);
+  font-variant-numeric: tabular-nums;
+}
 
 .hero__score {
   display: flex;
@@ -201,49 +228,52 @@ watch([justFinished, attempt], ([just, a]) => {
 }
 .hero__ring {
   position: relative;
-  width: 112px;
-  height: 112px;
+  width: 144px;
+  height: 144px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .hero__ring-inner {
-  width: 90px;
-  height: 90px;
+  width: 116px;
+  height: 116px;
   border-radius: 50%;
   background: var(--surface-container);
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
 }
 .hero__percent {
-  font-size: 1.5rem;
+  font-size: 2.25rem;
   font-weight: 800;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   color: var(--on-surface);
 }
-.hero__points {
-  font-variant-numeric: tabular-nums;
-}
 
 @media (max-width: 640px) {
-  .hero {
-    grid-template-columns: 1fr;
-    text-align: left;
-  }
+  .hero { grid-template-columns: 1fr; gap: var(--space-lg); text-align: left; }
   .hero__score { justify-content: flex-start; }
-  .hero__action { justify-self: flex-start; }
 }
 
-/* Question list */
+/* ----- Floating top action ----- */
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 var(--space-lg);
+}
+
+/* ----- Question list — flat, no nested cards ----- */
 .qlist {
   list-style: none;
   padding: 0;
   margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+.question {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
@@ -253,25 +283,31 @@ watch([justFinished, attempt], ([just, a]) => {
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-md);
-  margin-bottom: var(--space-md);
 }
 .qhead__title {
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+  min-width: 0;
 }
 .q-text {
   margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--on-surface);
+  line-height: 1.4;
 }
 .qhead__score {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  padding: var(--space-sm) var(--space-md);
-  border-radius: var(--radius-md);
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  padding: 6px 12px;
+  border-radius: 999px;
   background: var(--surface-container-high);
-  color: var(--on-surface-variant);
-  white-space: nowrap;
+  color: var(--on-surface);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
 }
 .qhead__score--full {
   background: var(--secondary-container);
@@ -281,92 +317,128 @@ watch([justFinished, attempt], ([just, a]) => {
   background: var(--error-container);
   color: var(--on-error-container);
 }
-.qhead__score-value {
-  font-size: 1.25rem;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  color: inherit;
-}
-.qhead__score--full .qhead__score-value .muted,
-.qhead__score--zero .qhead__score-value .muted {
-  color: inherit;
-  opacity: 0.7;
-}
+.qhead__score-value { font-size: 1rem; }
+.qhead__score-divider { opacity: 0.5; }
+.qhead__score-max { font-size: 0.875rem; opacity: 0.7; }
 
-/* Options */
+/* ----- Options ----- */
 .opts {
   list-style: none;
   padding: 0;
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: 6px;
 }
 .opt {
   --opt-bg: var(--surface-container-low);
   --opt-border: var(--outline-variant);
-  --opt-fg: var(--on-surface);
   --opt-accent: var(--on-surface-variant);
+  --opt-fg: var(--on-surface);
 
   display: grid;
-  grid-template-columns: 28px 1fr auto;
+  grid-template-columns: 24px 1fr auto;
   align-items: center;
   gap: var(--space-md);
-  padding: var(--space-md);
+  padding: 12px var(--space-md);
   background: var(--opt-bg);
   border: 1px solid var(--opt-border);
-  border-left-width: 4px;
-  border-radius: var(--radius);
+  border-radius: var(--radius-md);
   color: var(--opt-fg);
 }
-.opt__icon {
+
+/* Filled checkbox if the user picked this option, hollow otherwise.
+   This is what tells the reader what *they* did, independent of correctness. */
+.opt__pick {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
+}
+.opt__pick-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  border: 1.5px solid var(--on-surface-variant);
+  background: transparent;
+  transition: background-color 120ms, border-color 120ms;
+}
+.opt--picked .opt__pick-box {
   background: var(--opt-accent);
+  border-color: var(--opt-accent);
+}
+.opt__pick-tick {
   color: var(--opt-bg);
   font-weight: 800;
-  font-size: 0.95rem;
+  font-size: 0.8rem;
   line-height: 1;
 }
-.opt__text {
-  font-size: 1rem;
+.opt--picked.opt--correct .opt__pick-tick,
+.opt--picked.opt--wrong .opt__pick-tick {
+  color: #000;
 }
+
+.opt__text {
+  font-size: 0.975rem;
+  color: var(--opt-fg);
+}
+
 .opt__chip {
-  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 8px;
   border-radius: 999px;
   background: var(--opt-accent);
-  color: var(--opt-bg);
+  color: #000;
   font-weight: 700;
   letter-spacing: 0.02em;
-  text-transform: uppercase;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+.opt__chip-symbol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.25);
+  color: inherit;
   font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .opt--correct {
-  --opt-bg: color-mix(in srgb, var(--secondary-container) 35%, var(--surface-container-low));
-  --opt-border: var(--on-secondary-container);
-  --opt-fg: var(--on-surface);
+  --opt-bg: color-mix(in srgb, var(--on-secondary-container) 14%, var(--surface-container-low));
+  --opt-border: color-mix(in srgb, var(--on-secondary-container) 50%, transparent);
   --opt-accent: var(--on-secondary-container);
 }
 .opt--wrong {
-  --opt-bg: color-mix(in srgb, var(--error-container) 28%, var(--surface-container-low));
-  --opt-border: var(--on-error-container);
+  --opt-bg: color-mix(in srgb, var(--on-error-container) 12%, var(--surface-container-low));
+  --opt-border: color-mix(in srgb, var(--on-error-container) 50%, transparent);
   --opt-accent: var(--on-error-container);
 }
 .opt--missed {
   --opt-bg: var(--surface-container-low);
-  --opt-border: var(--on-secondary-container);
+  --opt-border: color-mix(in srgb, var(--on-secondary-container) 35%, transparent);
   --opt-accent: var(--on-secondary-container);
-  border-left-style: dashed;
 }
 .opt--skipped {
-  --opt-bg: var(--surface-container-low);
+  --opt-bg: transparent;
   --opt-border: var(--outline-variant);
   --opt-accent: var(--on-surface-variant);
-  opacity: 0.7;
+  --opt-fg: var(--on-surface-variant);
+}
+.opt--skipped .opt__chip {
+  background: transparent;
+  border: 1px solid var(--outline-variant);
+  color: var(--on-surface-variant);
+}
+.opt--skipped .opt__chip-symbol {
+  display: none;
 }
 </style>

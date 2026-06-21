@@ -57,8 +57,8 @@ test('full happy path: create quiz → add question → start attempt → finish
   const popup = page.getByRole('dialog')
   if (await popup.count()) await popup.locator('..').click({ force: true }).catch(() => {})
 
-  // Should show score (not JSON)
-  await expect(page.getByRole('heading', { name: /score/i }).or(page.getByText('Score').first())).toBeVisible()
+  // Should show score (not JSON) — the result hero shows a percent.
+  await expect(page.getByText(/^\d+%$/).first()).toBeVisible()
   const body = (await page.locator('body').innerText()).trim()
   expect(body).not.toMatch(/^\{/)
 })
