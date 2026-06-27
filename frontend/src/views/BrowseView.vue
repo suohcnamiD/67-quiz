@@ -6,7 +6,9 @@ import {
   useGetAttemptsInProgress,
   useGetFinishedAttempts,
 } from '@/api/attempt-controller/attempt-controller'
+import { useGetOwnProfile } from '@/api/user-profile-controller/user-profile-controller'
 import { useSearch } from '@/api/search-controller/search-controller'
+import { useAuthStore } from '@/stores/auth'
 import { useDebouncedRef } from '@/lib/useDebouncedRef'
 import Card from '@/components/Card.vue'
 import Chip from '@/components/Chip.vue'
@@ -16,12 +18,19 @@ import UserCard from '@/components/UserCard.vue'
 
 const router = useRouter()
 const route = useRoute()
+const auth = useAuthStore()
 const errorText = ref<string | null>(null)
 
 const page = ref(0)
 const quizzes = useGetQuizzes(computed(() => ({ page: page.value })))
 const inProgress = useGetAttemptsInProgress({ page: 0 })
 const finished = useGetFinishedAttempts({ page: 0 })
+const profile = useGetOwnProfile()
+
+const me = computed(() => profile.data.value)
+const greetingName = computed(
+  () => me.value?.displayName ?? me.value?.username ?? auth.displayName ?? auth.username ?? 'there',
+)
 
 const items = computed(() => quizzes.data.value?._embedded?.quizzes ?? [])
 const inProgressItems = computed(() => inProgress.data.value?._embedded?.attempts ?? [])
@@ -102,6 +111,29 @@ function fmtRelative(iso?: string): string {
 
 <template>
   <p v-if="errorText" class="banner label-md" role="alert">{{ errorText }}</p>
+
+  <section class="hero" aria-label="Your dashboard">
+    <div class="hero__head">
+      <span class="label-sm muted">Signed in</span>
+      <h1 class="hero__title">Welcome back, {{ greetingName }}.</h1>
+    </div>
+    <ul class="stats">
+      <li class="stat">
+        <span class="stat__label label-sm muted">Quizzes authored</span>
+        <span class="stat__value">{{ me?.quizzesAuthored ?? 0 }}</span>
+      </li>
+      <li class="stat">
+        <span class="stat__label label-sm muted">Attempts taken</span>
+        <span class="stat__value">{{ me?.attemptsTaken ?? 0 }}</span>
+      </li>
+      <li class="stat">
+        <span class="stat__label label-sm muted">Average score</span>
+        <span class="stat__value">
+          {{ me?.averageScorePercent != null ? `${me.averageScorePercent}%` : '—' }}
+        </span>
+      </li>
+    </ul>
+  </section>
 
   <section class="search" aria-label="Search">
     <label class="search__field">
@@ -240,6 +272,53 @@ function fmtRelative(iso?: string): string {
   background: var(--error-container);
   color: var(--on-error-container);
   border-radius: var(--radius);
+}
+.hero {
+  margin: 0 0 var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+.hero__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.hero__title {
+  margin: 0;
+  font-size: clamp(1.5rem, 4vw, 2.25rem);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--on-surface);
+}
+.stats {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+.stat {
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md) var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.stat__value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--on-surface);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+@media (max-width: 640px) {
+  .stats {
+    grid-template-columns: 1fr;
+  }
 }
 .search {
   margin-bottom: var(--space-lg);

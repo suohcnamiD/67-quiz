@@ -75,6 +75,8 @@ import Card from '@/components/Card.vue'
   font-size: clamp(2.75rem, 8vw, 4.5rem);
   font-weight: 900;
   letter-spacing: -0.03em;
+  line-height: 1.05;
+  padding-bottom: 0.1em;
   color: var(--on-surface);
 }
 .hero__tagline {
