@@ -9,6 +9,7 @@ import {
 } from '@/api/question-controller/question-controller'
 import { useQueryClient } from '@tanstack/vue-query'
 import { errorMessage } from '@/lib/errors'
+import { confirmDialog } from '@/lib/confirmDialog'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import Chip from '@/components/Chip.vue'
@@ -130,7 +131,13 @@ async function saveEdit() {
 const removingId = ref<string | null>(null)
 async function removeQuestion(id?: string) {
   if (!id) return
-  if (!confirm('Remove this question? This cannot be undone.')) return
+  const ok = await confirmDialog.open({
+    title: 'Remove this question?',
+    body: 'This cannot be undone.',
+    confirmLabel: 'Remove',
+    danger: true,
+  })
+  if (!ok) return
   // If the user happens to be editing the same question, drop the edit state.
   if (editingId.value === id) cancelEdit()
   removingId.value = id
@@ -146,7 +153,13 @@ async function removeQuestion(id?: string) {
 }
 
 async function removeQuiz() {
-  if (!confirm('Delete this quiz? This cannot be undone.')) return
+  const ok = await confirmDialog.open({
+    title: 'Delete this quiz?',
+    body: 'This cannot be undone.',
+    confirmLabel: 'Delete',
+    danger: true,
+  })
+  if (!ok) return
   errorText.value = null
   try {
     await deleteQuiz(quizId.value)

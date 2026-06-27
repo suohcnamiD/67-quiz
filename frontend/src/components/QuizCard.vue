@@ -9,6 +9,7 @@ import {
 import { _delete as deleteQuiz, getGetQuizzesQueryKey } from '@/api/quiz-controller/quiz-controller'
 import { getGetQuizzesByAuthorQueryKey } from '@/api/user-profile-controller/user-profile-controller'
 import { errorMessage } from '@/lib/errors'
+import { confirmDialog } from '@/lib/confirmDialog'
 import type { QuizSummaryDto } from '@/api/openAPIDefinition.schemas'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
@@ -64,7 +65,13 @@ async function startAttempt() {
 
 async function removeQuiz() {
   if (!props.quiz.id) return
-  if (!confirm('Delete this quiz? This cannot be undone.')) return
+  const ok = await confirmDialog.open({
+    title: 'Delete this quiz?',
+    body: 'This cannot be undone.',
+    confirmLabel: 'Delete',
+    danger: true,
+  })
+  if (!ok) return
   deleting.value = true
   try {
     await deleteQuiz(props.quiz.id)

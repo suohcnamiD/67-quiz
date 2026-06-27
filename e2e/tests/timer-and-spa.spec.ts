@@ -155,7 +155,10 @@ test('attempt result shows the score with the label "Score"', async ({ page }) =
 
   await page.getByRole('button', { name: 'b', exact: true }).click()
   await page.waitForTimeout(400)
-  await page.getByRole('button', { name: /finish attempt/i }).click()
+  // Two Finish buttons (header + end-of-list); either works. Click the header.
+  await page.getByRole('button', { name: /finish attempt/i }).first().click()
+  // ConfirmDialog → click Finish to commit.
+  await page.getByRole('dialog').getByRole('button', { name: 'Finish' }).click()
   await page.waitForURL(/\/app\/attempt\/[^/]+\/result$/, { timeout: 15_000 })
 
   // Dismiss celebration overlay if it appears.

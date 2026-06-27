@@ -61,6 +61,8 @@ test('Remove button deletes the question from the list', async ({ page }) => {
     .locator('li', { hasText: 'What is 2 + 2?' })
     .getByRole('button', { name: 'Remove' })
     .click()
+  // ConfirmDialog appears for the destructive action.
+  await page.getByRole('dialog').getByRole('button', { name: 'Remove' }).click()
   const deleteResponse = await removed
   expect(deleteResponse.status()).toBe(200)
   await expect(page.getByText('What is 2 + 2?')).toBeHidden({ timeout: 10_000 })

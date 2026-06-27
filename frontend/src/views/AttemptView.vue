@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useGetAttemptsInProgress, useGetFinishedAttempts, commitAttemptActions, finishAttempt, getGetAttemptsInProgressQueryKey, getGetFinishedAttemptsQueryKey } from '@/api/attempt-controller/attempt-controller'
 import { useQueryClient } from '@tanstack/vue-query'
 import { errorMessage, firstErrorCode } from '@/lib/errors'
+import { confirmDialog } from '@/lib/confirmDialog'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
@@ -141,7 +142,12 @@ async function finishCore() {
   finishing.value = false
 }
 async function finish() {
-  if (!confirm('Finish this attempt?')) return
+  const ok = await confirmDialog.open({
+    title: 'Finish this attempt?',
+    body: "You won't be able to change answers after finishing.",
+    confirmLabel: 'Finish',
+  })
+  if (!ok) return
   await finishCore()
 }
 
@@ -214,6 +220,9 @@ watch(remainingMs, (ms) => {
         </Card>
       </li>
     </ol>
+    <div v-if="remainingMs > 0" class="finish-foot">
+      <Button :loading="finishing" @click="finish">Finish attempt</Button>
+    </div>
   </template>
   <div v-else-if="finishing || autoFinished" class="empty body-md">Loading…</div>
   <Card v-else class="notfound">
@@ -270,6 +279,20 @@ watch(remainingMs, (ms) => {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
+}
+.finish-foot {
+  margin-top: var(--space-xl);
+  display: flex;
+  justify-content: center;
+}
+.finish-foot :deep(button) {
+  min-width: 16rem;
+}
+@media (max-width: 640px) {
+  .finish-foot :deep(button) {
+    width: 100%;
+    min-width: 0;
+  }
 }
 .qhead {
   display: flex;

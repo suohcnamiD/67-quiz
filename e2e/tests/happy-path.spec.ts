@@ -49,8 +49,11 @@ test('full happy path: create quiz → add question → start attempt → finish
   await page.getByRole('button', { name: '4', exact: true }).click()
   await page.waitForTimeout(500)
 
-  // Finish (UI)
-  await page.getByRole('button', { name: /finish attempt/i }).click()
+  // Finish (UI) — there are two Finish buttons now (header + end of list);
+  // either works, the header one is fine.
+  await page.getByRole('button', { name: /finish attempt/i }).first().click()
+  // ConfirmDialog appears; click Finish to confirm.
+  await page.getByRole('dialog').getByRole('button', { name: 'Finish' }).click()
   await page.waitForURL(/\/app\/attempt\/[^/]+\/result$/, { timeout: 15_000 })
 
   // Dismiss the celebration popup so we can assert on the underlying page.
@@ -61,4 +64,25 @@ test('full happy path: create quiz → add question → start attempt → finish
   await expect(page.getByText(/^\d+%$/).first()).toBeVisible()
   const body = (await page.locator('body').innerText()).trim()
   expect(body).not.toMatch(/^\{/)
+})
+
+test('attempt page shows Finish in both header and at end of list', async ({ page }) => {
+  // Use the sampler-seeded Mixed types quiz so we don't need authoring.
+  await page.goto('/login')
+  await page.locator('input[autocomplete="username"]').fill('sampler')
+  await page.locator('input[autocomplete="current-password"]').fill('Passw0rd1')
+  await page.locator('button[type="submit"]').click()
+  await page.waitForURL(/\/app/, { timeout: 15_000 })
+
+  const quizzes = await (await page.request.get('http://localhost:5173/api/users/sampler/quizzes?page=0')).json()
+  const quizId = quizzes._embedded.quizzes[0].id
+  const start = await (await page.request.post('http://localhost:5173/api/attempt', {
+    data: { quizId }, headers: { 'Content-Type': 'application/json' },
+  })).json()
+
+  await page.goto(`/app/attempt/${start.id}`)
+  await page.waitForLoadState('networkidle')
+
+  const buttons = page.getByRole('button', { name: /finish attempt/i })
+  await expect(buttons).toHaveCount(2)
 })

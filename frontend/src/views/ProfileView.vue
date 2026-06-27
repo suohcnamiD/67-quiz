@@ -14,6 +14,7 @@ import {
 import { useAuthStore } from '@/stores/auth'
 import { errorMessage } from '@/lib/errors'
 import { scrollAndFlash } from '@/lib/scrollAndFlash'
+import { confirmDialog } from '@/lib/confirmDialog'
 import Button from '@/components/Button.vue'
 import Input from '@/components/Input.vue'
 import Avatar from '@/components/Avatar.vue'
@@ -119,7 +120,13 @@ async function onFilePicked(event: Event) {
 }
 
 async function removeAvatar() {
-  if (!confirm('Remove your avatar?')) return
+  const ok = await confirmDialog.open({
+    title: 'Remove your avatar?',
+    body: 'You can upload a new one any time.',
+    confirmLabel: 'Remove',
+    danger: true,
+  })
+  if (!ok) return
   avatarError.value = null
   removingAvatar.value = true
   try {
