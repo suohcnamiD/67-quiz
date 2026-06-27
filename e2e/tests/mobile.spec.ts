@@ -123,3 +123,16 @@ test('mobile menu closes on Escape and after navigating', async ({ page }) => {
   await page.waitForURL(/\/app\/quiz\/new$/, { timeout: 5_000 })
   await expect(menu).toBeHidden()
 })
+
+test('mobile menu FAB sits in the bottom-right thumb zone', async ({ page }) => {
+  await loginAsSampler(page)
+  const fab = page.getByRole('button', { name: /open navigation menu/i })
+  const box = await fab.boundingBox()
+  expect(box, 'FAB must have a bounding box').not.toBeNull()
+  // Right edge close to the viewport's right edge.
+  expect(MOBILE.width - (box!.x + box!.width)).toBeLessThan(40)
+  // Bottom edge close to the viewport's bottom — i.e. reachable by a
+  // thumb on a phone in the dominant hand. Anything in the top 60% of
+  // the viewport is not thumb-reachable.
+  expect(box!.y).toBeGreaterThan(MOBILE.height * 0.6)
+})

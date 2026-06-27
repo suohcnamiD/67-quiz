@@ -85,26 +85,20 @@ onUnmounted(() => {
             <span class="me__name label-md">{{ auth.displayName ?? auth.username }}</span>
           </RouterLink>
           <Button class="signout-btn" variant="ghost" @click="logout">Sign out</Button>
-          <button
-            ref="toggleRef"
-            type="button"
-            class="menu-toggle"
-            aria-label="Open navigation menu"
-            aria-haspopup="menu"
-            :aria-expanded="menuOpen"
-            aria-controls="topbar-menu"
-            @click="toggleMenu"
-          >
-            <span class="menu-toggle__bar" aria-hidden="true" />
-            <span class="menu-toggle__bar" aria-hidden="true" />
-            <span class="menu-toggle__bar" aria-hidden="true" />
-          </button>
         </div>
       </div>
+    </header>
+    <main class="content">
+      <RouterView />
+    </main>
+
+    <!-- Thumb-reachable navigation. Lives outside the topbar so it can
+         anchor to the viewport's bottom-right. Hidden on desktop. -->
+    <div class="thumb-nav" :class="{ 'thumb-nav--open': menuOpen }">
       <Transition name="menu">
         <div
           v-if="menuOpen"
-          id="topbar-menu"
+          id="thumb-menu"
           ref="menuRef"
           class="menu"
           role="menu"
@@ -141,10 +135,23 @@ onUnmounted(() => {
           >Sign out</button>
         </div>
       </Transition>
-    </header>
-    <main class="content">
-      <RouterView />
-    </main>
+      <button
+        ref="toggleRef"
+        type="button"
+        class="fab"
+        :aria-label="menuOpen ? 'Close navigation menu' : 'Open navigation menu'"
+        aria-haspopup="menu"
+        :aria-expanded="menuOpen"
+        aria-controls="thumb-menu"
+        @click="toggleMenu"
+      >
+        <span class="fab__bars" :class="{ 'fab__bars--open': menuOpen }" aria-hidden="true">
+          <span class="fab__bar" />
+          <span class="fab__bar" />
+          <span class="fab__bar" />
+        </span>
+      </button>
+    </div>
   </div>
 </template>
 
@@ -224,54 +231,90 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
-/* Hamburger button — hidden on desktop, shown on mobile. */
-.menu-toggle {
+/* Thumb-reachable nav — hidden on desktop. */
+.thumb-nav {
   display: none;
+  position: fixed;
+  bottom: var(--space-lg);
+  right: var(--space-lg);
+  z-index: 40;
   flex-direction: column;
-  justify-content: center;
-  gap: 4px;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  border: 1px solid var(--outline-variant);
-  border-radius: 8px;
-  background: transparent;
-  cursor: pointer;
-  transition: border-color 120ms ease, background-color 120ms ease;
+  align-items: flex-end;
+  gap: var(--space-sm);
+  /* The container itself doesn't intercept taps when closed; only the FAB and
+   * the menu (when open) do. Keeps middle-of-screen clicks clean. */
+  pointer-events: none;
 }
-.menu-toggle:hover {
-  border-color: var(--outline);
-  background: var(--surface-container-high);
-}
-.menu-toggle__bar {
-  display: block;
-  width: 18px;
-  height: 2px;
-  margin: 0 auto;
-  background: var(--on-surface);
-  border-radius: 1px;
+.thumb-nav > * {
+  pointer-events: auto;
 }
 
-/* The sheet itself drops down from the topbar. */
-.menu {
+.fab {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 0;
+  background: var(--primary-container);
+  color: var(--on-primary-container);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), background-color 120ms ease;
+}
+.fab:hover {
+  background: #c92424;
+}
+.fab:active {
+  transform: scale(0.96);
+}
+
+/* Animated hamburger → X glyph. */
+.fab__bars {
+  position: relative;
+  width: 22px;
+  height: 16px;
+}
+.fab__bar {
   position: absolute;
-  top: 100%;
-  right: var(--margin-desktop);
-  margin-top: var(--space-sm);
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: currentColor;
+  border-radius: 1px;
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), opacity 160ms ease;
+}
+.fab__bar:nth-child(1) { top: 0; }
+.fab__bar:nth-child(2) { top: 7px; }
+.fab__bar:nth-child(3) { top: 14px; }
+.fab__bars--open .fab__bar:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+.fab__bars--open .fab__bar:nth-child(2) {
+  opacity: 0;
+}
+.fab__bars--open .fab__bar:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+/* The menu sheet, expanding upward from above the FAB. */
+.menu {
   min-width: 14rem;
-  max-width: calc(100vw - 2 * var(--margin-mobile));
+  max-width: calc(100vw - 2 * var(--space-lg));
   background: var(--surface-container);
   border: 1px solid var(--outline-variant);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-overlay);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
   padding: var(--space-xs);
   display: flex;
   flex-direction: column;
+  transform-origin: 100% 100%;
 }
 .menu__item {
   appearance: none;
   display: block;
-  padding: 10px 14px;
+  padding: 12px 16px;
   border: 0;
   border-radius: var(--radius);
   background: transparent;
@@ -298,15 +341,17 @@ onUnmounted(() => {
   margin: var(--space-xs) 0;
 }
 
-/* Mount/unmount transition for the menu. */
+/* Slide+fade from the bottom-right corner (anchored above the FAB). */
 .menu-enter-active,
 .menu-leave-active {
-  transition: opacity 120ms ease, transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition:
+    opacity 140ms ease,
+    transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 .menu-enter-from,
 .menu-leave-to {
   opacity: 0;
-  transform: translateY(-4px);
+  transform: translateY(8px) scale(0.96);
 }
 @media (prefers-reduced-motion: reduce) {
   .menu-enter-active,
@@ -316,6 +361,9 @@ onUnmounted(() => {
   .menu-enter-from,
   .menu-leave-to {
     transform: none;
+  }
+  .fab__bar {
+    transition: none;
   }
 }
 
@@ -341,21 +389,19 @@ onUnmounted(() => {
   }
 }
 
-/* Replace tabs with the hamburger menu at <=640 px. The Sign-out button
- * goes into the menu too, so the topbar carries only brand + avatar +
- * menu trigger. */
+/* Activate the thumb nav at <=640 px and pull the tab/sign-out controls
+ * out of the topbar — they now live inside the FAB menu. Leave space at
+ * the bottom of the page so content doesn't sit under the FAB. */
 @media (max-width: 640px) {
   .nav,
   .signout-btn {
     display: none;
   }
-  .menu-toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+  .thumb-nav {
+    display: flex;
   }
-  .menu {
-    right: var(--margin-mobile);
+  .content {
+    padding-bottom: calc(56px + var(--space-xl) + var(--space-lg));
   }
 }
 
@@ -365,6 +411,11 @@ onUnmounted(() => {
   }
   .me {
     padding: 2px;
+  }
+  /* Safe-area aware on phones with home indicators. */
+  .thumb-nav {
+    bottom: calc(var(--space-md) + env(safe-area-inset-bottom, 0px));
+    right: var(--space-md);
   }
 }
 </style>
