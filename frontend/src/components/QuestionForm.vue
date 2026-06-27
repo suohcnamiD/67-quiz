@@ -14,8 +14,8 @@ const optionRows = defineModel<OptionData[]>('options', { required: true })
 const questionText = defineModel<string>('text', { required: true })
 
 defineProps<{
-  /** Used as a stable suffix for the radio-group name so multiple QuestionForms
-   *  on the same page (e.g. one editing alongside the Add form) don't fight. */
+  /** Retained for parent disambiguation, no longer drives the input names
+   *  (a single styled checkbox handles both single- and multi-choice now). */
   scopeId: string
 }>()
 
@@ -29,6 +29,18 @@ function removeOption(i: number) {
 }
 function setSingleCorrect(i: number) {
   optionRows.value = optionRows.value.map((row, j) => ({ ...row, correct: j === i }))
+}
+function onCorrectToggle(i: number, next: boolean) {
+  if (questionType.value === SINGLE) {
+    // Single-choice: ticking an option clears all siblings; unticking the
+    // currently-correct one is a no-op (the form needs exactly one correct).
+    if (!next) return
+    setSingleCorrect(i)
+    return
+  }
+  optionRows.value = optionRows.value.map((row, j) =>
+    j === i ? { ...row, correct: next } : row,
+  )
 }
 
 // Switching to single-choice must trim multiple-correct down to one (or zero
@@ -92,18 +104,11 @@ watch(questionType, (next) => {
         />
         <label class="opt-row__correct">
           <input
-            v-if="questionType === MULTI"
             type="checkbox"
             class="visually-hidden"
-            v-model="o.correct"
-          />
-          <input
-            v-else
-            type="radio"
-            class="visually-hidden"
-            :name="`single-correct-${scopeId}`"
             :checked="o.correct"
-            @change="setSingleCorrect(i)"
+            :aria-label="questionType === SINGLE ? 'Correct (only one)' : 'Correct'"
+            @change="onCorrectToggle(i, ($event.target as HTMLInputElement).checked)"
           />
           <span
             :class="[
