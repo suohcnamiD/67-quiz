@@ -84,7 +84,7 @@ const logout = () => {
 }
 .nav {
   display: flex;
-  gap: var(--space-md);
+  gap: var(--space-lg);
   flex: 1;
   min-width: 0;
 }
@@ -163,7 +163,9 @@ const logout = () => {
     gap: var(--space-sm);
   }
   .nav {
-    gap: var(--space-xs);
+    /* Big enough that "Browse" and "New quiz" don't visually merge but small
+     * enough that the four topbar pieces still fit a 375px row. */
+    gap: 14px;
     font-size: 13px;
   }
   .actions :deep(.btn) {
