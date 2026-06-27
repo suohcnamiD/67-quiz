@@ -1,17 +1,62 @@
 <script setup lang="ts">
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { RouterLink, RouterView, useRouter } from 'vue-router'
+import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
 import Button from './Button.vue'
 import Avatar from './Avatar.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 
-const logout = () => {
+const menuOpen = ref(false)
+const menuRef = ref<HTMLElement | null>(null)
+const toggleRef = ref<HTMLButtonElement | null>(null)
+
+function toggleMenu() {
+  menuOpen.value = !menuOpen.value
+}
+function closeMenu() {
+  menuOpen.value = false
+}
+
+function logout() {
+  closeMenu()
   // No backend logout endpoint exposed; clear locally and bounce to /login.
   auth.clear()
   router.push('/login')
 }
+
+// Close on route change so navigating from inside the menu actually dismisses it.
+watch(() => route.fullPath, closeMenu)
+
+function onDocPointerDown(e: PointerEvent) {
+  if (!menuOpen.value) return
+  const target = e.target as Node | null
+  if (
+    target &&
+    !menuRef.value?.contains(target) &&
+    !toggleRef.value?.contains(target)
+  ) {
+    closeMenu()
+  }
+}
+function onKeydown(e: KeyboardEvent) {
+  if (menuOpen.value && e.key === 'Escape') {
+    e.preventDefault()
+    closeMenu()
+    toggleRef.value?.focus()
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', onDocPointerDown)
+  window.addEventListener('keydown', onKeydown)
+})
+onUnmounted(() => {
+  document.removeEventListener('pointerdown', onDocPointerDown)
+  window.removeEventListener('keydown', onKeydown)
+})
 </script>
 
 <template>
@@ -19,7 +64,7 @@ const logout = () => {
     <header class="topbar">
       <div class="topbar__inner">
         <RouterLink to="/app" class="brand">67quiz</RouterLink>
-        <nav class="nav label-md">
+        <nav class="nav label-md" aria-label="Primary">
           <RouterLink to="/app" exact-active-class="router-link-active">Browse</RouterLink>
           <RouterLink to="/app/quiz/new" exact-active-class="router-link-active">New quiz</RouterLink>
         </nav>
@@ -39,9 +84,63 @@ const logout = () => {
             />
             <span class="me__name label-md">{{ auth.displayName ?? auth.username }}</span>
           </RouterLink>
-          <Button variant="ghost" @click="logout">Sign out</Button>
+          <Button class="signout-btn" variant="ghost" @click="logout">Sign out</Button>
+          <button
+            ref="toggleRef"
+            type="button"
+            class="menu-toggle"
+            aria-label="Open navigation menu"
+            aria-haspopup="menu"
+            :aria-expanded="menuOpen"
+            aria-controls="topbar-menu"
+            @click="toggleMenu"
+          >
+            <span class="menu-toggle__bar" aria-hidden="true" />
+            <span class="menu-toggle__bar" aria-hidden="true" />
+            <span class="menu-toggle__bar" aria-hidden="true" />
+          </button>
         </div>
       </div>
+      <Transition name="menu">
+        <div
+          v-if="menuOpen"
+          id="topbar-menu"
+          ref="menuRef"
+          class="menu"
+          role="menu"
+          aria-label="Primary navigation"
+        >
+          <RouterLink
+            to="/app"
+            class="menu__item"
+            role="menuitem"
+            exact-active-class="menu__item--active"
+            @click="closeMenu"
+          >Browse</RouterLink>
+          <RouterLink
+            to="/app/quiz/new"
+            class="menu__item"
+            role="menuitem"
+            exact-active-class="menu__item--active"
+            @click="closeMenu"
+          >New quiz</RouterLink>
+          <RouterLink
+            v-if="auth.isAuthenticated()"
+            to="/app/profile"
+            class="menu__item"
+            role="menuitem"
+            exact-active-class="menu__item--active"
+            @click="closeMenu"
+          >Your profile</RouterLink>
+          <hr class="menu__sep" />
+          <button
+            type="button"
+            class="menu__item menu__item--danger"
+            role="menuitem"
+            @click="logout"
+          >Sign out</button>
+        </div>
+      </Transition>
     </header>
     <main class="content">
       <RouterView />
@@ -124,6 +223,102 @@ const logout = () => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Hamburger button — hidden on desktop, shown on mobile. */
+.menu-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--outline-variant);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+.menu-toggle:hover {
+  border-color: var(--outline);
+  background: var(--surface-container-high);
+}
+.menu-toggle__bar {
+  display: block;
+  width: 18px;
+  height: 2px;
+  margin: 0 auto;
+  background: var(--on-surface);
+  border-radius: 1px;
+}
+
+/* The sheet itself drops down from the topbar. */
+.menu {
+  position: absolute;
+  top: 100%;
+  right: var(--margin-desktop);
+  margin-top: var(--space-sm);
+  min-width: 14rem;
+  max-width: calc(100vw - 2 * var(--margin-mobile));
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-overlay);
+  padding: var(--space-xs);
+  display: flex;
+  flex-direction: column;
+}
+.menu__item {
+  appearance: none;
+  display: block;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--on-surface);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: none;
+}
+.menu__item:hover,
+.menu__item:focus-visible {
+  background: var(--surface-container-high);
+}
+.menu__item--active {
+  color: var(--on-secondary-container);
+  font-weight: 600;
+}
+.menu__item--danger {
+  color: var(--error);
+}
+.menu__sep {
+  border: 0;
+  border-top: 1px solid var(--outline-variant);
+  margin: var(--space-xs) 0;
+}
+
+/* Mount/unmount transition for the menu. */
+.menu-enter-active,
+.menu-leave-active {
+  transition: opacity 120ms ease, transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.menu-enter-from,
+.menu-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .menu-enter-active,
+  .menu-leave-active {
+    transition: none;
+  }
+  .menu-enter-from,
+  .menu-leave-to {
+    transform: none;
+  }
+}
+
 .content {
   max-width: 1200px;
   margin: 0 auto;
@@ -131,6 +326,7 @@ const logout = () => {
   width: 100%;
   flex: 1;
 }
+
 @media (max-width: 768px) {
   .topbar__inner,
   .content {
@@ -140,37 +336,35 @@ const logout = () => {
   .topbar__inner {
     gap: var(--space-md);
   }
-  .nav {
-    gap: var(--space-sm);
-  }
   .me__name {
     display: none;
   }
 }
+
+/* Replace tabs with the hamburger menu at <=640 px. The Sign-out button
+ * goes into the menu too, so the topbar carries only brand + avatar +
+ * menu trigger. */
+@media (max-width: 640px) {
+  .nav,
+  .signout-btn {
+    display: none;
+  }
+  .menu-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .menu {
+    right: var(--margin-mobile);
+  }
+}
+
 @media (max-width: 480px) {
-  /* On really narrow screens the brand + nav + avatar + sign-out won't all
-   * fit; drop the brand link's visible weight so the right-side actions get
-   * room. The brand is still the AppShell home link. */
   .brand {
-    font-size: 16px;
+    font-size: 18px;
   }
   .me {
     padding: 2px;
-  }
-  /* Tighter topbar gaps and a smaller Sign-out so all four pieces fit
-   * without the nav text wrapping onto two lines. */
-  .topbar__inner {
-    gap: var(--space-sm);
-  }
-  .nav {
-    /* Big enough that "Browse" and "New quiz" don't visually merge but small
-     * enough that the four topbar pieces still fit a 375px row. */
-    gap: 14px;
-    font-size: 13px;
-  }
-  .actions :deep(.btn) {
-    padding: 6px 10px;
-    font-size: 12px;
   }
 }
 </style>

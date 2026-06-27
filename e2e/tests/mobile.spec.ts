@@ -86,3 +86,40 @@ test('Browse search results render single-column on mobile', async ({ page }) =>
   // horizontal padding on a 375px viewport).
   expect(cardW).toBeGreaterThan(280)
 })
+
+test('mobile hamburger replaces the nav tabs and opens a menu', async ({ page }) => {
+  await loginAsSampler(page)
+  // Desktop-only nav links are hidden; the inline Sign-out button is gone too.
+  const browseTab = page.locator('.topbar__inner .nav a', { hasText: 'Browse' })
+  await expect(browseTab).toBeHidden()
+  await expect(page.locator('.signout-btn')).toBeHidden()
+  // The hamburger is visible.
+  const toggle = page.getByRole('button', { name: 'Open navigation menu' })
+  await expect(toggle).toBeVisible()
+
+  await toggle.click()
+  const menu = page.getByRole('menu', { name: 'Primary navigation' })
+  await expect(menu).toBeVisible()
+  // All four items present.
+  await expect(menu.getByRole('menuitem', { name: 'Browse' })).toBeVisible()
+  await expect(menu.getByRole('menuitem', { name: 'New quiz' })).toBeVisible()
+  await expect(menu.getByRole('menuitem', { name: 'Your profile' })).toBeVisible()
+  await expect(menu.getByRole('menuitem', { name: 'Sign out' })).toBeVisible()
+})
+
+test('mobile menu closes on Escape and after navigating', async ({ page }) => {
+  await loginAsSampler(page)
+  const toggle = page.getByRole('button', { name: 'Open navigation menu' })
+  await toggle.click()
+  const menu = page.getByRole('menu', { name: 'Primary navigation' })
+  await expect(menu).toBeVisible()
+
+  await page.keyboard.press('Escape')
+  await expect(menu).toBeHidden()
+
+  // Reopen and navigate via the menu — it should auto-close.
+  await toggle.click()
+  await menu.getByRole('menuitem', { name: 'New quiz' }).click()
+  await page.waitForURL(/\/app\/quiz\/new$/, { timeout: 5_000 })
+  await expect(menu).toBeHidden()
+})
