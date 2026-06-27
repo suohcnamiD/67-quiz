@@ -4,7 +4,12 @@ import { useAuthStore } from '@/stores/auth'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    { path: '/', redirect: '/app' },
+    {
+      path: '/',
+      name: 'landing',
+      component: () => import('@/views/LandingView.vue'),
+      meta: { landing: true },
+    },
     {
       path: '/login',
       name: 'login',
@@ -43,6 +48,10 @@ router.beforeEach(async (to) => {
   const auth = useAuthStore()
   if (auth.status === 'unknown') await auth.refresh()
 
+  const isLanding = to.matched.some((r) => r.meta.landing)
+  if (isLanding) {
+    return auth.isAuthenticated() ? { name: 'browse' } : true
+  }
   const wantsAnon = to.matched.some((r) => r.meta.anonymous)
   if (wantsAnon) {
     return auth.isAuthenticated() ? { name: 'browse' } : true
