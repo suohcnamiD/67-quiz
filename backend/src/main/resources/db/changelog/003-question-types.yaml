@@ -1,0 +1,23 @@
+databaseChangeLog:
+  - changeSet:
+      id: add-question-type
+      author: hubenko
+      changes:
+        - addColumn:
+            tableName: questions
+            columns:
+              - column:
+                  name: type
+                  type: VARCHAR(32)
+                  defaultValueComputed: "'MULTI_CHOICE'"
+                  constraints:
+                    nullable: false
+                  remarks: One of QuestionType (SINGLE_CHOICE, MULTI_CHOICE). Drives scoring + UI.
+
+  - changeSet:
+      id: backfill-question-type
+      author: hubenko
+      changes:
+        - sql:
+            sql: UPDATE questions SET type = 'MULTI_CHOICE' WHERE type IS NULL OR type = ''
+            stripComments: true

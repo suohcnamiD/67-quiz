@@ -6,3 +6,14 @@ frontend/src/api/
 
 # Playwright CLI scratch
 **/.playwright-cli/
+
+# Local Claude Code settings
+.claude/
+
+# Backend test runner output
+backend/test-results/
+backend/build/
+
+# Uploaded user files (avatars, etc.) — local dev only
+uploads/
+backend/uploads/

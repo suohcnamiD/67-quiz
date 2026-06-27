@@ -6,10 +6,17 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
 public interface QuizAttemptRepository extends JpaRepository<Attempt, UUID> {
     Page<Attempt> findByUserAndFinishedIsTrue(ApplicationUser user, Pageable pageable);
     Page<Attempt> findByUserAndFinishedIsFalse(ApplicationUser user, Pageable pageable);
+
+    List<Attempt> findByUser_IdAndFinishedIsFalseAndFinishDeadlineBefore(UUID userId, Instant finishDeadline);
+
+    int countByUserAndFinishedIsTrue(ApplicationUser user);
+
+    List<Attempt> findAllByUserAndFinishedIsTrue(ApplicationUser user);
 }

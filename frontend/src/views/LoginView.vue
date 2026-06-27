@@ -3,28 +3,27 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { login } from '@/api/authentication-controller/authentication-controller'
 import { useAuthStore } from '@/stores/auth'
-import { firstErrorCode } from '@/lib/axios'
+import { errorMessage } from '@/lib/errors'
 import Button from '@/components/Button.vue'
 import Input from '@/components/Input.vue'
 import Card from '@/components/Card.vue'
 
 const username = ref('')
 const password = ref('')
-const errorMessage = ref<string | null>(null)
+const errorText = ref<string | null>(null)
 const submitting = ref(false)
 const auth = useAuthStore()
 const router = useRouter()
 
 async function submit() {
-  errorMessage.value = null
+  errorText.value = null
   submitting.value = true
   try {
     const res = await login({ username: username.value, password: password.value })
     auth.markAuthenticated(res.roles ?? [])
     router.push('/app')
   } catch (e) {
-    const code = firstErrorCode(e)
-    errorMessage.value = code === 'UNAUTHORIZED' ? 'Wrong username or password.' : 'Could not sign in.'
+    errorText.value = errorMessage(e)
   } finally {
     submitting.value = false
   }
@@ -38,7 +37,7 @@ async function submit() {
       <form class="form" @submit.prevent="submit">
         <Input v-model="username" label="Username" autocomplete="username" />
         <Input v-model="password" label="Password" type="password" autocomplete="current-password" />
-        <p v-if="errorMessage" class="form__error label-md">{{ errorMessage }}</p>
+        <p v-if="errorText" class="form__error label-md">{{ errorText }}</p>
         <Button type="submit" :loading="submitting" full-width>Sign in</Button>
       </form>
       <p class="footnote body-md">

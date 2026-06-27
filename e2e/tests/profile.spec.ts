@@ -1,0 +1,170 @@
+import { test, expect, type Page } from '@playwright/test'
+
+async function registerAndLogin(page: Page): Promise<string> {
+  const username = `p${Date.now().toString(36)}${Math.floor(Math.random() * 100)}`.slice(0, 16)
+  const password = 'Passw0rd1'
+  await page.goto('/register')
+  await page.locator('input[autocomplete="username"]').fill(username)
+  await page.locator('input[autocomplete="new-password"]').fill(password)
+  await page.locator('button[type="submit"]').click()
+  await page.waitForURL(/\/app/, { timeout: 15_000 })
+  return username
+}
+
+// Minimal valid PNG: 4×4 red square. ImageIO rejects truncated PNGs, so we
+// keep a real-enough one — generated once via Python and hardcoded here.
+const TINY_RED_PNG = Buffer.from(
+  '89504e470d0a1a0a0000000d4948445200000004000000040802000000269309290000001049444154' +
+    '789c63f8cfc000470cc47100ae930ff1d05f239e0000000049454e44ae426082',
+  'hex',
+)
+
+test('register: AppShell shows the new user’s name and initials avatar', async ({ page }) => {
+  const username = await registerAndLogin(page)
+  // The AppShell `.me` chip should carry the username as text (no avatar yet).
+  await expect(page.locator('.me__name').first()).toHaveText(username, { timeout: 10_000 })
+})
+
+test('profile page renders own stats and lets you edit the display name', async ({ page }) => {
+  const username = await registerAndLogin(page)
+  await page.goto('/app/profile')
+  await expect(page.getByRole('heading', { name: username, exact: true })).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByText(`@${username}`)).toBeVisible()
+
+  // Stats are all-zero for a fresh user.
+  await expect(page.getByText('Quizzes authored')).toBeVisible()
+  await expect(page.getByText('Attempts taken')).toBeVisible()
+  await expect(page.getByText('Average score')).toBeVisible()
+
+  // Open the edit-profile modal and change the display name.
+  const newName = `Display ${Date.now() % 1000}`
+  await page.getByRole('button', { name: 'Edit profile' }).click()
+  await expect(page.getByRole('dialog', { name: 'Edit profile' })).toBeVisible()
+  await page.getByLabel('Display name').fill(newName)
+  await page.getByRole('button', { name: 'Save' }).click()
+  // The dialog closes; header + AppShell pick up the new name.
+  await expect(page.getByRole('dialog', { name: 'Edit profile' })).toBeHidden()
+  await expect(page.getByRole('heading', { name: newName, exact: true })).toBeVisible({ timeout: 10_000 })
+  await expect(page.locator('.me__name').first()).toHaveText(newName)
+})
+
+test('public profile route is readable for any user', async ({ page }) => {
+  const username = await registerAndLogin(page)
+  await page.goto(`/app/users/${username}`)
+  await expect(page.getByRole('heading', { name: username, exact: true })).toBeVisible({ timeout: 10_000 })
+  // It's you, so the "This is you" affordance shows.
+  await expect(page.getByText(/This is you/)).toBeVisible()
+})
+
+test('avatar upload changes the AppShell image src', async ({ page }) => {
+  await registerAndLogin(page)
+  await page.goto('/app/profile')
+  // The avatar is now a button that opens the upload modal.
+  await page.getByRole('button', { name: /upload avatar|change avatar/i }).click()
+  await expect(page.getByRole('dialog', { name: 'Change avatar' })).toBeVisible()
+
+  // Drive the hidden <input type="file"> directly so we don't need to open
+  // the OS file picker.
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'avatar.png',
+    mimeType: 'image/png',
+    buffer: TINY_RED_PNG,
+  })
+
+  // After upload the modal closes and the AppShell <img> resolves.
+  await expect(page.getByRole('dialog', { name: 'Change avatar' })).toBeHidden({ timeout: 15_000 })
+  const shellImg = page.locator('.me img')
+  await expect(shellImg).toBeVisible({ timeout: 10_000 })
+  const src = await shellImg.getAttribute('src')
+  expect(src).toMatch(/^\/api\/users\/.+\/avatar\?v=\d+$/)
+})
+
+test('quiz card author chip links to the author profile', async ({ page }) => {
+  // Use the seeded sampler user — they own the "General trivia" quiz.
+  const username = await registerAndLogin(page)
+  await page.goto('/app')
+  await page.waitForLoadState('networkidle')
+
+  // The author chip exists on at least one card (sampler's quizzes are seeded).
+  const chip = page.locator('.author').first()
+  if (await chip.count() === 0) {
+    // No quizzes in DB? Skip rather than fail — the chip only renders if
+    // there's a quiz with an author on the page.
+    test.skip(true, 'no quizzes available to test author chip')
+  }
+  const authorName = await chip.locator('.author__name').innerText()
+  await chip.click()
+  await page.waitForURL(/\/app\/users\/[^/]+$/, { timeout: 10_000 })
+  // The destination shows the same name in the hero heading (h1). The
+  // "Quizzes by …" h2 also contains the name — disambiguate by h1.
+  await expect(page.locator('h1', { hasText: authorName }).first()).toBeVisible({ timeout: 10_000 })
+  // The freshly registered user isn't the author, so no "This is you" affordance.
+  expect(page.url()).not.toContain(`/users/${username}`)
+})
+
+test('"Quizzes authored" stat is a button that disabled at zero', async ({ page }) => {
+  await registerAndLogin(page)
+  await page.goto('/app/profile')
+  const stat = page.getByRole('button', { name: /quizzes authored/i })
+  await expect(stat).toBeVisible()
+  await expect(stat).toBeDisabled()
+})
+
+test('"Quizzes authored" stat flashes the authored section when clicked', async ({ page }) => {
+  // Sampler has authored quizzes, so the stat is enabled.
+  await page.goto('/login')
+  await page.locator('input[autocomplete="username"]').fill('sampler')
+  await page.locator('input[autocomplete="current-password"]').fill('Passw0rd1')
+  await page.locator('button[type="submit"]').click()
+  await page.waitForURL(/\/app/, { timeout: 10_000 })
+
+  await page.goto('/app/profile')
+  await page.waitForLoadState('networkidle')
+  const stat = page.getByRole('button', { name: /quizzes authored/i })
+  await expect(stat).not.toBeDisabled()
+
+  const section = page.locator('#authored-section')
+  await stat.click()
+  // The helper drives the flash via the Web Animations API; right after the
+  // click there should be exactly one running animation on the section.
+  const runningAfterClick = await section.evaluate(
+    (el) => el.getAnimations().filter((a) => a.playState === 'running').length,
+  )
+  expect(runningAfterClick).toBeGreaterThan(0)
+
+  // Rapid re-clicks must cancel the previous animation and start a fresh one,
+  // not stack on top. After three quick clicks we still expect one (not three).
+  await stat.click()
+  await stat.click()
+  await stat.click()
+  const runningAfterBurst = await section.evaluate(
+    (el) => el.getAnimations().filter((a) => a.playState === 'running').length,
+  )
+  expect(runningAfterBurst).toBe(1)
+})
+
+test('"Attempts taken" stat navigates to Browse#past-results when there are attempts', async ({ page }) => {
+  // Sign in as sampler (has authored quizzes; we'll have them complete one).
+  await page.goto('/login')
+  await page.locator('input[autocomplete="username"]').fill('sampler')
+  await page.locator('input[autocomplete="current-password"]').fill('Passw0rd1')
+  await page.locator('button[type="submit"]').click()
+  await page.waitForURL(/\/app/, { timeout: 10_000 })
+
+  // Find a sampler quiz and finish an attempt via API so the Past-results
+  // section actually renders.
+  const quizzes = await (await page.request.get('http://localhost:5173/api/users/sampler/quizzes?page=0')).json()
+  const quizId = quizzes._embedded.quizzes[0].id
+  const startRes = await page.request.post('http://localhost:5173/api/attempt', {
+    data: { quizId }, headers: { 'Content-Type': 'application/json' },
+  })
+  const attempt = await startRes.json()
+  await page.request.patch('http://localhost:5173/api/attempt/finish', {
+    data: { attemptId: attempt.id }, headers: { 'Content-Type': 'application/json' },
+  })
+
+  await page.goto('/app/profile')
+  await page.getByRole('button', { name: /attempts taken/i }).click()
+  await page.waitForURL(/\/app(?:\?.*)?#past-results$/, { timeout: 10_000 })
+  await expect(page.getByRole('heading', { name: 'Past results' })).toBeVisible()
+})

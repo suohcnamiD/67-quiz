@@ -4,12 +4,13 @@ package dev.six_seven_quiz.quiz.model;
 import dev.six_seven_quiz.quiz.dto.request.OptionData;
 import dev.six_seven_quiz.quiz.dto.QuestionData;
 import dev.six_seven_quiz.quiz.exception.BlankIndexedOptionException;
+import dev.six_seven_quiz.quiz.exception.InvalidQuestionShapeException;
 import dev.six_seven_quiz.shared.component.Utilities;
 import jakarta.persistence.*;
 import dev.six_seven_quiz.user.ApplicationUser;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -71,26 +72,46 @@ public class Quiz {
     }
 
     public Attempt start(ApplicationUser user) {
-        return new Attempt(user, this, LocalDateTime.now().plus(this.duration));
+        return new Attempt(user, this, Instant.now().plus(this.duration));
     }
 
     public int getMaximumScore() {
-        return questions
-                .stream().mapToInt(question -> question.getOptions().size()).sum();
+        return questions.stream()
+                .mapToInt(question ->
+                        question.getType() == QuestionType.SINGLE_CHOICE
+                                ? 1
+                                : question.getOptions().size())
+                .sum();
     }
 
     public void addQuestion(QuestionData questionData) {
-        Question question = new Question(this, questionData.text());
+        if (questionData.type() == null) {
+            throw new InvalidQuestionShapeException("Question type is required");
+        }
+        List<OptionData> options = questionData.options();
+        if (options == null || options.size() < 2) {
+            throw new InvalidQuestionShapeException("A question needs at least two options");
+        }
+
+        Question question = new Question(this, questionData.text(), questionData.type());
 
         int i = 0;
-
-        for (OptionData optionData : questionData.options()) {
-            if (optionData.text().isBlank()) throw new BlankIndexedOptionException(i);
+        long correctCount = 0;
+        for (OptionData optionData : options) {
+            if (optionData.text() == null || optionData.text().isBlank()) {
+                throw new BlankIndexedOptionException(i);
+            }
+            if (optionData.correct()) correctCount++;
             i++;
+        }
+        if (questionData.type() == QuestionType.SINGLE_CHOICE && correctCount != 1) {
+            throw new InvalidQuestionShapeException(
+                    "Single-choice questions need exactly one correct option (got " + correctCount + ")"
+            );
         }
 
         List<Option> createdOptions = new ArrayList<>();
-        for (OptionData optionData : questionData.options()) {
+        for (OptionData optionData : options) {
             Option rawOption = new Option(question, optionData.text(), optionData.correct());
             createdOptions.add(rawOption);
         }

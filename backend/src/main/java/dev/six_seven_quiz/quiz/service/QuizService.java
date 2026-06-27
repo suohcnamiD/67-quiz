@@ -12,6 +12,7 @@ import dev.six_seven_quiz.quiz.repository.QuizRepository;
 import dev.six_seven_quiz.quiz.validator.QuizValidator;
 import dev.six_seven_quiz.user.ApplicationUser;
 import dev.six_seven_quiz.user.ApplicationUserService;
+import dev.six_seven_quiz.user.profile.component.mapper.UserProfileMapper;
 import jakarta.transaction.Transactional;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.data.domain.Page;
@@ -25,18 +26,23 @@ import java.util.UUID;
 @Service
 public class QuizService {
 
-    private static final int QUIZZES_PER_PAGE = 20;
+    // 21 instead of 20 so a 3-column desktop grid fills exactly 7 rows with no
+    // trailing single-card row. Mobile (1-col) and tablet (2-col) layouts
+    // don't care.
+    private static final int QUIZZES_PER_PAGE = 21;
 
     private final ApplicationUserService applicationUserService;
     private final QuizRepository quizRepository;
     private final QuizMapper quizMapper;
     private final QuestionRepository questionRepository;
+    private final UserProfileMapper userProfileMapper;
 
-    public QuizService(ApplicationUserService applicationUserService, QuizRepository quizRepository, QuizMapper quizMapper, QuizAttemptRepository quizAttemptRepository, QuestionRepository questionRepository) {
+    public QuizService(ApplicationUserService applicationUserService, QuizRepository quizRepository, QuizMapper quizMapper, QuizAttemptRepository quizAttemptRepository, QuestionRepository questionRepository, UserProfileMapper userProfileMapper) {
         this.applicationUserService = applicationUserService;
         this.quizRepository = quizRepository;
         this.quizMapper = quizMapper;
         this.questionRepository = questionRepository;
+        this.userProfileMapper = userProfileMapper;
     }
 
     public QuizDto createQuiz(UserDetails userDetails, CreateQuizRequest request) {
@@ -54,6 +60,27 @@ public class QuizService {
         return quizRepository.findAll(produceSanitizedPageable(page)).map(quiz -> quizToSummary(quiz, user));
     }
 
+    /**
+     * Quizzes authored by {@code author}. {@code viewer} drives the
+     * {@code youAreAuthor} flag on the summary — so the same listing reads
+     * differently on someone else's profile vs. your own.
+     */
+    public Page<QuizSummaryDto> getQuizzesByAuthor(ApplicationUser author, ApplicationUser viewer, int page) {
+        return quizRepository
+                .findByAuthorOrderByNameAsc(author, produceSanitizedPageable(page))
+                .map(quiz -> quizToSummary(quiz, viewer));
+    }
+
+    /**
+     * Substring search on quiz name. {@code viewer} is used the same way as
+     * above to populate {@code youAreAuthor}.
+     */
+    public Page<QuizSummaryDto> searchQuizzesByName(String needle, ApplicationUser viewer, int page, int pageSize) {
+        return quizRepository
+                .findByNameContainingIgnoreCaseOrderByNameAsc(needle, PageRequest.of(page, pageSize))
+                .map(quiz -> quizToSummary(quiz, viewer));
+    }
+
     private QuizDto quizToDto(Quiz quiz, ApplicationUser user) {
         int questionCount = questionRepository.countByQuiz_QuizId(quiz.getId());
         boolean areYouAuthor = quiz.getAuthor().equals(user);
@@ -63,7 +90,7 @@ public class QuizService {
     private QuizSummaryDto quizToSummary(Quiz quiz, ApplicationUser user) {
         int questionCount = questionRepository.countByQuiz_QuizId(quiz.getId());
         boolean areYouAuthor = quiz.getAuthor().equals(user);
-        return quizMapper.toSummary(quiz, questionCount, areYouAuthor);
+        return quizMapper.toSummary(quiz, questionCount, areYouAuthor, userProfileMapper.toAuthorSummary(quiz.getAuthor()));
     }
 
     private Pageable produceSanitizedPageable(int page) {

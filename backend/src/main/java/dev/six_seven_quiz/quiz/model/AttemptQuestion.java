@@ -97,4 +97,39 @@ public class AttemptQuestion {
         selectedOptions.remove(option);
         this.answered = true;
     }
+
+    public void clearSelections() {
+        selectedOptions.clear();
+    }
+
+    public QuestionType getType() {
+        return question.getType();
+    }
+
+    /**
+     * Score the user earned on this question. For multi-choice this is the
+     * per-option count of correctly classified picks (the existing rule).
+     * For single-choice it's 1 iff the unique correct option is among the
+     * user's picks, else 0.
+     */
+    public int getEarnedScore() {
+        if (getType() == QuestionType.SINGLE_CHOICE) {
+            return question.getOptions().stream()
+                    .filter(Option::isCorrect)
+                    .anyMatch(selectedOptions::contains) ? 1 : 0;
+        }
+        int earned = 0;
+        for (Option option : question.getOptions()) {
+            if (option.isCorrect() == selectedOptions.contains(option)) earned++;
+        }
+        return earned;
+    }
+
+    /**
+     * Maximum score this question can yield. Multi-choice = option count
+     * (each option scored independently); single-choice = 1.
+     */
+    public int getMaximumScore() {
+        return getType() == QuestionType.SINGLE_CHOICE ? 1 : question.getOptions().size();
+    }
 }

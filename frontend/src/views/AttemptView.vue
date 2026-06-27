@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useGetAttemptsInProgress, commitAttemptActions, finishAttempt, getGetAttemptsInProgressQueryKey, getGetFinishedAttemptsQueryKey } from '@/api/attempt-controller/attempt-controller'
+import { useGetAttemptsInProgress, useGetFinishedAttempts, commitAttemptActions, finishAttempt, getGetAttemptsInProgressQueryKey, getGetFinishedAttemptsQueryKey } from '@/api/attempt-controller/attempt-controller'
 import { useQueryClient } from '@tanstack/vue-query'
+import { errorMessage, firstErrorCode } from '@/lib/errors'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
@@ -12,10 +13,17 @@ const router = useRouter()
 const qc = useQueryClient()
 const attemptId = computed(() => route.params.attemptId as string)
 
-const { data, isLoading } = useGetAttemptsInProgress({ page: 0 })
+const { data, isPending } = useGetAttemptsInProgress({ page: 0 })
+const finished = useGetFinishedAttempts({ page: 0 })
 const attempt = computed(() =>
   (data.value?._embedded?.attempts ?? []).find((a) => a.id === attemptId.value),
 )
+const isFinished = computed(() =>
+  (finished.data.value?._embedded?.attempts ?? []).some((a) => a.id === attemptId.value),
+)
+// Only show the loading state on initial fetch — background refetches keep the
+// previous data on screen so it doesn't flash to "Loading…" after every commit.
+const settled = computed(() => !isPending.value && !finished.isPending.value)
 
 const now = ref(Date.now())
 const ticker = setInterval(() => (now.value = Date.now()), 1000)
@@ -40,48 +48,122 @@ function fmtRemaining(ms: number): string {
 
 const totalQuestions = computed(() => attempt.value?.questions?.length ?? 0)
 
+const errorText = ref<string | null>(null)
 const togglingKey = ref<string | null>(null)
-async function toggleOption(questionId?: string, optionId?: string, currentlySelected?: boolean) {
+async function toggleOption(
+  questionId: string | undefined,
+  optionId: string | undefined,
+  currentlySelected: boolean | undefined,
+  questionType: 'SINGLE_CHOICE' | 'MULTI_CHOICE' | undefined,
+) {
   if (!questionId || !optionId) return
+  if (remainingMs.value <= 0) return
+  const isSingle = questionType === 'SINGLE_CHOICE'
+  // Single-choice clicks on the already-picked option are a no-op — once you've
+  // picked, you can only switch, not unselect.
+  if (isSingle && currentlySelected) return
+  const next = isSingle ? true : !currentlySelected
   const key = `${questionId}:${optionId}`
   togglingKey.value = key
+  errorText.value = null
+
+  // Optimistic cache update — keeps the UI stable across the commit round-trip.
+  // For single-choice, set the picked option to selected and clear all siblings;
+  // the backend does the same when it processes the action.
+  const queryKey = getGetAttemptsInProgressQueryKey({ page: 0 })
+  const previous = qc.getQueryData<typeof data.value>(queryKey)
+  qc.setQueryData<typeof data.value>(queryKey, (old) => {
+    if (!old?._embedded?.attempts) return old
+    return {
+      ...old,
+      _embedded: {
+        ...old._embedded,
+        attempts: old._embedded.attempts.map((a) =>
+          a.id !== attemptId.value
+            ? a
+            : {
+                ...a,
+                questions: (a.questions ?? []).map((q) =>
+                  q.id !== questionId
+                    ? q
+                    : {
+                        ...q,
+                        options: (q.options ?? []).map((o) => {
+                          if (isSingle) return { ...o, selected: o.id === optionId }
+                          return o.id !== optionId ? o : { ...o, selected: next }
+                        }),
+                      },
+                ),
+              },
+        ),
+      },
+    }
+  })
+
   try {
     await commitAttemptActions({
       attemptId: attemptId.value,
-      actions: [{ questionId, optionId, selected: !currentlySelected }],
+      actions: [{ questionId, optionId, selected: next }],
     })
-    qc.invalidateQueries({ queryKey: getGetAttemptsInProgressQueryKey() })
+  } catch (e) {
+    // Roll back the optimistic update.
+    qc.setQueryData(queryKey, previous)
+    errorText.value = errorMessage(e)
   } finally {
     togglingKey.value = null
   }
 }
 
 const finishing = ref(false)
-async function finish() {
-  if (!confirm('Finish this attempt?')) return
+const autoFinished = ref(false)
+async function finishCore() {
   finishing.value = true
+  errorText.value = null
   try {
     await finishAttempt({ attemptId: attemptId.value })
-    await Promise.all([
-      qc.invalidateQueries({ queryKey: getGetAttemptsInProgressQueryKey() }),
-      qc.invalidateQueries({ queryKey: getGetFinishedAttemptsQueryKey() }),
-    ])
-    router.push(`/app/attempt/${attemptId.value}/result`)
-  } finally {
-    finishing.value = false
+  } catch (e) {
+    // If the backend already auto-finished this attempt (deadline passed),
+    // treat the call as a no-op and still navigate to the result.
+    if (firstErrorCode(e) !== 'ATTEMPT_ALREADY_FINISHED') {
+      errorText.value = errorMessage(e)
+      finishing.value = false
+      return
+    }
   }
+  // Navigate first, then invalidate. If we invalidated before navigating,
+  // the in-progress query would drop this attempt and the AttemptView
+  // would briefly render "Attempt not found" between frames.
+  router.push({ path: `/app/attempt/${attemptId.value}/result`, query: { just: '1' } })
+  await Promise.all([
+    qc.invalidateQueries({ queryKey: getGetAttemptsInProgressQueryKey() }),
+    qc.invalidateQueries({ queryKey: getGetFinishedAttemptsQueryKey() }),
+  ])
+  finishing.value = false
+}
+async function finish() {
+  if (!confirm('Finish this attempt?')) return
+  await finishCore()
 }
 
-watch(attempt, (a) => {
-  // If the attempt isn't in the in-progress list, it may already be finished — bounce to result.
-  if (!isLoading.value && !a && data.value) {
+watch([attempt, isFinished, settled], ([a, fin, s]) => {
+  if (s && !a && fin) {
     router.replace(`/app/attempt/${attemptId.value}/result`)
   }
+})
+
+// When the timer runs out, finish on the user's behalf and bounce to result.
+// Fire exactly once — guarded by autoFinished and by the in-flight finishing flag.
+watch(remainingMs, (ms) => {
+  if (ms > 0) return
+  if (autoFinished.value || finishing.value) return
+  if (!attempt.value) return
+  autoFinished.value = true
+  void finishCore()
 })
 </script>
 
 <template>
-  <div v-if="isLoading" class="empty body-md">Loading…</div>
+  <div v-if="!settled" class="empty body-md">Loading…</div>
   <template v-else-if="attempt">
     <div class="bar">
       <ProgressBar :value="remainingPct" />
@@ -98,20 +180,29 @@ watch(attempt, (a) => {
       <Button :loading="finishing" @click="finish">Finish attempt</Button>
     </header>
 
+    <p v-if="errorText" class="banner label-md">{{ errorText }}</p>
+
     <ol class="qlist">
       <li v-for="(q, i) in attempt.questions ?? []" :key="q.id">
         <Card>
           <div class="qhead">
             <span class="label-sm muted">Question {{ i + 1 }} / {{ totalQuestions }}</span>
+            <span class="label-sm muted qhead__rule">
+              {{ q.type === 'SINGLE_CHOICE' ? 'Single answer' : 'Select all that apply' }}
+            </span>
           </div>
           <p class="body-lg q-text">{{ q.text }}</p>
           <ul class="opts">
             <li v-for="o in q.options ?? []" :key="o.id">
               <button
                 type="button"
-                :class="['opt', { 'opt--selected': o.selected }]"
+                :class="[
+                  'opt',
+                  { 'opt--selected': o.selected },
+                  q.type === 'SINGLE_CHOICE' ? 'opt--radio' : 'opt--checkbox',
+                ]"
                 :disabled="togglingKey === `${q.id}:${o.id}`"
-                @click="toggleOption(q.id, o.id, o.selected)"
+                @click="toggleOption(q.id, o.id, o.selected, q.type)"
               >
                 <span class="opt__marker">
                   <span v-if="o.selected" class="opt__dot" />
@@ -124,6 +215,12 @@ watch(attempt, (a) => {
       </li>
     </ol>
   </template>
+  <div v-else-if="finishing || autoFinished" class="empty body-md">Loading…</div>
+  <Card v-else class="notfound">
+    <h1 class="headline-md">Attempt not found</h1>
+    <p class="body-md muted">This attempt doesn't exist or you don't have access to it.</p>
+    <Button @click="router.push('/app')">Back to browse</Button>
+  </Card>
 </template>
 
 <style scoped>
@@ -158,6 +255,13 @@ watch(attempt, (a) => {
 }
 .time {
   font-variant-numeric: tabular-nums;
+}
+.banner {
+  margin: 0 0 var(--space-lg);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--error-container);
+  color: var(--on-error-container);
+  border-radius: var(--radius);
 }
 .qlist {
   list-style: none;
@@ -215,6 +319,13 @@ watch(attempt, (a) => {
   border-radius: var(--radius);
   flex-shrink: 0;
 }
+/* Round marker for single-choice (radio) options. */
+.opt--radio .opt__marker {
+  border-radius: 50%;
+}
+.opt--radio .opt__dot {
+  border-radius: 50%;
+}
 .opt--selected .opt__marker {
   border-color: var(--primary-container);
 }
@@ -229,5 +340,37 @@ watch(attempt, (a) => {
 }
 .empty {
   color: var(--on-surface-variant);
+}
+.notfound {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  align-items: flex-start;
+}
+.notfound h1 {
+  margin: 0;
+}
+
+/* Mobile: the three header pieces (title / time / Finish) overflow the
+ * 375px row. Stack them vertically and let the Finish button become a
+ * full-width tap target. The timer keeps tabular numerals so it doesn't
+ * dance as digits change. */
+@media (max-width: 640px) {
+  .head {
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-lg);
+  }
+  .meta-stack.right {
+    margin-left: 0;
+    text-align: left;
+  }
+  .title-stack {
+    margin-right: 0;
+    flex: 1 1 100%;
+  }
+  .head :deep(.btn) {
+    width: 100%;
+  }
 }
 </style>

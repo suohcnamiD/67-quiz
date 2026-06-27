@@ -165,3 +165,30 @@ select {
   font-size: inherit;
   color: inherit;
 }
+
+/* Global focus-visible ring. Specific component styles can opt out by
+ * overriding outline + :focus-visible inside their scope. */
+:focus-visible {
+  outline: 2px solid var(--on-secondary-container);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Skip-link target for screen reader / keyboard users. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: var(--space-sm);
+  background: var(--surface-container);
+  color: var(--on-surface);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius);
+  z-index: 100;
+}
+.skip-link:focus {
+  left: var(--space-md);
+}
+
+/* The previous CSS class-based flash lived here. It's now driven by the
+ * Web Animations API in lib/scrollAndFlash.ts so rapid re-clicks can
+ * cancel-and-restart cleanly without leftover setTimeout teardown. */
