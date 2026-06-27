@@ -4,6 +4,7 @@ import dev.six_seven_quiz.quiz.component.mapper.QuestionMapper;
 import dev.six_seven_quiz.quiz.dto.QuestionData;
 import dev.six_seven_quiz.quiz.dto.request.AddQuestionRequest;
 import dev.six_seven_quiz.quiz.dto.request.DeleteQuestionRequest;
+import dev.six_seven_quiz.quiz.dto.request.EditQuestionRequest;
 import dev.six_seven_quiz.quiz.dto.response.viewing.QuestionSummaryDto;
 import dev.six_seven_quiz.quiz.exception.QuestionNotFoundException;
 import dev.six_seven_quiz.quiz.exception.QuizNotFoundException;
@@ -65,11 +66,38 @@ public class QuestionService {
         Question question = questionRepository.findById(request.questionId()).orElseThrow(() -> new QuestionNotFoundException(request.questionId()));
         Quiz quiz = question.getQuiz();
         QuizValidator.requireOwner(quiz, user);
+        UUID quizId = quiz.getId();
 
+        quiz.getQuestions().remove(question);
         questionRepository.delete(question);
+        quizRepository.save(quiz);
+        entityManager.flush();
+        entityManager.clear();
 
-        entityManager.refresh(quiz);
+        Quiz reloaded = quizRepository.findById(quizId).orElseThrow(() -> new QuizNotFoundException(quizId));
+        return reloaded.getQuestions().stream().map(questionMapper::toSummaryDto).toList();
+    }
 
-        return quiz.getQuestions().stream().map(questionMapper::toSummaryDto).toList();
+    @Transactional
+    public List<QuestionSummaryDto> editAsUser(
+            UserDetails userDetails,
+            UUID questionId,
+            @Valid EditQuestionRequest request
+    ) {
+        ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
+        Question question = questionRepository.findById(questionId)
+                .orElseThrow(() -> new QuestionNotFoundException(questionId));
+        Quiz quiz = question.getQuiz();
+        QuizValidator.requireOwner(quiz, user);
+        UUID quizId = quiz.getId();
+
+        quiz.editQuestion(question, new QuestionData(request.text(), request.type(), request.options()));
+
+        questionRepository.save(question);
+        entityManager.flush();
+        entityManager.clear();
+
+        Quiz reloaded = quizRepository.findById(quizId).orElseThrow(() -> new QuizNotFoundException(quizId));
+        return reloaded.getQuestions().stream().map(questionMapper::toSummaryDto).toList();
     }
 }

@@ -61,8 +61,25 @@ public class Question {
         this.options.addAll(newOptions);
     }
 
+    /**
+     * Replace the entire options list. Used by the edit-question flow.
+     * orphanRemoval on the @OneToMany will delete the rows from the previous
+     * list once the parent is saved.
+     */
+    public void replaceOptions(List<Option> newOptions) {
+        if (this.options == null) {
+            this.options = new ArrayList<>();
+        }
+        this.options.clear();
+        this.options.addAll(newOptions);
+    }
+
     public String getText() {
         return text;
+    }
+
+    public void setText(String text) {
+        this.text = text;
     }
 
     public QuestionType getType() {
