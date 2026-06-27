@@ -27,7 +27,8 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 ```
 
 ## Intro
