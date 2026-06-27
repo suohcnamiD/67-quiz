@@ -86,10 +86,12 @@ const logout = () => {
   display: flex;
   gap: var(--space-md);
   flex: 1;
+  min-width: 0;
 }
 .nav a {
   color: var(--on-surface-variant);
   padding: var(--space-xs) 0;
+  white-space: nowrap;
 }
 .nav a.router-link-active {
   color: var(--on-surface);
@@ -150,10 +152,23 @@ const logout = () => {
    * fit; drop the brand link's visible weight so the right-side actions get
    * room. The brand is still the AppShell home link. */
   .brand {
-    font-size: 18px;
+    font-size: 16px;
   }
   .me {
     padding: 2px;
+  }
+  /* Tighter topbar gaps and a smaller Sign-out so all four pieces fit
+   * without the nav text wrapping onto two lines. */
+  .topbar__inner {
+    gap: var(--space-sm);
+  }
+  .nav {
+    gap: var(--space-xs);
+    font-size: 13px;
+  }
+  .actions :deep(.btn) {
+    padding: 6px 10px;
+    font-size: 12px;
   }
 }
 </style>

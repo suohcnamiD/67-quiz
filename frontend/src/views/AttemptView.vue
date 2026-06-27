@@ -350,4 +350,27 @@ watch(remainingMs, (ms) => {
 .notfound h1 {
   margin: 0;
 }
+
+/* Mobile: the three header pieces (title / time / Finish) overflow the
+ * 375px row. Stack them vertically and let the Finish button become a
+ * full-width tap target. The timer keeps tabular numerals so it doesn't
+ * dance as digits change. */
+@media (max-width: 640px) {
+  .head {
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-lg);
+  }
+  .meta-stack.right {
+    margin-left: 0;
+    text-align: left;
+  }
+  .title-stack {
+    margin-right: 0;
+    flex: 1 1 100%;
+  }
+  .head :deep(.btn) {
+    width: 100%;
+  }
+}
 </style>

@@ -26,7 +26,10 @@ import java.util.UUID;
 @Service
 public class QuizService {
 
-    private static final int QUIZZES_PER_PAGE = 20;
+    // 21 instead of 20 so a 3-column desktop grid fills exactly 7 rows with no
+    // trailing single-card row. Mobile (1-col) and tablet (2-col) layouts
+    // don't care.
+    private static final int QUIZZES_PER_PAGE = 21;
 
     private final ApplicationUserService applicationUserService;
     private final QuizRepository quizRepository;

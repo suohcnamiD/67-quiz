@@ -386,4 +386,19 @@ watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.v
 .muted {
   color: var(--on-surface-variant);
 }
+
+/* Mobile: stack the quiz title and the Back/Delete row, and let the
+ * actions fill the row so both buttons stay readable instead of
+ * line-breaking the labels. */
+@media (max-width: 480px) {
+  .head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-md);
+  }
+  .head__actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
 </style>
