@@ -75,9 +75,10 @@ onMounted(() => {
   }
   countTimer = requestAnimationFrame(tick)
 
-  // Auto-dismiss after 3.5s, but let the user click or press Escape to
-  // dismiss earlier.
-  dismissTimer = window.setTimeout(close, 3500)
+  // Auto-dismiss after 6s — enough time for the user to read the score
+  // without forcing them to manually close. Escape or a click anywhere also
+  // dismisses early, and the explicit Dismiss button does the same.
+  dismissTimer = window.setTimeout(close, 6000)
   window.addEventListener('keydown', onKeydown)
 })
 
@@ -118,7 +119,7 @@ onUnmounted(() => {
         <span class="popup__score-number">{{ displayedScore }}</span>
         <span class="popup__score-total">/ {{ max }}</span>
       </div>
-      <button type="button" class="popup__dismiss label-md" @click="close">Tap to see breakdown</button>
+      <button type="button" class="popup__dismiss label-md" @click="close">Dismiss</button>
     </div>
   </div>
 </template>

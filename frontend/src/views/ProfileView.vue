@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQueryClient } from '@tanstack/vue-query'
 import {
@@ -81,9 +81,19 @@ const avatarError = ref<string | null>(null)
 const uploadingAvatar = ref(false)
 const removingAvatar = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
+const previewUrl = ref<string | null>(null)
+
+function clearPreview() {
+  if (previewUrl.value) {
+    URL.revokeObjectURL(previewUrl.value)
+    previewUrl.value = null
+  }
+}
+onUnmounted(clearPreview)
 
 function openAvatarModal() {
   avatarError.value = null
+  clearPreview()
   avatarOpen.value = true
 }
 
@@ -95,6 +105,10 @@ async function onFilePicked(event: Event) {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
   if (!file) return
+  clearPreview()
+  // Show the just-picked file while the upload round-trips, so the user can
+  // see what's landing rather than staring at a spinner.
+  previewUrl.value = URL.createObjectURL(file)
   avatarError.value = null
   uploadingAvatar.value = true
   try {
@@ -111,6 +125,7 @@ async function onFilePicked(event: Event) {
     }
     // Close the modal on success so the user sees their new avatar on the hero.
     avatarOpen.value = false
+    clearPreview()
   } catch (e) {
     avatarError.value = errorMessage(e)
   } finally {
@@ -258,9 +273,18 @@ function scrollToAuthored() {
       </template>
     </Modal>
 
-    <Modal :open="avatarOpen" title="Change avatar" @close="avatarOpen = false">
+    <Modal :open="avatarOpen" title="Change avatar" @close="avatarOpen = false; clearPreview()">
       <div class="avatar-modal">
+        <img
+          v-if="previewUrl"
+          :src="previewUrl"
+          alt=""
+          class="avatar-preview"
+          width="120"
+          height="120"
+        />
         <Avatar
+          v-else
           :username="profile.username"
           :display-name="profile.displayName"
           :version="auth.avatarVersion"
@@ -287,7 +311,7 @@ function scrollToAuthored() {
           :loading="removingAvatar"
           @click="removeAvatar"
         >Remove</Button>
-        <Button variant="ghost" @click="avatarOpen = false">Cancel</Button>
+        <Button variant="ghost" @click="avatarOpen = false; clearPreview()">Cancel</Button>
         <Button :loading="uploadingAvatar" @click="pickAvatar">
           {{ profile.hasAvatar ? 'Replace…' : 'Upload…' }}
         </Button>
@@ -459,6 +483,13 @@ function scrollToAuthored() {
 }
 .avatar-modal .muted {
   max-width: 28rem;
+}
+.avatar-preview {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--outline-variant);
 }
 .file-input {
   display: none;

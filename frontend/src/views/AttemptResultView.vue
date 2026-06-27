@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useGetFinishedAttempts } from '@/api/attempt-controller/attempt-controller'
+import { useGetFinishedAttempts, attemptQuiz } from '@/api/attempt-controller/attempt-controller'
+import { errorMessage } from '@/lib/errors'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import FinishCelebration from '@/components/FinishCelebration.vue'
@@ -88,6 +89,23 @@ const showCelebration = ref(false)
 watch([justFinished, attempt], ([just, a]) => {
   if (just && a && !showCelebration.value) showCelebration.value = true
 }, { immediate: true })
+
+const tryAgainPending = ref(false)
+const tryAgainError = ref<string | null>(null)
+async function tryAgain() {
+  const quizId = attempt.value?.quiz?.id
+  if (!quizId) return
+  tryAgainPending.value = true
+  tryAgainError.value = null
+  try {
+    const fresh = await attemptQuiz({ quizId })
+    router.push(`/app/attempt/${fresh.id}`)
+  } catch (e) {
+    tryAgainError.value = errorMessage(e)
+  } finally {
+    tryAgainPending.value = false
+  }
+}
 </script>
 
 <template>
@@ -121,8 +139,14 @@ watch([justFinished, attempt], ([just, a]) => {
     </Card>
 
     <div class="actions">
+      <Button
+        v-if="attempt.quiz?.id"
+        :loading="tryAgainPending"
+        @click="tryAgain"
+      >Try again</Button>
       <Button variant="ghost" @click="router.push('/app')">Back to browse</Button>
     </div>
+    <p v-if="tryAgainError" class="banner label-md" role="alert">{{ tryAgainError }}</p>
 
     <ol class="qlist">
       <li v-for="(q, i) in attempt.questions ?? []" :key="q.id" class="question">
@@ -278,7 +302,15 @@ watch([justFinished, attempt], ([just, a]) => {
 .actions {
   display: flex;
   justify-content: flex-end;
+  gap: var(--space-sm);
   margin: 0 0 var(--space-lg);
+}
+.banner {
+  margin: 0 0 var(--space-lg);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--error-container);
+  color: var(--on-error-container);
+  border-radius: var(--radius);
 }
 
 /* ----- Question list — flat, no nested cards ----- */

@@ -37,6 +37,11 @@ const addOptions = ref<OptionData[]>([
 const submitting = ref(false)
 const errorText = ref<string | null>(null)
 
+const addSectionRef = ref<HTMLElement | null>(null)
+function scrollToAddForm() {
+  addSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
 function resetAddForm() {
   addText.value = ''
   addType.value = MULTI
@@ -198,7 +203,14 @@ watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.v
     </header>
 
     <section class="section">
-      <h2 class="headline-md">Questions</h2>
+      <div class="section__head">
+        <h2 class="headline-md">Questions</h2>
+        <Button
+          v-if="(quiz.data.value.questions?.length ?? 0) >= 3"
+          variant="ghost"
+          @click="scrollToAddForm"
+        >+ Add another</Button>
+      </div>
       <div v-if="!(quiz.data.value.questions?.length)" class="empty body-md">
         No questions yet. Add one below.
       </div>
@@ -255,7 +267,7 @@ watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.v
       </ol>
     </section>
 
-    <section class="section">
+    <section class="section" ref="addSectionRef">
       <h2 class="headline-md">Add a question</h2>
       <Card>
         <form class="form" @submit.prevent="submitQuestion">
@@ -290,7 +302,17 @@ watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.v
   margin: var(--space-xs) 0 0;
 }
 .section {
-  margin-bottom: var(--space-xl);
+  margin: var(--space-xl) 0;
+}
+.section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+.section__head h2 {
+  margin: 0;
 }
 .section h2 {
   margin: 0 0 var(--space-md);

@@ -2,6 +2,7 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
+import { confirmDialog } from '@/lib/confirmDialog'
 import Button from './Button.vue'
 import Avatar from './Avatar.vue'
 
@@ -20,8 +21,15 @@ function closeMenu() {
   menuOpen.value = false
 }
 
-function logout() {
+async function logout() {
   closeMenu()
+  const ok = await confirmDialog.open({
+    title: 'Sign out?',
+    body: "You'll need to sign in again to come back.",
+    confirmLabel: 'Sign out',
+    danger: true,
+  })
+  if (!ok) return
   // No backend logout endpoint exposed; clear locally and bounce to /login.
   auth.clear()
   router.push('/login')
@@ -46,6 +54,23 @@ function onKeydown(e: KeyboardEvent) {
     e.preventDefault()
     closeMenu()
     toggleRef.value?.focus()
+    return
+  }
+  // Quick-focus the BrowseView search input from anywhere in /app via
+  // `/` or ⌘K / Ctrl+K. Skip when typing in another input so the slash
+  // isn't intercepted mid-word.
+  const tag = (e.target as HTMLElement | null)?.tagName
+  const inField =
+    tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement | null)?.isContentEditable
+  const cmdK = (e.key === 'k' || e.key === 'K') && (e.metaKey || e.ctrlKey)
+  const slash = e.key === '/' && !inField
+  if (cmdK || slash) {
+    const input = document.querySelector<HTMLInputElement>('input[type="search"]')
+    if (input) {
+      e.preventDefault()
+      input.focus()
+      input.select()
+    }
   }
 }
 

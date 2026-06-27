@@ -51,6 +51,7 @@ const totalQuestions = computed(() => attempt.value?.questions?.length ?? 0)
 
 const errorText = ref<string | null>(null)
 const togglingKey = ref<string | null>(null)
+const pulseKey = ref<string | null>(null)
 async function toggleOption(
   questionId: string | undefined,
   optionId: string | undefined,
@@ -60,11 +61,18 @@ async function toggleOption(
   if (!questionId || !optionId) return
   if (remainingMs.value <= 0) return
   const isSingle = questionType === 'SINGLE_CHOICE'
-  // Single-choice clicks on the already-picked option are a no-op — once you've
-  // picked, you can only switch, not unselect.
-  if (isSingle && currentlySelected) return
-  const next = isSingle ? true : !currentlySelected
   const key = `${questionId}:${optionId}`
+  // Single-choice clicks on the already-picked option are a no-op — once you've
+  // picked, you can only switch, not unselect. Pulse the button so the click
+  // doesn't feel ignored.
+  if (isSingle && currentlySelected) {
+    pulseKey.value = key
+    setTimeout(() => {
+      if (pulseKey.value === key) pulseKey.value = null
+    }, 280)
+    return
+  }
+  const next = isSingle ? true : !currentlySelected
   togglingKey.value = key
   errorText.value = null
 
@@ -116,8 +124,13 @@ async function toggleOption(
 }
 
 const finishing = ref(false)
-const autoFinished = ref(false)
-async function finishCore() {
+// Auto-finish lifecycle when the timer hits zero. We track this separately
+// from `finishing` so a failed auto-attempt leaves a Retry banner without
+// stranding the user.
+type AutoFinishState = 'idle' | 'attempting' | 'succeeded' | 'failed'
+const autoFinishState = ref<AutoFinishState>('idle')
+const autoFinished = computed(() => autoFinishState.value !== 'idle')
+async function finishCore(viaAuto = false) {
   finishing.value = true
   errorText.value = null
   try {
@@ -128,9 +141,11 @@ async function finishCore() {
     if (firstErrorCode(e) !== 'ATTEMPT_ALREADY_FINISHED') {
       errorText.value = errorMessage(e)
       finishing.value = false
+      if (viaAuto) autoFinishState.value = 'failed'
       return
     }
   }
+  if (viaAuto) autoFinishState.value = 'succeeded'
   // Navigate first, then invalidate. If we invalidated before navigating,
   // the in-progress query would drop this attempt and the AttemptView
   // would briefly render "Attempt not found" between frames.
@@ -150,6 +165,10 @@ async function finish() {
   if (!ok) return
   await finishCore()
 }
+async function retryAutoFinish() {
+  autoFinishState.value = 'attempting'
+  await finishCore(true)
+}
 
 watch([attempt, isFinished, settled], ([a, fin, s]) => {
   if (s && !a && fin) {
@@ -158,13 +177,13 @@ watch([attempt, isFinished, settled], ([a, fin, s]) => {
 })
 
 // When the timer runs out, finish on the user's behalf and bounce to result.
-// Fire exactly once — guarded by autoFinished and by the in-flight finishing flag.
+// If the auto-attempt fails, show a Retry banner instead of stranding the user.
 watch(remainingMs, (ms) => {
   if (ms > 0) return
-  if (autoFinished.value || finishing.value) return
+  if (autoFinishState.value !== 'idle' || finishing.value) return
   if (!attempt.value) return
-  autoFinished.value = true
-  void finishCore()
+  autoFinishState.value = 'attempting'
+  void finishCore(true)
 })
 </script>
 
@@ -188,6 +207,11 @@ watch(remainingMs, (ms) => {
 
     <p v-if="errorText" class="banner label-md">{{ errorText }}</p>
 
+    <div v-if="autoFinishState === 'failed'" class="banner banner--retry" role="alert">
+      <span>Time's up, but we couldn't finish your attempt automatically.</span>
+      <Button variant="primary" :loading="finishing" @click="retryAutoFinish">Retry finish</Button>
+    </div>
+
     <ol class="qlist">
       <li v-for="(q, i) in attempt.questions ?? []" :key="q.id">
         <Card>
@@ -207,6 +231,7 @@ watch(remainingMs, (ms) => {
                   { 'opt--selected': o.selected },
                   q.type === 'SINGLE_CHOICE' ? 'opt--radio' : 'opt--checkbox',
                 ]"
+                :data-pulse="pulseKey === `${q.id}:${o.id}` ? 'true' : null"
                 :disabled="togglingKey === `${q.id}:${o.id}`"
                 @click="toggleOption(q.id, o.id, o.selected, q.type)"
               >
@@ -272,6 +297,13 @@ watch(remainingMs, (ms) => {
   color: var(--on-error-container);
   border-radius: var(--radius);
 }
+.banner--retry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
 .qlist {
   list-style: none;
   padding: 0;
@@ -331,6 +363,17 @@ watch(remainingMs, (ms) => {
 .opt--selected {
   border-color: var(--primary-container);
   background: var(--surface-container);
+}
+.opt[data-pulse] {
+  animation: opt-pulse 280ms ease;
+}
+@keyframes opt-pulse {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.015); border-color: var(--primary-container); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .opt[data-pulse] { animation: none; }
 }
 .opt__marker {
   display: inline-flex;

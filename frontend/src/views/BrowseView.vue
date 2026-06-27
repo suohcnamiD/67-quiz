@@ -127,6 +127,10 @@ function fmtRelative(iso?: string): string {
 
   <!-- Search mode hides the default Browse/Continue/Past sections. -->
   <template v-if="isSearching">
+    <p class="search-status label-sm">
+      <span>Searching: <strong>"{{ debouncedQuery }}"</strong></span>
+      <button type="button" class="search-status__clear" @click="clearSearch">Clear</button>
+    </p>
     <section class="section" aria-labelledby="search-quizzes-heading">
       <header class="section__head">
         <h2 id="search-quizzes-heading" class="headline-md">
@@ -191,7 +195,10 @@ function fmtRelative(iso?: string): string {
         <h2 id="browse-heading" class="headline-md">Browse quizzes</h2>
       </header>
       <p v-if="quizzes.isLoading.value" class="empty body-md">Loading…</p>
-      <p v-else-if="!items.length" class="empty body-md">No quizzes yet. Create one.</p>
+      <div v-else-if="!items.length" class="empty-state">
+        <p class="empty body-md">No quizzes yet — be the first to author one.</p>
+        <Button @click="router.push('/app/quiz/new')">New quiz</Button>
+      </div>
       <div v-else class="grid">
         <QuizCard v-for="q in items" :key="q.id" :quiz="q" @error="errorText = $event" />
       </div>
@@ -236,6 +243,29 @@ function fmtRelative(iso?: string): string {
 }
 .search {
   margin-bottom: var(--space-lg);
+}
+.search-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: 0 0 var(--space-md);
+  color: var(--on-surface-variant);
+}
+.search-status__clear {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: var(--on-surface);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-sm);
 }
 .search__field {
   position: relative;
