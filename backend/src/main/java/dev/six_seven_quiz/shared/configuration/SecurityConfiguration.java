@@ -43,18 +43,17 @@ public class SecurityConfiguration {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authorize -> {
                     authorize
-                            .requestMatchers("/", "/index.html", "/assets/**", "/favicon.ico").permitAll()
+                            // CORS preflight always permitted.
                             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                            .requestMatchers("/v3/api-docs").permitAll()
-                            .requestMatchers("/v3/api-docs/**").permitAll()
-                            .requestMatchers("/swagger-ui/**").permitAll()
+                            // API surface — explicit allow/deny based on the resource.
                             .requestMatchers("/api/authentication/**").permitAll()
-                            // SPA shell routes — serve index.html, Vue router handles auth redirect.
-                            // Permit GETs for anything that isn't /api/** so the SPA fallback can render.
-                            .requestMatchers(HttpMethod.GET, "/app", "/app/**", "/login", "/register").permitAll()
                             .requestMatchers("/api/**").authenticated()
-                            .requestMatchers(HttpMethod.GET, "/**").permitAll()
-                            .anyRequest().authenticated();
+                            // Everything else (Swagger UI, OpenAPI docs, the bundled
+                            // SPA's static files and the index.html fallback) is
+                            // public — the static resource handler decides what
+                            // actually gets returned. We don't enumerate page paths
+                            // here; that's the SPA's job.
+                            .anyRequest().permitAll();
                 })
 //                .formLogin(AbstractAuthenticationFilterConfigurer::permitAll)
                 .logout((logout) -> logout.logoutUrl("/authentication/logout").logoutSuccessHandler((request, response, authentication) -> {
@@ -81,6 +80,11 @@ public class SecurityConfiguration {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
+        // CORS only kicks in for cross-origin requests. In prod the SPA is
+        // bundled into this jar and served from the same origin as the API,
+        // so the browser never sends a preflight. This list only matters when
+        // the frontend lives on a separate origin (e.g. the local Vite dev
+        // server on :5173).
         configuration.setAllowedOriginPatterns(List.of(
                 "http://192.168.*.*:5173",
                 "http://localhost:5173"
