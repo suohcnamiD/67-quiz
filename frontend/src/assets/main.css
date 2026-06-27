@@ -189,18 +189,6 @@ select {
   left: var(--space-md);
 }
 
-/* Brief flash applied to a section that the user navigated to (e.g. via a
- * stat-card on the profile). Picks up the M3 secondary-container tint so
- * green = "here it is" without competing with the brand-red primary. */
-.flash-target {
-  animation: flash-pop 1s cubic-bezier(0.16, 1, 0.3, 1);
-  border-radius: var(--radius-lg);
-}
-@keyframes flash-pop {
-  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--on-secondary-container) 60%, transparent); }
-  20%  { box-shadow: 0 0 0 10px color-mix(in srgb, var(--on-secondary-container) 35%, transparent); }
-  100% { box-shadow: 0 0 0 0 transparent; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .flash-target { animation: none; }
-}
+/* The previous CSS class-based flash lived here. It's now driven by the
+ * Web Animations API in lib/scrollAndFlash.ts so rapid re-clicks can
+ * cancel-and-restart cleanly without leftover setTimeout teardown. */

@@ -124,10 +124,23 @@ test('"Quizzes authored" stat flashes the authored section when clicked', async 
   await expect(stat).not.toBeDisabled()
 
   const section = page.locator('#authored-section')
-  await expect(section).not.toHaveClass(/flash-target/)
   await stat.click()
-  // The helper toggles the class on; the animation removes it after ~1s.
-  await expect(section).toHaveClass(/flash-target/, { timeout: 1000 })
+  // The helper drives the flash via the Web Animations API; right after the
+  // click there should be exactly one running animation on the section.
+  const runningAfterClick = await section.evaluate(
+    (el) => el.getAnimations().filter((a) => a.playState === 'running').length,
+  )
+  expect(runningAfterClick).toBeGreaterThan(0)
+
+  // Rapid re-clicks must cancel the previous animation and start a fresh one,
+  // not stack on top. After three quick clicks we still expect one (not three).
+  await stat.click()
+  await stat.click()
+  await stat.click()
+  const runningAfterBurst = await section.evaluate(
+    (el) => el.getAnimations().filter((a) => a.playState === 'running').length,
+  )
+  expect(runningAfterBurst).toBe(1)
 })
 
 test('"Attempts taken" stat navigates to Browse#past-results when there are attempts', async ({ page }) => {
