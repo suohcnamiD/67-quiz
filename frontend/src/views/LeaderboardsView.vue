@@ -34,11 +34,11 @@ const totalElements = computed(() => current.value.data.value?.totalElements ?? 
 const you = computed<LeaderboardEntryDto | null>(() => current.value.data.value?.you ?? null)
 const isLoading = computed(() => current.value.isLoading.value)
 
-const primaryLabel = computed(() => (tab.value === 'players' ? 'Avg score' : 'Avg rating'))
+const primaryLabel = computed(() => (tab.value === 'players' ? 'Score' : 'Avg rating'))
 const secondaryLabel = computed(() => (tab.value === 'players' ? 'attempts' : 'ratings'))
 const qualifierHint = computed(() =>
   tab.value === 'players'
-    ? 'Qualifying: at least 3 finished attempts.'
+    ? 'Score combines your accuracy with how many attempts you’ve taken. New players shrink toward 50% until enough attempts settle the score. Qualifying: at least 3 finished attempts.'
     : 'Qualifying: at least 5 ratings across your quizzes.',
 )
 
