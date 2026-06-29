@@ -28,7 +28,7 @@ public class QuizController {
 
 
     @DeleteMapping("/{quizId}")
-    public void delete(
+    public void deleteQuiz(
             @PathVariable @NotNull UUID quizId,
             @AuthenticationPrincipal UserDetails userDetails
     ) {

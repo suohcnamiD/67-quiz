@@ -18,6 +18,7 @@ import { confirmDialog } from '@/lib/confirmDialog'
 import Button from '@/components/Button.vue'
 import Input from '@/components/Input.vue'
 import Avatar from '@/components/Avatar.vue'
+import ProfileComments from '@/components/ProfileComments.vue'
 import QuizCard from '@/components/QuizCard.vue'
 import Modal from '@/components/Modal.vue'
 
@@ -233,6 +234,7 @@ function scrollToAuthored() {
       >
         <span class="stat__value">{{ profile.quizzesAuthored ?? 0 }}</span>
         <span class="stat__label label-sm">Quizzes authored</span>
+        <span class="stat__chevron" aria-hidden="true">›</span>
       </button>
       <button
         type="button"
@@ -243,6 +245,7 @@ function scrollToAuthored() {
       >
         <span class="stat__value">{{ profile.attemptsTaken ?? 0 }}</span>
         <span class="stat__label label-sm">Attempts taken</span>
+        <span class="stat__chevron" aria-hidden="true">›</span>
       </button>
       <div class="stat">
         <span class="stat__value">
@@ -274,6 +277,8 @@ function scrollToAuthored() {
     </section>
 
     <p v-if="errorText" class="banner label-md" role="alert">{{ errorText }}</p>
+
+    <ProfileComments v-if="profile?.username" :username="profile.username" />
 
     <div class="bottom-actions">
       <Button variant="ghost" @click="router.push('/app')">Back to browse</Button>
@@ -427,6 +432,7 @@ function scrollToAuthored() {
   border: 1px solid var(--outline-variant);
   border-radius: var(--radius-lg);
   text-align: left;
+  position: relative;
 }
 .stat--link {
   appearance: none;
@@ -439,12 +445,29 @@ function scrollToAuthored() {
   border-color: var(--outline);
   background: var(--surface-container-high);
 }
+.stat--link:not(:disabled):hover .stat__chevron {
+  transform: translateX(2px);
+  color: var(--on-surface);
+}
 .stat--link:not(:disabled):active {
   transform: translateY(1px);
 }
 .stat--link:disabled {
   cursor: default;
   opacity: 0.85;
+}
+.stat--link:disabled .stat__chevron {
+  display: none;
+}
+.stat__chevron {
+  position: absolute;
+  top: var(--space-md);
+  right: var(--space-md);
+  color: var(--on-surface-variant);
+  font-size: 1.5rem;
+  line-height: 1;
+  font-weight: 300;
+  transition: transform 120ms ease, color 120ms ease;
 }
 .stat__value {
   font-size: 2rem;

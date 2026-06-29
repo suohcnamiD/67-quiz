@@ -7,7 +7,7 @@ import {
   useGetMine,
   useUpsertMine,
   getGetMineQueryKey,
-  getSummaryQueryKey,
+  getRatingSummaryQueryKey,
 } from '@/api/quiz-rating-controller/quiz-rating-controller'
 import { getGetQuizzesQueryKey } from '@/api/quiz-controller/quiz-controller'
 import { errorMessage, firstErrorCode } from '@/lib/errors'
@@ -170,7 +170,7 @@ async function saveRating() {
     })
     ratingSaved.value = true
     qc.invalidateQueries({ queryKey: getGetMineQueryKey(quizId.value) })
-    qc.invalidateQueries({ queryKey: getSummaryQueryKey(quizId.value) })
+    qc.invalidateQueries({ queryKey: getRatingSummaryQueryKey(quizId.value) })
     qc.invalidateQueries({ queryKey: getGetQuizzesQueryKey() })
     // Persist dismissal so the prompt doesn't keep insisting after a save.
     if (dismissKey.value) {

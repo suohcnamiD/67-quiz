@@ -47,7 +47,7 @@ public class QuizRatingController {
     }
 
     @GetMapping
-    public PagedModel<EntityModel<QuizRatingDto>> list(
+    public PagedModel<EntityModel<QuizRatingDto>> listRatings(
             @PathVariable @NotNull UUID quizId,
             @RequestParam(defaultValue = "0") int page,
             @Parameter(hidden = true) PagedResourcesAssembler<QuizRatingDto> pagedResourcesAssembler
@@ -56,7 +56,7 @@ public class QuizRatingController {
     }
 
     @GetMapping("/summary")
-    public QuizRatingSummaryDto summary(@PathVariable @NotNull UUID quizId) {
+    public QuizRatingSummaryDto ratingSummary(@PathVariable @NotNull UUID quizId) {
         QuizRatingService.Summary s = ratingService.aggregate(quizId);
         return new QuizRatingSummaryDto(s.average(), s.count());
     }

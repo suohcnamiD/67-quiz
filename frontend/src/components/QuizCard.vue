@@ -6,7 +6,7 @@ import {
   attemptQuiz,
   getGetAttemptsInProgressQueryKey,
 } from '@/api/attempt-controller/attempt-controller'
-import { _delete as deleteQuiz, getGetQuizzesQueryKey } from '@/api/quiz-controller/quiz-controller'
+import { deleteQuiz, getGetQuizzesQueryKey } from '@/api/quiz-controller/quiz-controller'
 import { getGetQuizzesByAuthorQueryKey } from '@/api/user-profile-controller/user-profile-controller'
 import { errorMessage } from '@/lib/errors'
 import { confirmDialog } from '@/lib/confirmDialog'

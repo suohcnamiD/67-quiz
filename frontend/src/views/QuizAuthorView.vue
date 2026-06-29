@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useGetQuiz, _delete as deleteQuiz, getGetQuizQueryKey } from '@/api/quiz-controller/quiz-controller'
+import { useGetQuiz, deleteQuiz, getGetQuizQueryKey } from '@/api/quiz-controller/quiz-controller'
 import {
   addQuizQuestion,
   deleteQuizQuestion,
   editQuizQuestion,
 } from '@/api/question-controller/question-controller'
-import { useList as useRatingList, useSummary as useRatingSummary } from '@/api/quiz-rating-controller/quiz-rating-controller'
+import { useListRatings as useRatingList, useRatingSummary } from '@/api/quiz-rating-controller/quiz-rating-controller'
 import { useQueryClient } from '@tanstack/vue-query'
 import { errorMessage } from '@/lib/errors'
 import { confirmDialog } from '@/lib/confirmDialog'

@@ -1,0 +1,59 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-profile-comments-table
+      author: hubenko
+      changes:
+        - createTable:
+            tableName: profile_comments
+            remarks: Public comments left on a user's profile by any signed-in user.
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: profile_comments_pk
+              - column:
+                  name: target_user_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: author_user_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: body
+                  type: VARCHAR(1000)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: profile_comments
+            baseColumnNames: target_user_id
+            referencedTableName: users
+            referencedColumnNames: id
+            constraintName: profile_comments_target_fk
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: profile_comments
+            baseColumnNames: author_user_id
+            referencedTableName: users
+            referencedColumnNames: id
+            constraintName: profile_comments_author_fk
+            onDelete: CASCADE
+        - createIndex:
+            tableName: profile_comments
+            indexName: profile_comments_target_ix
+            columns:
+              - column:
+                  name: target_user_id
+              - column:
+                  name: created_at
+                  descending: true

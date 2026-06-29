@@ -79,6 +79,9 @@ const INVALID_RATING: Resolver = (d) => {
 const RATING_NOT_ELIGIBLE: Resolver = () =>
   'Finish the quiz before rating it.'
 
+const INVALID_COMMENT: Resolver = (d) =>
+  str(d, 'message') ?? 'That comment is invalid.'
+
 const QUIZ_NOT_FOUND: Resolver = () => 'That quiz could not be found.'
 const QUESTION_NOT_FOUND: Resolver = () => 'That question could not be found.'
 const ATTEMPT_NOT_FOUND: Resolver = () => 'That attempt could not be found.'
@@ -103,6 +106,8 @@ const INVALID_FORMAT: Resolver = (d) => {
 const STATIC: Record<string, string> = {
   NO_ACCESS_TO_QUIZ: 'You don’t have access to this quiz.',
   NO_ACCESS_TO_ATTEMPT: 'You don’t have access to this attempt.',
+  NO_ACCESS_TO_COMMENT: 'You can’t delete this comment.',
+  COMMENT_NOT_FOUND: 'That comment is no longer there.',
   ATTEMPT_ALREADY_FINISHED: 'This attempt is already finished.',
   USERNAME_ALREADY_TAKEN: 'That username is already taken.',
   UNAUTHORIZED: 'Wrong username or password.',
@@ -126,6 +131,7 @@ const RESOLVERS: Record<string, Resolver> = {
   INVALID_IMAGE,
   INVALID_RATING,
   RATING_NOT_ELIGIBLE,
+  INVALID_COMMENT,
   QUIZ_NOT_FOUND,
   QUESTION_NOT_FOUND,
   ATTEMPT_NOT_FOUND,
