@@ -66,11 +66,6 @@ public class GlobalExceptionHandler {
         return Failure.status(NOT_FOUND).toResponseEntity();
     }
 
-    @ExceptionHandler(NoResourceFoundException.class)
-    public ResponseEntity<?> handleNoResourceFoundException(NoResourceFoundException exception) {
-        return Failure.status(NOT_FOUND).toResponseEntity();
-    }
-
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Failure> handleValidationExceptions(MethodArgumentNotValidException exception) {
         return Failure.of(
