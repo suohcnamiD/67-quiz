@@ -1,4 +1,11 @@
 spring:
+  profiles:
+    # Default boot runs as prod. Demo seeders (e.g. SamplerSeeder) gate
+    # themselves with !prod so a freshly deployed instance doesn't ship
+    # fixture content. Override locally with
+    # `SPRING_PROFILES_ACTIVE=local ./gradlew bootRun` to seed the demo
+    # sampler user + quizzes for the e2e suite.
+    default: prod
   jpa:
     open-in-view: false
   session:

@@ -12,6 +12,7 @@ import jakarta.persistence.PersistenceContext;
 import jakarta.transaction.Transactional;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -31,8 +32,13 @@ import java.util.UUID;
  * Implemented as an ApplicationRunner instead of a Liquibase changeset so the
  * password is hashed by the live PasswordEncoder bean rather than committing
  * a precomputed BCrypt string to the changelog.
+ *
+ * Gated to non-prod profiles so production boots don't ship fixture content.
+ * The default profile is "prod" (see application.yaml), so by default this
+ * bean is NOT registered. Enable locally with SPRING_PROFILES_ACTIVE=local.
  */
 @Component
+@Profile("!prod")
 public class SamplerSeeder implements ApplicationRunner {
 
     private static final String USERNAME = "sampler";
