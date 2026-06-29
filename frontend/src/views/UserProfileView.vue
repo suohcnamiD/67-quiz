@@ -183,10 +183,6 @@ function scrollToAuthored() {
   border-color: var(--outline);
   background: var(--surface-container-high);
 }
-.stat--link:not(:disabled):hover .stat__chevron {
-  transform: translateX(2px);
-  color: var(--on-surface);
-}
 .stat--link:not(:disabled):active {
   transform: translateY(1px);
 }
@@ -199,13 +195,18 @@ function scrollToAuthored() {
 }
 .stat__chevron {
   position: absolute;
-  top: var(--space-md);
+  top: 50%;
   right: var(--space-md);
+  transform: translateY(-50%);
   color: var(--on-surface-variant);
   font-size: 1.5rem;
   line-height: 1;
   font-weight: 300;
   transition: transform 120ms ease, color 120ms ease;
+}
+.stat--link:not(:disabled):hover .stat__chevron {
+  transform: translateY(-50%) translateX(2px);
+  color: var(--on-surface);
 }
 .stat__value {
   font-size: 2rem;

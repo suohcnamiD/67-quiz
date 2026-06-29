@@ -50,8 +50,10 @@ async function submit() {
 <template>
   <div class="page">
     <Card>
-      <RouterLink to="/" class="brand-link" aria-label="67quiz home"><BrandMark size="md" /></RouterLink>
-      <h1 class="headline-lg">Sign in</h1>
+      <header class="auth-head">
+        <RouterLink to="/" class="brand-link" aria-label="67quiz home"><BrandMark size="md" /></RouterLink>
+        <h1 class="headline-lg auth-head__title">Sign in</h1>
+      </header>
       <form class="form" @submit.prevent="submit">
         <Input
           v-model="username"
@@ -109,6 +111,22 @@ async function submit() {
   transition: opacity 120ms ease;
 }
 .brand-link:hover { opacity: 1; }
+.auth-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-lg);
+}
+.auth-head .brand-link {
+  margin-bottom: 0;
+}
+.auth-head__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--on-surface-variant);
+}
 .footnote {
   margin-top: var(--space-lg);
   color: var(--on-surface-variant);
