@@ -42,6 +42,9 @@ dependencies {
 
     implementation("org.mapstruct:mapstruct:1.6.3")
     annotationProcessor("org.mapstruct:mapstruct-processor:1.6.3")
+    // ImageIO plugin so AvatarStorageService can decode WebP uploads — the
+    // stock JDK ImageIO ships PNG/JPEG/GIF/BMP only.
+    implementation("com.twelvemonkeys.imageio:imageio-webp:3.12.0")
 
     testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
     testImplementation("org.springframework.boot:spring-boot-starter-security-test")
