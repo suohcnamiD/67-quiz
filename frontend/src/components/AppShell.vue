@@ -91,6 +91,7 @@ onUnmounted(() => {
         <RouterLink to="/app" class="brand">67quiz</RouterLink>
         <nav class="nav label-md" aria-label="Primary">
           <RouterLink to="/app" exact-active-class="router-link-active">Browse</RouterLink>
+          <RouterLink to="/app/leaderboards" exact-active-class="router-link-active">Leaderboards</RouterLink>
           <RouterLink to="/app/quiz/new" exact-active-class="router-link-active">New quiz</RouterLink>
         </nav>
         <div class="actions">
@@ -136,6 +137,13 @@ onUnmounted(() => {
             exact-active-class="menu__item--active"
             @click="closeMenu"
           >Browse</RouterLink>
+          <RouterLink
+            to="/app/leaderboards"
+            class="menu__item"
+            role="menuitem"
+            exact-active-class="menu__item--active"
+            @click="closeMenu"
+          >Leaderboards</RouterLink>
           <RouterLink
             to="/app/quiz/new"
             class="menu__item"
