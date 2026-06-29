@@ -1,10 +1,10 @@
 name: Build & Push Frontend Image
 on:
-  push:
-    tags:
-      - "v*"
-    branches:
-      - dev
+  workflow_run:
+    workflows:
+      - "Build & Push Backend Image"
+    types:
+      - completed
 
 jobs:
   build:

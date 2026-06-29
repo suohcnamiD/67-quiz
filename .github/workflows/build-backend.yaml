@@ -1,11 +1,11 @@
 name: Build & Push Backend Image
 
 on:
-  push:
-    tags:
-      - "v*"
-    branches:
-      - dev
+  workflow_run:
+    workflows:
+      - "Generate OpenAPI docs"
+    types:
+      - completed
 
 jobs:
   build:
@@ -21,7 +21,6 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
-
 
       - name: Make gradlew executable
         shell: bash
