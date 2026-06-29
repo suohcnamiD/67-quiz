@@ -1,4 +1,6 @@
 <script setup lang="ts">
+defineOptions({ name: 'UiButton' })
+
 defineProps<{
   variant?: 'primary' | 'ghost' | 'danger'
   type?: 'button' | 'submit'

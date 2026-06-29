@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, watch, nextTick, ref } from 'vue'
 
+defineOptions({ name: 'UiModal' })
+
 const props = defineProps<{
   open: boolean
   title: string

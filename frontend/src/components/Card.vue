@@ -1,4 +1,6 @@
 <script setup lang="ts">
+defineOptions({ name: 'UiCard' })
+
 defineProps<{
   interactive?: boolean
 }>()
