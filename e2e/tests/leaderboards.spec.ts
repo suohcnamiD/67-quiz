@@ -59,6 +59,24 @@ async function makeQuiz(req: APIRequestContext, name: string): Promise<string> {
   return quiz.id
 }
 
+/**
+ * Walk the players board pagination until we land on the page containing the
+ * given username. The Playwright assertions following this helper can then
+ * inspect the .row--you and .row entries on the visible page. Returns false
+ * if the user isn't reached within the page budget.
+ */
+async function findUserRow(page: Page, username: string, maxPages = 25): Promise<boolean> {
+  for (let i = 0; i < maxPages; i++) {
+    await page.locator('.row').first().waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {})
+    if (await page.locator('.row', { hasText: username }).count() > 0) return true
+    const next = page.getByRole('button', { name: /^next$/i })
+    if (!(await next.isVisible().catch(() => false)) || await next.isDisabled()) return false
+    await next.click()
+    await page.waitForTimeout(200)
+  }
+  return false
+}
+
 test('leaderboards nav link is present and lands on the players tab', async ({ page }) => {
   await registerUI(page)
   await page.getByRole('link', { name: /leaderboards/i }).first().click()
@@ -76,9 +94,14 @@ test('completing 3+ attempts surfaces the user on the players board with their r
   await page.goto('/app/leaderboards')
   // "You are ranked X of N" pill should be visible. With Bayesian shrinkage
   // K=5, prior=50%, a 100%/3-attempt user lands at (300 + 250)/8 ≈ 69%.
+  // The pill is shown across all pages — that's the cheap assertion.
   await expect(page.locator('.you')).toBeVisible({ timeout: 10_000 })
   await expect(page.locator('.you')).toContainText('You are ranked')
-  // The user's own row should be highlighted.
+
+  // The user's row may be on a later page in a populated DB; walk pages until
+  // we find it, then assert it's highlighted as theirs.
+  const found = await findUserRow(page, username)
+  expect(found, `expected to find user ${username} on the players board within reach`).toBe(true)
   await expect(page.locator('.row--you')).toBeVisible()
   await expect(page.locator('.row--you')).toContainText(username)
 })
@@ -139,6 +162,7 @@ test('players board orders entries by adjusted score (Bayesian shrinkage)', asyn
   await expect(page.locator('.row').first()).toBeVisible({ timeout: 10_000 })
 
   async function rankOf(username: string): Promise<number> {
+    expect(await findUserRow(page, username), `expected ${username} reachable via pagination`).toBe(true)
     const row = page.locator('.row', { hasText: username }).first()
     await expect(row).toBeVisible({ timeout: 10_000 })
     const rankText = await row.locator('.row__rank').innerText()
