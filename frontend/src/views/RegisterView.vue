@@ -7,6 +7,7 @@ import { errorMessage, firstError, validationFieldErrors } from '@/lib/errors'
 import Button from '@/components/Button.vue'
 import Input from '@/components/Input.vue'
 import Card from '@/components/Card.vue'
+import BrandMark from '@/components/BrandMark.vue'
 
 const username = ref('')
 const password = ref('')
@@ -54,6 +55,7 @@ async function submit() {
 <template>
   <div class="page">
     <Card>
+      <RouterLink to="/" class="brand-link" aria-label="67quiz home"><BrandMark size="md" /></RouterLink>
       <h1 class="headline-lg">Create account</h1>
       <form class="form" @submit.prevent="submit">
         <Input
@@ -104,6 +106,14 @@ async function submit() {
 .form__error {
   color: var(--error);
 }
+.brand-link {
+  display: inline-block;
+  margin-bottom: var(--space-md);
+  text-decoration: none;
+  opacity: 0.85;
+  transition: opacity 120ms ease;
+}
+.brand-link:hover { opacity: 1; }
 .footnote {
   margin-top: var(--space-lg);
   color: var(--on-surface-variant);

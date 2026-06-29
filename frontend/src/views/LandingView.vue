@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import Button from '@/components/Button.vue'
 import Card from '@/components/Card.vue'
+import BrandMark from '@/components/BrandMark.vue'
 </script>
 
 <template>
   <div class="page">
     <main class="wrap">
       <section class="hero">
-        <h1 class="hero__brand">67quiz</h1>
+        <BrandMark as="h1" size="lg" />
         <p class="hero__tagline body-lg muted">
           Author quizzes, share them, and see how your friends score.
         </p>

@@ -5,6 +5,7 @@ import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
 import { confirmDialog } from '@/lib/confirmDialog'
 import Button from './Button.vue'
 import Avatar from './Avatar.vue'
+import BrandMark from './BrandMark.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -88,7 +89,7 @@ onUnmounted(() => {
   <div class="shell">
     <header class="topbar">
       <div class="topbar__inner">
-        <RouterLink to="/app" class="brand">67quiz</RouterLink>
+        <RouterLink to="/app" class="brand"><BrandMark size="sm" /></RouterLink>
         <nav class="nav label-md" aria-label="Primary">
           <RouterLink to="/app" exact-active-class="router-link-active">Browse</RouterLink>
           <RouterLink to="/app/leaderboards" exact-active-class="router-link-active">Leaderboards</RouterLink>

@@ -8,6 +8,7 @@ import {
 } from '@/api/attempt-controller/attempt-controller'
 import { useGetOwnProfile } from '@/api/user-profile-controller/user-profile-controller'
 import { useSearch } from '@/api/search-controller/search-controller'
+import { useTopPlayers, useTopAuthors } from '@/api/leaderboard-controller/leaderboard-controller'
 import { useAuthStore } from '@/stores/auth'
 import { useDebouncedRef } from '@/lib/useDebouncedRef'
 import Card from '@/components/Card.vue'
@@ -31,6 +32,14 @@ const me = computed(() => profile.data.value)
 const greetingName = computed(
   () => me.value?.displayName ?? me.value?.username ?? auth.displayName ?? auth.username ?? 'there',
 )
+
+// Leaderboard rank — only renders when the user qualifies on either board.
+// Asking for page=0 of each is enough: the `you` field is computed across
+// the full qualifying population, not just the page.
+const players = useTopPlayers({ page: 0 })
+const authors = useTopAuthors({ page: 0 })
+const playerRank = computed(() => players.data.value?.you ?? null)
+const authorRank = computed(() => authors.data.value?.you ?? null)
 
 const items = computed(() => quizzes.data.value?._embedded?.quizzes ?? [])
 const inProgressItems = computed(() => inProgress.data.value?._embedded?.attempts ?? [])
@@ -166,6 +175,18 @@ function fmtRelative(iso?: string): string {
         </span>
       </li>
     </ul>
+    <div v-if="playerRank || authorRank" class="rank-row" aria-label="Your leaderboard standings">
+      <RouterLink v-if="playerRank" to="/app/leaderboards" class="rank-pill">
+        <span class="rank-pill__hash">#{{ playerRank.rank }}</span>
+        <span class="rank-pill__label body-md">Top players</span>
+        <span class="rank-pill__chevron" aria-hidden="true">›</span>
+      </RouterLink>
+      <RouterLink v-if="authorRank" to="/app/leaderboards" class="rank-pill">
+        <span class="rank-pill__hash">#{{ authorRank.rank }}</span>
+        <span class="rank-pill__label body-md">Top authors</span>
+        <span class="rank-pill__chevron" aria-hidden="true">›</span>
+      </RouterLink>
+    </div>
   </section>
 
   <section class="search" aria-label="Search">
@@ -406,6 +427,41 @@ function fmtRelative(iso?: string): string {
   .stats {
     grid-template-columns: 1fr;
   }
+}
+.rank-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+.rank-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 6px 10px 6px 12px;
+  border-radius: 999px;
+  background: var(--primary-container);
+  color: var(--on-primary-container);
+  text-decoration: none;
+  font-weight: 600;
+  transition: transform 120ms ease, background-color 120ms ease;
+}
+.rank-pill:hover {
+  background: color-mix(in srgb, var(--primary-container) 88%, white);
+}
+.rank-pill__hash {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+.rank-pill__chevron {
+  font-size: 1.1rem;
+  line-height: 1;
+  opacity: 0.7;
+  transition: transform 120ms ease;
+}
+.rank-pill:hover .rank-pill__chevron {
+  transform: translateX(2px);
+  opacity: 1;
 }
 .search {
   margin-bottom: var(--space-lg);
