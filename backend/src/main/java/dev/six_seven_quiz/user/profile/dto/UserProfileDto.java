@@ -2,7 +2,7 @@ package dev.six_seven_quiz.user.profile.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
-@Schema(description = "Public-facing user profile. Editable fields are mutable only on /api/users/me.")
+@Schema(description = "Public-facing user profile. Editable fields are mutable only on /users/me.")
 public record UserProfileDto(
         String username,
         String displayName,

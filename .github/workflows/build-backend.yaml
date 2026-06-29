@@ -1,4 +1,4 @@
-name: Build & Push Image
+name: Build & Push Backend Image
 
 on:
   push:
@@ -33,21 +33,6 @@ jobs:
           distribution: temurin
           java-version: 25
 
-      - name: Generate OpenAPI spec
-        working-directory: backend
-        run: ./gradlew generateOpenApiDocs --no-daemon
-
-      - name: Build Frontend
-        working-directory: frontend
-        run: |
-          npm ci
-          npm run build
-      - name: Copy Frontend Build to Backend
-        run: |
-          mkdir -p backend/src/main/resources/static
-          rm -rf backend/src/main/resources/static/*
-          cp -r frontend/dist/* backend/src/main/resources/static/
-
       - name: Build jar
         working-directory: backend
         run: |
@@ -75,7 +60,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./backend
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
