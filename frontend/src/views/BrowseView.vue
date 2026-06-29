@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, useTemplateRef, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGetQuizzes } from '@/api/quiz-controller/quiz-controller'
 import {
@@ -36,27 +36,44 @@ const items = computed(() => quizzes.data.value?._embedded?.quizzes ?? [])
 const inProgressItems = computed(() => inProgress.data.value?._embedded?.attempts ?? [])
 const finishedItems = computed(() => finished.data.value?._embedded?.attempts ?? [])
 const totalPages = computed(() => quizzes.data.value?.page?.totalPages ?? 1)
+const totalQuizzes = computed(() => quizzes.data.value?.page?.totalElements ?? items.value.length)
 
-// Hash-anchor scroll: when we arrive at /app#past-results (e.g. from the
-// profile's "Attempts taken" stat) the past-results section may not be in the
-// DOM yet — it's behind v-if and the finished-attempts query is still in
-// flight. Watch both signals and scroll once the target exists.
-function scrollToHashTarget() {
-  const id = route.hash.replace(/^#/, '')
-  if (!id) return
-  const el = document.getElementById(id)
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
-onMounted(() => {
-  void nextTick(scrollToHashTarget)
+// Numeric pager: compact list of page indices with leading/trailing ellipses
+// once totalPages exceeds 7. Mobile collapses further via CSS.
+const pageNumbers = computed<(number | 'ellipsis')[]>(() => {
+  const total = totalPages.value
+  const current = page.value
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i)
+  const pages: (number | 'ellipsis')[] = [0]
+  const start = Math.max(1, current - 1)
+  const end = Math.min(total - 2, current + 1)
+  if (start > 1) pages.push('ellipsis')
+  for (let i = start; i <= end; i++) pages.push(i)
+  if (end < total - 2) pages.push('ellipsis')
+  pages.push(total - 1)
+  return pages
 })
-watch(
-  [() => route.hash, finishedItems],
-  () => void nextTick(scrollToHashTarget),
-)
+
+// Hash-anchor scroll: when we arrive at /app#past-results the section may
+// still be loading. Wait for finished-attempts data, scroll once, then stop.
+const hasScrolled = ref(false)
+watchEffect(() => {
+  if (hasScrolled.value) return
+  if (route.hash !== '#past-results') return
+  if (finished.isLoading.value) return
+  if (!finishedItems.value.length) {
+    hasScrolled.value = true
+    return
+  }
+  const el = document.getElementById('past-results')
+  if (!el) return
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  hasScrolled.value = true
+})
 
 // Search — debounced so we don't fire a request per keystroke. The backend
 // already short-circuits anything under 2 chars to empty results.
+const searchInput = useTemplateRef<HTMLInputElement>('searchInput')
 const rawQuery = ref('')
 const debouncedQuery = useDebouncedRef(rawQuery, 250)
 const isSearching = computed(() => rawQuery.value.trim().length >= 2)
@@ -67,6 +84,7 @@ const searchResults = useSearch(searchParams, {
 })
 const matchedQuizzes = computed(() => searchResults.data.value?.quizzes ?? [])
 const matchedUsers = computed(() => searchResults.data.value?.users ?? [])
+const totalMatches = computed(() => matchedQuizzes.value.length + matchedUsers.value.length)
 const noMatches = computed(
   () =>
     isSearching.value &&
@@ -77,6 +95,21 @@ const noMatches = computed(
 
 function clearSearch() {
   rawQuery.value = ''
+  searchInput.value?.focus()
+}
+
+function onSearchKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && rawQuery.value) {
+    e.preventDefault()
+    clearSearch()
+  }
+}
+
+function isStale(iso?: string): boolean {
+  if (!iso) return false
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return false
+  return Date.now() - then > 60 * 60 * 1000
 }
 
 function fmtDuration(iso?: string): string {
@@ -139,6 +172,7 @@ function fmtRelative(iso?: string): string {
     <label class="search__field">
       <span class="visually-hidden">Search quizzes and people</span>
       <input
+        ref="searchInput"
         v-model="rawQuery"
         type="search"
         class="search__input"
@@ -146,6 +180,7 @@ function fmtRelative(iso?: string): string {
         autocomplete="off"
         spellcheck="false"
         aria-label="Search quizzes and people"
+        @keydown="onSearchKeydown"
       />
       <button
         v-if="rawQuery"
@@ -157,112 +192,164 @@ function fmtRelative(iso?: string): string {
     </label>
   </section>
 
-  <!-- Search mode hides the default Browse/Continue/Past sections. -->
-  <template v-if="isSearching">
+  <!-- Search overlay: sits above the dashboard while searching, dashboard
+       sections below remain mounted so clearing search is instant. -->
+  <section
+    v-if="isSearching"
+    class="search-results"
+    role="region"
+    aria-label="Search results"
+  >
     <p class="search-status label-sm">
-      <span>Searching: <strong>"{{ debouncedQuery }}"</strong></span>
+      <span>
+        Searching: <strong>"{{ debouncedQuery }}"</strong>
+        <span v-if="!searchResults.isLoading.value" aria-live="polite" class="muted">
+          · {{ totalMatches }} {{ totalMatches === 1 ? 'match' : 'matches' }}
+        </span>
+      </span>
       <button type="button" class="search-status__clear" @click="clearSearch">Clear</button>
     </p>
-    <section class="section" aria-labelledby="search-quizzes-heading">
-      <header class="section__head">
-        <h2 id="search-quizzes-heading" class="headline-md">
-          Quizzes <span v-if="matchedQuizzes.length" class="muted label-md">({{ matchedQuizzes.length }})</span>
-        </h2>
-      </header>
-      <p v-if="searchResults.isLoading.value" class="empty body-md">Searching…</p>
-      <p v-else-if="!matchedQuizzes.length" class="empty body-md">No matching quizzes.</p>
-      <div v-else class="grid">
-        <QuizCard
-          v-for="q in matchedQuizzes"
-          :key="q.id"
-          :quiz="q"
-          @error="errorText = $event"
-        />
+
+    <template v-if="searchResults.isLoading.value">
+      <div class="grid" aria-hidden="true">
+        <div v-for="i in 2" :key="i" class="skeleton skeleton--card" />
       </div>
-    </section>
-    <section class="section" aria-labelledby="search-users-heading">
-      <header class="section__head">
-        <h2 id="search-users-heading" class="headline-md">
-          People <span v-if="matchedUsers.length" class="muted label-md">({{ matchedUsers.length }})</span>
-        </h2>
-      </header>
-      <p v-if="searchResults.isLoading.value" class="empty body-md">Searching…</p>
-      <p v-else-if="!matchedUsers.length" class="empty body-md">No matching people.</p>
-      <ul v-else class="people-list">
-        <li v-for="u in matchedUsers" :key="u.username">
-          <UserCard :user="u" />
+    </template>
+    <template v-else>
+      <section v-if="matchedQuizzes.length" class="section" aria-labelledby="search-quizzes-heading">
+        <header class="section__head">
+          <h2 id="search-quizzes-heading" class="headline-md">
+            Quizzes <span class="muted label-md">({{ matchedQuizzes.length }})</span>
+          </h2>
+        </header>
+        <div class="grid">
+          <QuizCard
+            v-for="q in matchedQuizzes"
+            :key="q.id"
+            :quiz="q"
+            @error="errorText = $event"
+          />
+        </div>
+      </section>
+      <section v-if="matchedUsers.length" class="section" aria-labelledby="search-users-heading">
+        <header class="section__head">
+          <h2 id="search-users-heading" class="headline-md">
+            People <span class="muted label-md">({{ matchedUsers.length }})</span>
+          </h2>
+        </header>
+        <ul class="people-list">
+          <li v-for="u in matchedUsers" :key="u.username">
+            <UserCard :user="u" />
+          </li>
+        </ul>
+      </section>
+      <p v-if="noMatches" class="empty body-md">
+        Nothing matches "{{ debouncedQuery }}". Try a different search.
+      </p>
+    </template>
+  </section>
+
+  <section
+    v-if="inProgressItems.length"
+    class="section section--accent"
+    aria-labelledby="continue-heading"
+  >
+    <header class="section__head">
+      <h2 id="continue-heading" class="headline-md">Continue</h2>
+    </header>
+    <div class="grid">
+      <Card
+        v-for="a in inProgressItems"
+        :key="a.id"
+        interactive
+        class="resume-card"
+        @click="router.push(`/app/attempt/${a.id}`)"
+      >
+        <div class="row">
+          <h3 class="headline-md">{{ a.quiz?.name ?? 'Untitled quiz' }}</h3>
+          <Chip :tone="isStale(a.startedAt) ? 'warning' : undefined">Resume</Chip>
+        </div>
+        <div class="meta-row label-sm">
+          <span>{{ a.questions?.length ?? 0 }} questions</span>
+          <span v-if="a.quiz?.duration">·</span>
+          <span v-if="a.quiz?.duration">{{ fmtDuration(a.quiz.duration) }}</span>
+          <span v-if="a.startedAt">·</span>
+          <span v-if="a.startedAt">Started {{ fmtRelative(a.startedAt) }}</span>
+        </div>
+      </Card>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="browse-heading">
+    <header class="section__head">
+      <h2 id="browse-heading" class="headline-md">
+        Browse quizzes
+        <span v-if="totalQuizzes" class="muted label-md">({{ totalQuizzes }})</span>
+      </h2>
+    </header>
+    <div v-if="quizzes.isLoading.value" class="grid" aria-hidden="true">
+      <div v-for="i in 3" :key="i" class="skeleton skeleton--card" />
+    </div>
+    <div v-else-if="!items.length" class="empty-state">
+      <p class="empty body-md">No quizzes yet — be the first to author one.</p>
+      <Button @click="router.push('/app/quiz/new')">New quiz</Button>
+    </div>
+    <div v-else class="grid">
+      <QuizCard v-for="q in items" :key="q.id" :quiz="q" @error="errorText = $event" />
+    </div>
+    <nav v-if="totalPages > 1" class="pager" aria-label="Browse pagination">
+      <button
+        type="button"
+        class="pager__btn pager__btn--nav"
+        :disabled="page === 0"
+        aria-label="Previous page"
+        @click="page = Math.max(0, page - 1)"
+      >‹</button>
+      <ul class="pager__list">
+        <li v-for="(p, i) in pageNumbers" :key="`${p}-${i}`">
+          <span v-if="p === 'ellipsis'" class="pager__ellipsis" aria-hidden="true">…</span>
+          <button
+            v-else
+            type="button"
+            class="pager__btn pager__btn--num"
+            :class="{ 'pager__btn--active': p === page }"
+            :aria-current="p === page ? 'page' : undefined"
+            :aria-label="`Page ${p + 1}`"
+            @click="page = p"
+          >{{ p + 1 }}</button>
         </li>
       </ul>
-    </section>
-    <p v-if="noMatches" class="empty body-md">
-      Nothing matches "{{ debouncedQuery }}". Try a different search.
-    </p>
-  </template>
+      <button
+        type="button"
+        class="pager__btn pager__btn--nav"
+        :disabled="page + 1 >= totalPages"
+        aria-label="Next page"
+        @click="page = page + 1"
+      >›</button>
+    </nav>
+  </section>
 
-  <template v-else>
-    <section class="section" aria-labelledby="continue-heading">
-      <header class="section__head">
-        <h2 id="continue-heading" class="headline-md">Continue</h2>
-      </header>
-      <div v-if="inProgressItems.length" class="grid">
-        <Card v-for="a in inProgressItems" :key="a.id" interactive @click="router.push(`/app/attempt/${a.id}`)">
-          <div class="row">
-            <h3 class="headline-md">{{ a.quiz?.name ?? 'Untitled quiz' }}</h3>
-            <Chip>In progress</Chip>
+  <section v-if="finishedItems.length" id="past-results" class="section" aria-labelledby="past-heading">
+    <header class="section__head">
+      <h2 id="past-heading" class="headline-md">Past results</h2>
+    </header>
+    <div class="grid">
+      <Card v-for="a in finishedItems" :key="a.id" interactive @click="router.push(`/app/attempt/${a.id}/result`)">
+        <div class="row">
+          <h3 class="headline-md">{{ a.quiz?.name ?? 'Untitled quiz' }}</h3>
+          <Chip tone="success">Finished</Chip>
+        </div>
+        <div class="row">
+          <div class="score-stack">
+            <span class="label-sm muted">Score</span>
+            <span class="headline-md">{{ a.score ?? 0 }} <span class="muted">/ {{ a.maximumScore ?? 0 }}</span></span>
           </div>
-          <div class="meta-row label-sm">
-            <span>{{ a.questions?.length ?? 0 }} questions</span>
-            <span v-if="a.quiz?.duration">·</span>
-            <span v-if="a.quiz?.duration">{{ fmtDuration(a.quiz.duration) }}</span>
-            <span v-if="a.startedAt">·</span>
-            <span v-if="a.startedAt">Started {{ fmtRelative(a.startedAt) }}</span>
-          </div>
-        </Card>
-      </div>
-      <p v-else class="empty body-md">No active attempts.</p>
-    </section>
-
-    <section class="section" aria-labelledby="browse-heading">
-      <header class="section__head">
-        <h2 id="browse-heading" class="headline-md">Browse quizzes</h2>
-      </header>
-      <p v-if="quizzes.isLoading.value" class="empty body-md">Loading…</p>
-      <div v-else-if="!items.length" class="empty-state">
-        <p class="empty body-md">No quizzes yet — be the first to author one.</p>
-        <Button @click="router.push('/app/quiz/new')">New quiz</Button>
-      </div>
-      <div v-else class="grid">
-        <QuizCard v-for="q in items" :key="q.id" :quiz="q" @error="errorText = $event" />
-      </div>
-      <div v-if="totalPages > 1" class="pager">
-        <Button variant="ghost" :disabled="page === 0" @click="page = Math.max(0, page - 1)">Previous</Button>
-        <span class="label-sm muted">Page {{ page + 1 }} / {{ totalPages }}</span>
-        <Button variant="ghost" :disabled="page + 1 >= totalPages" @click="page = page + 1">Next</Button>
-      </div>
-    </section>
-
-    <section v-if="finishedItems.length" id="past-results" class="section" aria-labelledby="past-heading">
-      <header class="section__head">
-        <h2 id="past-heading" class="headline-md">Past results</h2>
-      </header>
-      <div class="grid">
-        <Card v-for="a in finishedItems" :key="a.id" interactive @click="router.push(`/app/attempt/${a.id}/result`)">
-          <div class="row">
-            <h3 class="headline-md">{{ a.quiz?.name ?? 'Untitled quiz' }}</h3>
-            <Chip tone="success">Finished</Chip>
-          </div>
-          <div class="row">
-            <div class="score-stack">
-              <span class="label-sm muted">Score</span>
-              <span class="headline-md">{{ a.score ?? 0 }} <span class="muted">/ {{ a.maximumScore ?? 0 }}</span></span>
-            </div>
-            <span class="label-sm muted">{{ a.questions?.length ?? 0 }} questions</span>
-          </div>
-          <p v-if="a.startedAt" class="meta body-md">Attempted {{ fmtRelative(a.startedAt) }}</p>
-        </Card>
-      </div>
-    </section>
-  </template>
+          <span class="label-sm muted">{{ a.questions?.length ?? 0 }} questions</span>
+        </div>
+        <p v-if="a.startedAt" class="meta body-md">Attempted {{ fmtRelative(a.startedAt) }}</p>
+      </Card>
+    </div>
+  </section>
 </template>
 
 <style scoped>
@@ -445,10 +532,117 @@ function fmtRelative(iso?: string): string {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-md);
+  gap: var(--space-sm);
   margin-top: var(--space-lg);
+  flex-wrap: wrap;
+}
+.pager__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pager__btn {
+  appearance: none;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius);
+  border: 1px solid var(--outline-variant);
+  background: var(--surface-container);
+  color: var(--on-surface);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.pager__btn:hover:not(:disabled) {
+  background: var(--surface-container-high);
+}
+.pager__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.pager__btn--nav {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+.pager__btn--active {
+  background: var(--primary-container);
+  color: var(--on-primary-container);
+  border-color: var(--primary-container);
+  cursor: default;
+}
+.pager__ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 44px;
+  color: var(--on-surface-variant);
 }
 .muted {
   color: var(--on-surface-variant);
+}
+
+/* Search-overlay container — sits above dashboard sections while searching. */
+.search-results {
+  margin-bottom: var(--space-xl);
+  padding-block-end: var(--space-xl);
+  border-bottom: 1px solid var(--outline-variant);
+}
+
+/* Accent treatment for the Continue section. */
+.section--accent {
+  position: relative;
+  padding-left: var(--space-md);
+  border-left: 3px solid var(--primary-container);
+}
+.section--accent .section__head h2 {
+  font-size: 1.375rem;
+}
+.resume-card {
+  background: var(--surface-container-low);
+}
+
+/* Inline skeleton loaders — match Card footprint so layout doesn't jump. */
+.skeleton {
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  position: relative;
+  overflow: hidden;
+  animation: skeleton-pulse 1400ms ease-in-out infinite;
+}
+.skeleton--card {
+  min-height: 132px;
+}
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
+@media (max-width: 640px) {
+  .section--accent {
+    padding-left: var(--space-sm);
+  }
+  .pager {
+    gap: var(--space-xs);
+  }
+  .pager__btn {
+    min-width: 40px;
+    height: 40px;
+  }
 }
 </style>
