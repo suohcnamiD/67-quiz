@@ -23,7 +23,7 @@ defineEmits<{ (e: 'update:modelValue', value: string): void }>()
       :class="['field__input', { 'field__input--error': error }]"
       @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
     />
-    <span v-if="error" class="field__error label-sm">{{ error }}</span>
+    <span v-if="error" class="field__error body-md">{{ error }}</span>
   </label>
 </template>
 
@@ -58,5 +58,7 @@ defineEmits<{ (e: 'update:modelValue', value: string): void }>()
 }
 .field__error {
   color: var(--error);
+  font-size: 0.875rem;
+  line-height: 1.25;
 }
 </style>

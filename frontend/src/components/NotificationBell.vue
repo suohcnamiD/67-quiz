@@ -159,7 +159,21 @@ onUnmounted(() => {
       aria-haspopup="menu"
       @click="toggle"
     >
-      <span class="bell__icon" aria-hidden="true">🔔</span>
+      <svg
+        class="bell__icon"
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        width="20"
+        height="20"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8" />
+        <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+      </svg>
       <span v-if="unreadCount > 0" class="bell__badge label-sm">
         {{ unreadCount > 99 ? '99+' : unreadCount }}
       </span>
@@ -214,7 +228,7 @@ onUnmounted(() => {
   appearance: none;
   background: transparent;
   border: 0;
-  color: var(--on-surface);
+  color: var(--on-surface-variant);
   cursor: pointer;
   width: 36px;
   height: 36px;
@@ -223,11 +237,14 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   position: relative;
-  font-size: 1.1rem;
-  transition: background-color 120ms ease;
+  transition: background-color 120ms ease, color 120ms ease;
 }
 .bell__button:hover {
   background: var(--surface-container-high);
+  color: var(--on-surface);
+}
+.bell__icon {
+  display: block;
 }
 .bell__badge {
   position: absolute;

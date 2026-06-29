@@ -114,18 +114,16 @@ async function submit() {
 .auth-head {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: var(--space-xs);
+  gap: var(--space-md);
   margin-bottom: var(--space-lg);
 }
 .auth-head .brand-link {
   margin-bottom: 0;
+  align-self: center;
 }
 .auth-head__title {
   margin: 0;
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--on-surface-variant);
+  text-align: left;
 }
 .footnote {
   margin-top: var(--space-lg);
