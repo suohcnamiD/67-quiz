@@ -15,8 +15,6 @@ spring:
       include-exception: false
       whitelabel:
         enabled: false
-    resources:
-      add-mappings: true
   servlet:
     multipart:
       max-file-size: 2MB

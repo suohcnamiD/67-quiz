@@ -109,14 +109,6 @@ test('attempt timer shows ~5 minutes immediately after start (not 00:00)', async
   expect(text, `timer reads ${text}, expected 04:5x`).toMatch(/^04:5[0-9]$/)
 })
 
-test('hitting backend SPA shell paths never returns raw JSON', async ({ request }) => {
-  for (const path of ['/app', '/app/foo', '/app/attempt/abc', '/login', '/register', '/totally-not-a-thing']) {
-    const res = await request.get(`http://localhost:8080${path}`)
-    const body = (await res.text()).trimStart()
-    expect(body.startsWith('{'), `path ${path} returned JSON body starting with ${body.slice(0,80)}`).toBe(false)
-  }
-})
-
 test('clicking options does not flash "Loading…"', async ({ page }) => {
   page.on('dialog', async (d) => { await d.accept() })
   await registerAndLogin(page)

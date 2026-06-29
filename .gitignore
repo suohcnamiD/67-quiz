@@ -17,8 +17,3 @@ backend/build/
 # Uploaded user files (avatars, etc.) — local dev only
 uploads/
 backend/uploads/
-
-# Frontend bundle copied into the backend resources at build time.
-# CI rebuilds it from frontend/dist; we don't check it in.
-backend/src/main/resources/static/
-frontend/dist/
