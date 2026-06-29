@@ -172,4 +172,46 @@ public class LeaderboardService {
 
     private record PlayerRow(ApplicationUser user, double adjusted, int attempts) {}
     private record AuthorRow(ApplicationUser user, double avg, long ratings) {}
+
+    /**
+     * Internal: full ranking of qualifying user IDs on the players board
+     * (rank 1 first), used by the snapshot job that emits rank-drop
+     * notifications. No pagination, no caller-relative {@code you} row.
+     */
+    @Transactional
+    public List<UUID> rankedPlayerIds() {
+        List<UUID> candidateIds = applicationUserRepository.findUserIdsWithFinishedAttempts();
+        Map<UUID, ApplicationUser> usersById = applicationUserRepository.findAllById(candidateIds).stream()
+                .collect(Collectors.toMap(ApplicationUser::getId, u -> u));
+        List<PlayerRow> rows = new ArrayList<>();
+        for (UUID userId : candidateIds) {
+            ApplicationUser user = usersById.get(userId);
+            if (user == null) continue;
+            List<Attempt> attempts = quizAttemptRepository.findAllByUserAndFinishedIsTrue(user);
+            double sumPercent = 0;
+            int counted = 0;
+            for (Attempt attempt : attempts) {
+                int max = attempt.getMaximumScore();
+                if (max == 0) continue;
+                sumPercent += (100.0 * attempt.getEarnedScore()) / max;
+                counted++;
+            }
+            if (counted < MIN_PLAYER_ATTEMPTS) continue;
+            double adjusted = (sumPercent + PLAYER_PRIOR_K * PLAYER_PRIOR_MEAN) / (counted + PLAYER_PRIOR_K);
+            rows.add(new PlayerRow(user, adjusted, counted));
+        }
+        rows.sort(
+                Comparator.comparingDouble(PlayerRow::adjusted)
+                        .thenComparingLong(PlayerRow::attempts)
+                        .reversed()
+        );
+        return rows.stream().map(r -> r.user().getId()).toList();
+    }
+
+    /** Internal: full ranking of qualifying author IDs (rank 1 first). */
+    @Transactional
+    public List<UUID> rankedAuthorIds() {
+        List<Object[]> raw = applicationUserRepository.findAuthorRankings(MIN_AUTHOR_RATINGS);
+        return raw.stream().map(r -> (UUID) r[0]).toList();
+    }
 }

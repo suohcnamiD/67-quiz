@@ -10,6 +10,8 @@ import dev.six_seven_quiz.quiz.dto.response.attempt.AttemptOptionDto;
 import dev.six_seven_quiz.quiz.dto.response.viewing.FinishedAttemptSummaryDto;
 import dev.six_seven_quiz.quiz.dto.response.viewing.FinishedOptionDto;
 import dev.six_seven_quiz.quiz.dto.response.viewing.FinishedQuestionDto;
+import dev.six_seven_quiz.notification.model.NotificationType;
+import dev.six_seven_quiz.notification.service.NotificationService;
 import dev.six_seven_quiz.quiz.dto.response.viewing.QuizSummaryDto;
 import dev.six_seven_quiz.quiz.dto.response.QuizRatingSummaryDto;
 import dev.six_seven_quiz.quiz.exception.AttemptFinishedException;
@@ -52,6 +54,7 @@ public class AttemptService {
     private final QuizMapper quizMapper;
     private final UserProfileMapper userProfileMapper;
     private final QuizRatingRepository quizRatingRepository;
+    private final NotificationService notificationService;
 
     private Pageable produceSanitizedPageable(int page) {
         return PageRequest.of(page, ATTEMPTS_PER_PAGE);
@@ -60,7 +63,7 @@ public class AttemptService {
     @PersistenceContext
     private EntityManager entityManager;
 
-    public AttemptService(ApplicationUserService applicationUserService, QuizAttemptRepository quizAttemptRepository, QuizRepository quizRepository, AttemptMapper attemptMapper, OptionMapper optionMapper, AttemptQuestionMapper attemptQuestionMapper, AttemptQuestionRepository attemptQuestionRepository, QuestionRepository questionRepository, QuizMapper quizMapper, UserProfileMapper userProfileMapper, QuizRatingRepository quizRatingRepository) {
+    public AttemptService(ApplicationUserService applicationUserService, QuizAttemptRepository quizAttemptRepository, QuizRepository quizRepository, AttemptMapper attemptMapper, OptionMapper optionMapper, AttemptQuestionMapper attemptQuestionMapper, AttemptQuestionRepository attemptQuestionRepository, QuestionRepository questionRepository, QuizMapper quizMapper, UserProfileMapper userProfileMapper, QuizRatingRepository quizRatingRepository, NotificationService notificationService) {
         this.applicationUserService = applicationUserService;
         this.quizAttemptRepository = quizAttemptRepository;
         this.quizRepository = quizRepository;
@@ -71,6 +74,7 @@ public class AttemptService {
         this.quizMapper = quizMapper;
         this.userProfileMapper = userProfileMapper;
         this.quizRatingRepository = quizRatingRepository;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -194,6 +198,22 @@ public class AttemptService {
         attempt = quizAttemptRepository.save(attempt);
         entityManager.flush();
         entityManager.refresh(attempt);
+
+        // Notify the quiz author unless they took their own quiz.
+        ApplicationUser author = attempt.getQuiz().getAuthor();
+        if (!author.getId().equals(user.getId())) {
+            int maxScore = attempt.getMaximumScore();
+            int score = attempt.getEarnedScore();
+            java.util.Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("actorUsername", user.getUsername());
+            payload.put("actorDisplayName", user.getDisplayName());
+            payload.put("quizId", attempt.getQuiz().getId().toString());
+            payload.put("quizName", attempt.getQuiz().getName());
+            payload.put("attemptId", attempt.getId().toString());
+            payload.put("score", score);
+            payload.put("maxScore", maxScore);
+            notificationService.create(author, NotificationType.QUIZ_ATTEMPTED, payload);
+        }
 
         return attemptToFinishedSummary(attempt);
     }

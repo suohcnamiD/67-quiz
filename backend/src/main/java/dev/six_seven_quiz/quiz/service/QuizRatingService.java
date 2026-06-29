@@ -1,5 +1,7 @@
 package dev.six_seven_quiz.quiz.service;
 
+import dev.six_seven_quiz.notification.model.NotificationType;
+import dev.six_seven_quiz.notification.service.NotificationService;
 import dev.six_seven_quiz.quiz.component.mapper.QuizRatingMapper;
 import dev.six_seven_quiz.quiz.dto.response.QuizRatingDto;
 import dev.six_seven_quiz.quiz.exception.InvalidRatingException;
@@ -20,6 +22,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -36,6 +40,7 @@ public class QuizRatingService {
     private final QuizAttemptRepository attemptRepository;
     private final QuizRatingMapper ratingMapper;
     private final UserProfileMapper userProfileMapper;
+    private final NotificationService notificationService;
 
     public QuizRatingService(
             ApplicationUserService applicationUserService,
@@ -43,7 +48,8 @@ public class QuizRatingService {
             QuizRatingRepository ratingRepository,
             QuizAttemptRepository attemptRepository,
             QuizRatingMapper ratingMapper,
-            UserProfileMapper userProfileMapper
+            UserProfileMapper userProfileMapper,
+            NotificationService notificationService
     ) {
         this.applicationUserService = applicationUserService;
         this.quizRepository = quizRepository;
@@ -51,6 +57,7 @@ public class QuizRatingService {
         this.attemptRepository = attemptRepository;
         this.ratingMapper = ratingMapper;
         this.userProfileMapper = userProfileMapper;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -67,12 +74,24 @@ public class QuizRatingService {
 
         String trimmedComment = (comment == null || comment.isBlank()) ? null : comment.trim();
 
-        QuizRating saved = ratingRepository.findByQuiz_IdAndUser_Id(quizId, user.getId())
-                .map(existing -> {
-                    existing.update(score, trimmedComment);
-                    return existing;
-                })
+        Optional<QuizRating> existing = ratingRepository.findByQuiz_IdAndUser_Id(quizId, user.getId());
+        boolean isNew = existing.isEmpty();
+        QuizRating saved = existing
+                .map(e -> { e.update(score, trimmedComment); return e; })
                 .orElseGet(() -> ratingRepository.save(new QuizRating(quiz, user, score, trimmedComment)));
+
+        // Notify the quiz author unless they're rating their own quiz, and
+        // only on the first rate from this user — updates don't re-notify.
+        ApplicationUser author = quiz.getAuthor();
+        if (isNew && !author.getId().equals(user.getId())) {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("actorUsername", user.getUsername());
+            payload.put("actorDisplayName", user.getDisplayName());
+            payload.put("quizId", quizId.toString());
+            payload.put("quizName", quiz.getName());
+            payload.put("score", score);
+            notificationService.create(author, NotificationType.QUIZ_RATED, payload);
+        }
 
         return toDto(saved);
     }

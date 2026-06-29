@@ -17,3 +17,9 @@ databaseChangeLog:
   - include:
       file: 005-profile-comments.yaml
       relativeToChangelogFile: true
+  - include:
+      file: 006-notifications.yaml
+      relativeToChangelogFile: true
+  - include:
+      file: 007-leaderboard-snapshots.yaml
+      relativeToChangelogFile: true

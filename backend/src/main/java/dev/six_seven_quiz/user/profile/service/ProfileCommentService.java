@@ -1,5 +1,7 @@
 package dev.six_seven_quiz.user.profile.service;
 
+import dev.six_seven_quiz.notification.model.NotificationType;
+import dev.six_seven_quiz.notification.service.NotificationService;
 import dev.six_seven_quiz.user.ApplicationUser;
 import dev.six_seven_quiz.user.ApplicationUserRepository;
 import dev.six_seven_quiz.user.ApplicationUserService;
@@ -18,6 +20,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -30,17 +34,20 @@ public class ProfileCommentService {
     private final ApplicationUserRepository applicationUserRepository;
     private final ProfileCommentRepository commentRepository;
     private final UserProfileMapper userProfileMapper;
+    private final NotificationService notificationService;
 
     public ProfileCommentService(
             ApplicationUserService applicationUserService,
             ApplicationUserRepository applicationUserRepository,
             ProfileCommentRepository commentRepository,
-            UserProfileMapper userProfileMapper
+            UserProfileMapper userProfileMapper,
+            NotificationService notificationService
     ) {
         this.applicationUserService = applicationUserService;
         this.applicationUserRepository = applicationUserRepository;
         this.commentRepository = commentRepository;
         this.userProfileMapper = userProfileMapper;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -56,6 +63,17 @@ public class ProfileCommentService {
         ApplicationUser target = applicationUserRepository.findByUsername(targetUsername)
                 .orElseThrow(() -> new UnknownUsernameException(targetUsername));
         ProfileComment saved = commentRepository.save(new ProfileComment(target, author, trimmed));
+
+        // Notify the profile owner unless they're commenting on themselves.
+        if (!target.getId().equals(author.getId())) {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("actorUsername", author.getUsername());
+            payload.put("actorDisplayName", author.getDisplayName());
+            payload.put("commentId", saved.getId().toString());
+            payload.put("preview", trimmed.length() > 140 ? trimmed.substring(0, 140) + "…" : trimmed);
+            notificationService.create(target, NotificationType.COMMENT_RECEIVED, payload);
+        }
+
         return toDto(saved, author);
     }
 

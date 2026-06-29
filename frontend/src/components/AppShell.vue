@@ -6,6 +6,7 @@ import { confirmDialog } from '@/lib/confirmDialog'
 import Button from './Button.vue'
 import Avatar from './Avatar.vue'
 import BrandMark from './BrandMark.vue'
+import NotificationBell from './NotificationBell.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -96,6 +97,7 @@ onUnmounted(() => {
           <RouterLink to="/app/quiz/new" exact-active-class="router-link-active">New quiz</RouterLink>
         </nav>
         <div class="actions">
+          <NotificationBell v-if="auth.isAuthenticated()" />
           <RouterLink
             v-if="auth.isAuthenticated()"
             to="/app/profile"
@@ -160,6 +162,14 @@ onUnmounted(() => {
             exact-active-class="menu__item--active"
             @click="closeMenu"
           >Your profile</RouterLink>
+          <RouterLink
+            v-if="auth.isAuthenticated()"
+            to="/app/notifications"
+            class="menu__item"
+            role="menuitem"
+            exact-active-class="menu__item--active"
+            @click="closeMenu"
+          >Notifications</RouterLink>
           <hr class="menu__sep" />
           <button
             type="button"

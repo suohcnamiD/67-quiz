@@ -21,6 +21,7 @@ public record ApiError(
                         "COMMENT_NOT_FOUND",
                         "NO_ACCESS_TO_COMMENT",
                         "INVALID_COMMENT",
+                        "NOTIFICATION_NOT_FOUND",
                         "USERNAME_ALREADY_TAKEN",
                         "INVALID_USERNAME",
                         "INVALID_PASSWORD",
