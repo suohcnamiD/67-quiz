@@ -50,6 +50,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Make gradlew executable
+        shell: bash
+        run: chmod +x backend/gradlew
+
       - name: Build jar
         working-directory: backend
         run: |
