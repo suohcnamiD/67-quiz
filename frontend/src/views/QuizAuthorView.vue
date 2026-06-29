@@ -7,12 +7,14 @@ import {
   deleteQuizQuestion,
   editQuizQuestion,
 } from '@/api/question-controller/question-controller'
+import { useList as useRatingList, useSummary as useRatingSummary } from '@/api/quiz-rating-controller/quiz-rating-controller'
 import { useQueryClient } from '@tanstack/vue-query'
 import { errorMessage } from '@/lib/errors'
 import { confirmDialog } from '@/lib/confirmDialog'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import Chip from '@/components/Chip.vue'
+import Avatar from '@/components/Avatar.vue'
 import QuestionForm from '@/components/QuestionForm.vue'
 import type { OptionData, AddQuestionRequest, QuestionDto } from '@/api/openAPIDefinition.schemas'
 
@@ -179,6 +181,35 @@ function typeLabel(t: QuestionType | undefined | null): string {
 }
 
 watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) }))
+
+// ---------- Ratings (paginated list + summary) ----------
+const ratingsPage = ref(0)
+const ratingsParams = computed(() => ({ page: ratingsPage.value }))
+const ratingsList = useRatingList(quizId, ratingsParams)
+const ratingsSummary = useRatingSummary(quizId)
+const ratings = computed(() => ratingsList.data.value?._embedded?.ratings ?? [])
+const ratingsTotalPages = computed(() => ratingsList.data.value?.page?.totalPages ?? 1)
+
+function fmtRating(avg: number | null | undefined): string {
+  if (avg == null) return '—'
+  return avg.toFixed(1).replace(/\.0$/, '')
+}
+
+function fmtRelative(iso?: string): string {
+  if (!iso) return ''
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return ''
+  const diffSec = Math.round((Date.now() - then) / 1000)
+  const abs = Math.abs(diffSec)
+  if (abs < 45) return 'just now'
+  const diffMin = Math.round(diffSec / 60)
+  if (Math.abs(diffMin) < 60) return `${diffMin} min ago`
+  const diffHr = Math.round(diffSec / 3600)
+  if (Math.abs(diffHr) < 24) return `${diffHr} h ago`
+  const diffDay = Math.round(diffSec / 86400)
+  if (Math.abs(diffDay) < 30) return `${diffDay} d ago`
+  return new Date(iso).toLocaleDateString()
+}
 </script>
 
 <template>
@@ -281,6 +312,60 @@ watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.v
           <Button type="submit" :loading="submitting">Add question</Button>
         </form>
       </Card>
+    </section>
+
+    <section class="section">
+      <div class="section__head">
+        <h2 class="headline-md">
+          Ratings
+          <span v-if="(ratingsSummary.data.value?.count ?? 0) > 0" class="muted label-md">
+            · {{ fmtRating(ratingsSummary.data.value?.average ?? null) }} / 10 from {{ ratingsSummary.data.value?.count }}
+          </span>
+        </h2>
+      </div>
+      <p v-if="ratingsList.isLoading.value" class="empty body-md">Loading…</p>
+      <p v-else-if="!ratings.length" class="empty body-md">
+        No ratings yet. Once people finish your quiz they can leave a rating + comment here.
+      </p>
+      <ul v-else class="rating-list">
+        <li v-for="r in ratings" :key="r.id" class="rating-item">
+          <div class="rating-item__head">
+            <RouterLink
+              v-if="r.author?.username"
+              :to="{ name: 'user-profile', params: { username: r.author.username } }"
+              class="rating-item__user"
+            >
+              <Avatar
+                :username="r.author.username"
+                :display-name="r.author.displayName"
+                :initials-only="!r.author.hasAvatar"
+                :size="28"
+              />
+              <span class="label-md">{{ r.author.displayName ?? r.author.username }}</span>
+            </RouterLink>
+            <span class="rating-item__score" :title="`${r.score} of 10`">
+              <span aria-hidden="true">★</span>
+              <span class="rating-item__score-value">{{ r.score }}</span>
+              <span class="muted">/ 10</span>
+            </span>
+            <span class="label-sm muted">{{ fmtRelative(r.createdAt) }}</span>
+          </div>
+          <p v-if="r.comment" class="rating-item__body body-md">{{ r.comment }}</p>
+        </li>
+      </ul>
+      <div v-if="ratingsTotalPages > 1" class="rating-pager">
+        <Button
+          variant="ghost"
+          :disabled="ratingsPage === 0"
+          @click="ratingsPage = Math.max(0, ratingsPage - 1)"
+        >Previous</Button>
+        <span class="label-sm muted">Page {{ ratingsPage + 1 }} / {{ ratingsTotalPages }}</span>
+        <Button
+          variant="ghost"
+          :disabled="ratingsPage + 1 >= ratingsTotalPages"
+          @click="ratingsPage = ratingsPage + 1"
+        >Next</Button>
+      </div>
     </section>
   </template>
 </template>
@@ -390,6 +475,65 @@ watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.v
   color: var(--on-surface-variant);
 }
 
+/* ----- Ratings list ----- */
+.rating-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.rating-item {
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.rating-item__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+.rating-item__user {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--on-surface);
+  text-decoration: none;
+}
+.rating-item__user:hover {
+  text-decoration: underline;
+}
+.rating-item__score {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--on-surface);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.rating-item__score-value {
+  font-size: 1.05rem;
+}
+.rating-item__body {
+  margin: 0;
+  white-space: pre-wrap;
+  color: var(--on-surface);
+}
+.rating-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+
 @media (max-width: 480px) {
   .head {
     flex-direction: column;
@@ -399,6 +543,9 @@ watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.v
   .head__actions {
     width: 100%;
     justify-content: flex-start;
+  }
+  .rating-item__score {
+    margin-left: 0;
   }
 }
 </style>

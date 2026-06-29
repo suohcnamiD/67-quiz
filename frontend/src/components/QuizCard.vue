@@ -49,6 +49,11 @@ function fmtDuration(iso?: string): string {
   return parts.join(' ') || '0s'
 }
 
+function fmtRating(avg: number | undefined): string {
+  if (avg == null) return '—'
+  return avg.toFixed(1).replace(/\.0$/, '')
+}
+
 async function startAttempt() {
   if (!props.quiz.id) return
   starting.value = true
@@ -116,6 +121,16 @@ async function removeQuiz() {
       <span>{{ fmtDuration(quiz.duration) }}</span>
       <span v-if="quiz.maximumScore != null">·</span>
       <span v-if="quiz.maximumScore != null">Max {{ quiz.maximumScore }} pts</span>
+      <span v-if="(quiz.ratingSummary?.count ?? 0) > 0">·</span>
+      <span
+        v-if="(quiz.ratingSummary?.count ?? 0) > 0"
+        class="rating"
+        :title="`Average rating: ${fmtRating(quiz.ratingSummary?.average ?? undefined)} / 10 from ${quiz.ratingSummary?.count} rating${quiz.ratingSummary?.count === 1 ? '' : 's'}`"
+      >
+        <span aria-hidden="true">★</span>
+        <span class="rating__avg">{{ fmtRating(quiz.ratingSummary?.average ?? undefined) }}</span>
+        <span class="rating__count muted">({{ quiz.ratingSummary?.count }})</span>
+      </span>
     </div>
     <div class="actions">
       <Button type="button" :loading="starting" @click="startAttempt">Start attempt</Button>
@@ -178,5 +193,21 @@ async function removeQuiz() {
   text-transform: none;
   letter-spacing: normal;
   font-weight: 600;
+}
+.rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--on-surface);
+  font-variant-numeric: tabular-nums;
+}
+.rating__avg {
+  font-weight: 700;
+}
+.rating__count {
+  color: var(--on-surface-variant);
+}
+.muted {
+  color: var(--on-surface-variant);
 }
 </style>

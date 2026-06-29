@@ -69,6 +69,16 @@ const INVALID_DISPLAY_NAME: Resolver = (d) =>
 const INVALID_IMAGE: Resolver = (d) =>
   str(d, 'message') ?? 'That image couldn’t be read. Use a PNG, JPEG, or WebP.'
 
+const INVALID_RATING: Resolver = (d) => {
+  const min = num(d, 'minimum')
+  const max = num(d, 'maximum')
+  if (min != null && max != null) return `Rating must be between ${min} and ${max}.`
+  return 'That rating is out of range.'
+}
+
+const RATING_NOT_ELIGIBLE: Resolver = () =>
+  'Finish the quiz before rating it.'
+
 const QUIZ_NOT_FOUND: Resolver = () => 'That quiz could not be found.'
 const QUESTION_NOT_FOUND: Resolver = () => 'That question could not be found.'
 const ATTEMPT_NOT_FOUND: Resolver = () => 'That attempt could not be found.'
@@ -114,6 +124,8 @@ const RESOLVERS: Record<string, Resolver> = {
   AVATAR_TOO_LARGE,
   INVALID_DISPLAY_NAME,
   INVALID_IMAGE,
+  INVALID_RATING,
+  RATING_NOT_ELIGIBLE,
   QUIZ_NOT_FOUND,
   QUESTION_NOT_FOUND,
   ATTEMPT_NOT_FOUND,

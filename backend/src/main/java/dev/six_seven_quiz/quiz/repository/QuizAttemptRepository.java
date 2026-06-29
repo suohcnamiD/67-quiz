@@ -19,4 +19,6 @@ public interface QuizAttemptRepository extends JpaRepository<Attempt, UUID> {
     int countByUserAndFinishedIsTrue(ApplicationUser user);
 
     List<Attempt> findAllByUserAndFinishedIsTrue(ApplicationUser user);
+
+    boolean existsByUser_IdAndQuiz_IdAndFinishedIsTrue(UUID userId, UUID quizId);
 }

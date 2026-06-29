@@ -16,6 +16,8 @@ public record ApiError(
                         "ATTEMPT_ALREADY_FINISHED",
                         "BLANK_OPTION_TEXT",
                         "INVALID_QUESTION_SHAPE",
+                        "RATING_NOT_ELIGIBLE",
+                        "INVALID_RATING",
                         "USERNAME_ALREADY_TAKEN",
                         "INVALID_USERNAME",
                         "INVALID_PASSWORD",

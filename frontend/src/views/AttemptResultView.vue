@@ -1,8 +1,16 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useQueryClient } from '@tanstack/vue-query'
 import { useGetFinishedAttempts, attemptQuiz } from '@/api/attempt-controller/attempt-controller'
-import { errorMessage } from '@/lib/errors'
+import {
+  useGetMine,
+  useUpsertMine,
+  getGetMineQueryKey,
+  getSummaryQueryKey,
+} from '@/api/quiz-rating-controller/quiz-rating-controller'
+import { getGetQuizzesQueryKey } from '@/api/quiz-controller/quiz-controller'
+import { errorMessage, firstErrorCode } from '@/lib/errors'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import FinishCelebration from '@/components/FinishCelebration.vue'
@@ -10,12 +18,14 @@ import type { FinishedQuestionDto, FinishedOptionDto } from '@/api/openAPIDefini
 
 const route = useRoute()
 const router = useRouter()
+const qc = useQueryClient()
 const attemptId = computed(() => route.params.attemptId as string)
 
 const { data, isPending } = useGetFinishedAttempts({ page: 0 })
 const attempt = computed(() =>
   (data.value?._embedded?.attempts ?? []).find((a) => a.id === attemptId.value),
 )
+const quizId = computed(() => attempt.value?.quiz?.id)
 
 function questionScore(q: FinishedQuestionDto): { earned: number; max: number } {
   const opts = q.options ?? []
@@ -106,6 +116,79 @@ async function tryAgain() {
     tryAgainPending.value = false
   }
 }
+
+// ----- Rating widget ---------------------------------------------------
+// We fetch the user's existing rating (if any) and let them upsert. The
+// widget is dismissible per-quiz via localStorage so re-visits don't nag.
+const ratingEnabled = computed(() => !!quizId.value)
+const myRatingQuery = useGetMine(
+  computed(() => quizId.value ?? ''),
+  { query: { enabled: ratingEnabled } },
+)
+// Backend returns 204 No Content when there's no rating yet; vue-query then
+// resolves data to undefined/null. Treat null/undefined as "no rating yet".
+const myRating = computed(() => myRatingQuery.data.value ?? null)
+
+const dismissKey = computed(() => quizId.value ? `quiz-rating-dismissed:${quizId.value}` : null)
+function isDismissed(): boolean {
+  if (!dismissKey.value) return false
+  try { return localStorage.getItem(dismissKey.value) === '1' } catch { return false }
+}
+const dismissed = ref(isDismissed())
+watch(quizId, () => { dismissed.value = isDismissed() })
+
+const ratingScore = ref<number | null>(null)
+const ratingComment = ref('')
+const ratingSaving = ref(false)
+const ratingError = ref<string | null>(null)
+const ratingSaved = ref(false)
+
+watch(myRating, (r) => {
+  if (r) {
+    ratingScore.value = r.score ?? null
+    ratingComment.value = r.comment ?? ''
+  }
+}, { immediate: true })
+
+const showRatingWidget = computed(() => {
+  if (!quizId.value) return false
+  // Always show once the user has rated (so they can see + update it).
+  if (myRating.value) return true
+  return !dismissed.value
+})
+
+const upsertRating = useUpsertMine()
+async function saveRating() {
+  if (!quizId.value || ratingScore.value == null) return
+  ratingSaving.value = true
+  ratingError.value = null
+  try {
+    await upsertRating.mutateAsync({
+      quizId: quizId.value,
+      data: { score: ratingScore.value, comment: ratingComment.value || undefined },
+    })
+    ratingSaved.value = true
+    qc.invalidateQueries({ queryKey: getGetMineQueryKey(quizId.value) })
+    qc.invalidateQueries({ queryKey: getSummaryQueryKey(quizId.value) })
+    qc.invalidateQueries({ queryKey: getGetQuizzesQueryKey() })
+    // Persist dismissal so the prompt doesn't keep insisting after a save.
+    if (dismissKey.value) {
+      try { localStorage.setItem(dismissKey.value, '1') } catch { /* ignore */ }
+    }
+  } catch (e) {
+    if (firstErrorCode(e) !== 'RATING_NOT_ELIGIBLE') console.error(e)
+    ratingError.value = errorMessage(e)
+  } finally {
+    ratingSaving.value = false
+  }
+}
+
+function dismissRating() {
+  dismissed.value = true
+  if (dismissKey.value) {
+    try { localStorage.setItem(dismissKey.value, '1') } catch { /* ignore */ }
+  }
+}
 </script>
 
 <template>
@@ -147,6 +230,55 @@ async function tryAgain() {
       <Button variant="ghost" @click="router.push('/app')">Back to browse</Button>
     </div>
     <p v-if="tryAgainError" class="banner label-md" role="alert">{{ tryAgainError }}</p>
+
+    <Card v-if="showRatingWidget" class="rate" aria-labelledby="rate-heading">
+      <div class="rate__head">
+        <h2 id="rate-heading" class="headline-md rate__title">
+          {{ myRating ? 'Your rating' : 'Rate this quiz' }}
+        </h2>
+        <button
+          v-if="!myRating"
+          type="button"
+          class="rate__dismiss label-sm"
+          aria-label="Dismiss rating prompt"
+          @click="dismissRating"
+        >Maybe later</button>
+      </div>
+      <fieldset class="rate__stars" :disabled="ratingSaving">
+        <legend class="visually-hidden">Score from 1 to 10</legend>
+        <button
+          v-for="n in 10"
+          :key="n"
+          type="button"
+          class="rate__star"
+          :class="{ 'rate__star--on': ratingScore != null && n <= ratingScore }"
+          :aria-pressed="ratingScore === n"
+          :aria-label="`${n} out of 10`"
+          @click="ratingScore = n"
+        >★</button>
+      </fieldset>
+      <p class="rate__hint label-sm muted" v-if="ratingScore != null">
+        You picked {{ ratingScore }} / 10.
+      </p>
+      <textarea
+        v-model="ratingComment"
+        class="rate__comment"
+        :disabled="ratingSaving"
+        maxlength="500"
+        rows="3"
+        placeholder="Anything you want to say about this quiz? (optional)"
+        aria-label="Optional comment"
+      ></textarea>
+      <p v-if="ratingError" class="banner label-md" role="alert">{{ ratingError }}</p>
+      <div class="rate__actions">
+        <Button
+          :loading="ratingSaving"
+          :disabled="ratingScore == null"
+          @click="saveRating"
+        >{{ myRating ? 'Update rating' : 'Submit rating' }}</Button>
+        <span v-if="ratingSaved && !ratingError" class="rate__saved label-sm">Saved.</span>
+      </div>
+    </Card>
 
     <ol class="qlist">
       <li v-for="(q, i) in attempt.questions ?? []" :key="q.id" class="question">
@@ -472,5 +604,106 @@ async function tryAgain() {
   background: transparent;
   color: var(--on-secondary-container);
   border: 1px solid color-mix(in srgb, var(--on-secondary-container) 40%, transparent);
+}
+
+/* ----- Rating widget ----- */
+.rate {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin: 0 0 var(--space-lg);
+}
+.rate__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+.rate__title {
+  margin: 0;
+}
+.rate__dismiss {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: var(--on-surface-variant);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+.rate__dismiss:hover { color: var(--on-surface); }
+.rate__stars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.rate__star {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius);
+  width: 40px;
+  height: 40px;
+  color: var(--on-surface-variant);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 120ms, background-color 120ms, border-color 120ms;
+}
+.rate__star:hover {
+  border-color: var(--on-surface-variant);
+  color: var(--on-surface);
+}
+.rate__star--on {
+  background: var(--primary-container);
+  border-color: var(--primary-container);
+  color: var(--on-primary-container);
+}
+.rate__hint {
+  margin: 0;
+}
+.rate__comment {
+  width: 100%;
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius);
+  color: var(--on-surface);
+  padding: 10px 12px;
+  font: inherit;
+  resize: vertical;
+  min-height: 72px;
+}
+.rate__comment:focus {
+  outline: none;
+  border-color: var(--primary-container);
+}
+.rate__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+.rate__saved {
+  color: var(--on-secondary-container);
+}
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+@media (max-width: 640px) {
+  .rate__star {
+    width: 36px;
+    height: 36px;
+  }
 }
 </style>

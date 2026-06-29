@@ -11,3 +11,6 @@ databaseChangeLog:
   - include:
       file: 003-question-types.yaml
       relativeToChangelogFile: true
+  - include:
+      file: 004-quiz-ratings.yaml
+      relativeToChangelogFile: true
