@@ -98,6 +98,11 @@ public class GlobalExceptionHandler {
         ).toResponseEntity();
     }
 
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Failure> handleNoResourceFoundException(NoResourceFoundException exception) {
+        return Failure.status(NOT_FOUND).toResponseEntity();
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Failure> handleAllExceptions(Exception exception) {
         logger.error("Unhandled exception occurred", exception);
