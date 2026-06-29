@@ -8,6 +8,7 @@ import java.util.UUID;
 public record AttemptOptionDto(
         UUID id,
         String text,
-        boolean selected
+        boolean selected,
+        boolean hasImage
 ) {
 }

@@ -17,8 +17,10 @@ import java.util.List;
 )
 public interface AttemptQuestionMapper {
     @Mapping(source = "options", target = "options")
+    @Mapping(target = "hasImage", expression = "java(question.getQuestion().getImagePath() != null)")
     AttemptQuestionDto toDto(AttemptQuestion question, List<AttemptOptionDto> options);
 
     @Mapping(source = "options", target = "options")
+    @Mapping(target = "hasImage", expression = "java(question.getQuestion().getImagePath() != null)")
     FinishedQuestionDto toFinishedDto(AttemptQuestion question, List<FinishedOptionDto> options);
 }

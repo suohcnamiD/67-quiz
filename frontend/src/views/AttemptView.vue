@@ -5,6 +5,7 @@ import { useGetAttemptsInProgress, useGetFinishedAttempts, commitAttemptActions,
 import { useQueryClient } from '@tanstack/vue-query'
 import { errorMessage, firstErrorCode } from '@/lib/errors'
 import { confirmDialog } from '@/lib/confirmDialog'
+import { questionImageUrl, optionImageUrl } from '@/lib/quizImages'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
@@ -222,6 +223,13 @@ watch(remainingMs, (ms) => {
             </span>
           </div>
           <p class="body-lg q-text">{{ q.text }}</p>
+          <img
+            v-if="q.hasImage && q.id"
+            :src="questionImageUrl(q.id)"
+            alt=""
+            class="q-image"
+            loading="lazy"
+          />
           <ul class="opts">
             <li v-for="o in q.options ?? []" :key="o.id">
               <button
@@ -239,6 +247,13 @@ watch(remainingMs, (ms) => {
                   <span v-if="o.selected" class="opt__dot" />
                 </span>
                 <span class="opt__text">{{ o.text }}</span>
+                <img
+                  v-if="o.hasImage && o.id"
+                  :src="optionImageUrl(o.id)"
+                  alt=""
+                  class="opt__image"
+                  loading="lazy"
+                />
               </button>
             </li>
           </ul>
@@ -334,6 +349,20 @@ watch(remainingMs, (ms) => {
 }
 .q-text {
   margin: 0 0 var(--space-md);
+}
+.q-image {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: var(--radius-lg);
+  margin: 0 0 var(--space-md);
+}
+.opt__image {
+  max-width: 100%;
+  max-height: 160px;
+  border-radius: var(--radius);
+  margin-top: var(--space-xs);
+  align-self: stretch;
 }
 .opts {
   list-style: none;

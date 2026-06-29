@@ -38,6 +38,9 @@ public class Question {
     @Column(name = "type", nullable = false)
     private QuestionType type = QuestionType.MULTI_CHOICE;
 
+    @Column(name = "image_path")
+    private String imagePath;
+
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<Option> options;
 
@@ -88,5 +91,13 @@ public class Question {
 
     public void setType(QuestionType type) {
         this.type = type;
+    }
+
+    public String getImagePath() {
+        return imagePath;
+    }
+
+    public void setImagePath(String imagePath) {
+        this.imagePath = imagePath;
     }
 }

@@ -8,6 +8,7 @@ import java.util.UUID;
 public record OptionDto(
         UUID id,
         String text,
-        boolean correct
+        boolean correct,
+        boolean hasImage
 ) {
 }

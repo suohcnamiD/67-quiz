@@ -11,6 +11,7 @@ public record QuestionDto(
         UUID id,
         String text,
         QuestionType type,
+        boolean hasImage,
         List<OptionDto> options
 ) {
 }

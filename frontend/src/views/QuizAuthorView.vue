@@ -8,11 +8,21 @@ import {
   editQuizQuestion,
 } from '@/api/question-controller/question-controller'
 import { useListRatings as useRatingList, useRatingSummary } from '@/api/quiz-rating-controller/quiz-rating-controller'
+import {
+  uploadQuizCover,
+  deleteQuizCover,
+  uploadQuestionImage,
+  deleteQuestionImage,
+  uploadOptionImage,
+  deleteOptionImage,
+} from '@/api/quiz-image-controller/quiz-image-controller'
 import { useQueryClient } from '@tanstack/vue-query'
 import { errorMessage } from '@/lib/errors'
 import { confirmDialog } from '@/lib/confirmDialog'
+import { coverUrl, questionImageUrl, optionImageUrl } from '@/lib/quizImages'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
+import ImageUploader from '@/components/ImageUploader.vue'
 import Chip from '@/components/Chip.vue'
 import Avatar from '@/components/Avatar.vue'
 import QuestionForm from '@/components/QuestionForm.vue'
@@ -182,6 +192,58 @@ function typeLabel(t: QuestionType | undefined | null): string {
 
 watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) }))
 
+// ---------- Cover image ----------
+const coverError = ref<string | null>(null)
+const coverPath = computed(() => quizId.value ? coverUrl(quizId.value) : null)
+
+async function onCoverUpload(file: File) {
+  if (!quizId.value) return
+  coverError.value = null
+  try {
+    await uploadQuizCover(quizId.value, { file })
+    qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) })
+  } catch (e) {
+    coverError.value = errorMessage(e)
+  }
+}
+
+async function onCoverDelete() {
+  if (!quizId.value) return
+  coverError.value = null
+  try {
+    await deleteQuizCover(quizId.value)
+    qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) })
+  } catch (e) {
+    coverError.value = errorMessage(e)
+  }
+}
+
+// ---------- Per-question + per-option images ----------
+async function onQuestionImageUpload(id: string, file: File) {
+  try {
+    await uploadQuestionImage(id, { file })
+    qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) })
+  } catch (e) { errorText.value = errorMessage(e) }
+}
+async function onQuestionImageDelete(id: string) {
+  try {
+    await deleteQuestionImage(id)
+    qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) })
+  } catch (e) { errorText.value = errorMessage(e) }
+}
+async function onOptionImageUpload(id: string, file: File) {
+  try {
+    await uploadOptionImage(id, { file })
+    qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) })
+  } catch (e) { errorText.value = errorMessage(e) }
+}
+async function onOptionImageDelete(id: string) {
+  try {
+    await deleteOptionImage(id)
+    qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) })
+  } catch (e) { errorText.value = errorMessage(e) }
+}
+
 // ---------- Ratings (paginated list + summary) ----------
 const ratingsPage = ref(0)
 const ratingsParams = computed(() => ({ page: ratingsPage.value }))
@@ -220,6 +282,17 @@ function fmtRelative(iso?: string): string {
     <Button @click="router.push('/app')">Back to browse</Button>
   </Card>
   <template v-else>
+    <section class="cover-section">
+      <h2 class="visually-hidden">Quiz cover</h2>
+      <ImageUploader
+        :has-image="!!quiz.data.value.hasCover"
+        :image-url="coverPath"
+        empty-label="Add cover image"
+        @upload="onCoverUpload"
+        @delete="onCoverDelete"
+      />
+      <p v-if="coverError" class="banner label-md" role="alert">{{ coverError }}</p>
+    </section>
     <header class="head">
       <div>
         <h1 class="headline-lg">{{ quiz.data.value.name }}</h1>
@@ -267,14 +340,34 @@ function fmtRelative(iso?: string): string {
 
             <template v-if="editingId !== q.id">
               <p class="body-lg">{{ q.text }}</p>
+              <div class="q-image">
+                <ImageUploader
+                  :has-image="!!q.hasImage"
+                  :image-url="q.id ? questionImageUrl(q.id) : null"
+                  empty-label="Add question image"
+                  @upload="(file) => q.id && onQuestionImageUpload(q.id, file)"
+                  @delete="() => q.id && onQuestionImageDelete(q.id)"
+                />
+              </div>
               <ul class="opts">
                 <li
                   v-for="o in q.options ?? []"
                   :key="o.id"
                   :class="['opt', { 'opt--correct': o.correct }]"
                 >
-                  <span>{{ o.text }}</span>
-                  <Chip v-if="o.correct" tone="success">Correct</Chip>
+                  <div class="opt__row">
+                    <span class="opt__text">{{ o.text }}</span>
+                    <Chip v-if="o.correct" tone="success">Correct</Chip>
+                  </div>
+                  <div class="opt__image">
+                    <ImageUploader
+                      :has-image="!!o.hasImage"
+                      :image-url="o.id ? optionImageUrl(o.id) : null"
+                      empty-label="Add option image"
+                      @upload="(file) => o.id && onOptionImageUpload(o.id, file)"
+                      @delete="() => o.id && onOptionImageDelete(o.id)"
+                    />
+                  </div>
                 </li>
               </ul>
             </template>
@@ -371,6 +464,20 @@ function fmtRelative(iso?: string): string {
 </template>
 
 <style scoped>
+.cover-section {
+  margin-bottom: var(--space-lg);
+}
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 .head {
   display: flex;
   justify-content: space-between;
@@ -427,6 +534,9 @@ function fmtRelative(iso?: string): string {
   display: inline-flex;
   gap: var(--space-sm);
 }
+.q-image {
+  margin: var(--space-sm) 0 0;
+}
 .opts {
   list-style: none;
   padding: 0;
@@ -437,11 +547,23 @@ function fmtRelative(iso?: string): string {
 }
 .opt {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: var(--space-sm);
   padding: var(--space-sm) var(--space-md);
   background: var(--surface-container-low);
   border-radius: var(--radius);
+}
+.opt__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+.opt__text {
+  word-break: break-word;
+}
+.opt__image {
+  /* No extra spacing — ImageUploader handles its own gap. */
 }
 .opt--correct {
   border: 1px solid var(--secondary-container);

@@ -10,6 +10,7 @@ import { deleteQuiz, getGetQuizzesQueryKey } from '@/api/quiz-controller/quiz-co
 import { getGetQuizzesByAuthorQueryKey } from '@/api/user-profile-controller/user-profile-controller'
 import { errorMessage } from '@/lib/errors'
 import { confirmDialog } from '@/lib/confirmDialog'
+import { coverUrl } from '@/lib/quizImages'
 import type { QuizSummaryDto } from '@/api/openAPIDefinition.schemas'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
@@ -97,6 +98,13 @@ async function removeQuiz() {
 
 <template>
   <Card>
+    <img
+      v-if="quiz.hasCover && quiz.id"
+      :src="coverUrl(quiz.id)"
+      alt=""
+      class="cover"
+      loading="lazy"
+    />
     <div class="row">
       <h3 class="headline-md">{{ quiz.name }}</h3>
       <Chip v-if="quiz.youAreAuthor">Your quiz</Chip>
@@ -152,6 +160,14 @@ async function removeQuiz() {
 </template>
 
 <style scoped>
+.cover {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: var(--radius);
+  margin: calc(-1 * var(--space-md)) calc(-1 * var(--space-md)) var(--space-md);
+}
 .row {
   display: flex;
   align-items: center;

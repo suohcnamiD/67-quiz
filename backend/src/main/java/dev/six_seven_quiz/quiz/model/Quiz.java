@@ -42,6 +42,9 @@ public class Quiz {
     @Column(name = "duration")
     private Duration duration;
 
+    @Column(name = "cover_image_path")
+    private String coverImagePath;
+
     @OneToMany(fetch = FetchType.EAGER, cascade = {CascadeType.DETACH, CascadeType.MERGE, CascadeType.PERSIST, CascadeType.REFRESH, CascadeType.REMOVE})
     @JoinTable(
             name = "quiz_questions",
@@ -141,5 +144,13 @@ public class Quiz {
 
     public Duration getDuration() {
         return duration;
+    }
+
+    public String getCoverImagePath() {
+        return coverImagePath;
+    }
+
+    public void setCoverImagePath(String coverImagePath) {
+        this.coverImagePath = coverImagePath;
     }
 }

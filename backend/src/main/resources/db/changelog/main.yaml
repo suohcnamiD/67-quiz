@@ -23,3 +23,9 @@ databaseChangeLog:
   - include:
       file: 007-leaderboard-snapshots.yaml
       relativeToChangelogFile: true
+  - include:
+      file: 008-quiz-images.yaml
+      relativeToChangelogFile: true
+  - include:
+      file: 009-drop-sampler-fixture.yaml
+      relativeToChangelogFile: true

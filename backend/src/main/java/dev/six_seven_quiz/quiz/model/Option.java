@@ -29,6 +29,9 @@ public class Option {
     @Column(name = "text", nullable = false)
     private String text;
 
+    @Column(name = "image_path")
+    private String imagePath;
+
     public void setText(String text) {
         this.text = text;
     }
@@ -47,6 +50,14 @@ public class Option {
 
     public Boolean isCorrect() {
         return correct;
+    }
+
+    public String getImagePath() {
+        return imagePath;
+    }
+
+    public void setImagePath(String imagePath) {
+        this.imagePath = imagePath;
     }
 
     @Override

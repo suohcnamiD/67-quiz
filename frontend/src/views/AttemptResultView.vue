@@ -11,6 +11,7 @@ import {
 } from '@/api/quiz-rating-controller/quiz-rating-controller'
 import { getGetQuizzesQueryKey } from '@/api/quiz-controller/quiz-controller'
 import { errorMessage, firstErrorCode } from '@/lib/errors'
+import { questionImageUrl, optionImageUrl } from '@/lib/quizImages'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import FinishCelebration from '@/components/FinishCelebration.vue'
@@ -319,6 +320,13 @@ function dismissRating() {
             <span class="qhead__score-max">{{ questionScore(q).max }}</span>
           </div>
         </header>
+        <img
+          v-if="q.hasImage && q.id"
+          :src="questionImageUrl(q.id)"
+          alt=""
+          class="q-image"
+          loading="lazy"
+        />
         <ul class="opts">
           <li
             v-for="o in sortedOptions(q)"
@@ -331,6 +339,13 @@ function dismissRating() {
               </span>
             </span>
             <span class="opt__text">{{ o.text }}</span>
+            <img
+              v-if="o.hasImage && o.id"
+              :src="optionImageUrl(o.id)"
+              alt=""
+              class="opt__image"
+              loading="lazy"
+            />
             <span v-if="chipFor(o, q).score !== null" class="opt__chip">{{ chipFor(o, q).score }}</span>
           </li>
         </ul>
@@ -518,6 +533,22 @@ function dismissRating() {
 .qhead__score-value { font-size: 1rem; }
 .qhead__score-divider { opacity: 0.5; }
 .qhead__score-max { font-size: 0.875rem; opacity: 0.7; }
+
+.q-image {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: var(--radius-lg);
+  margin: 0 0 var(--space-md);
+}
+.opt__image {
+  grid-column: 2 / -1;
+  justify-self: start;
+  max-width: 100%;
+  max-height: 140px;
+  border-radius: var(--radius);
+  margin-top: var(--space-xs);
+}
 
 /* ----- Options ----- */
 .opts {

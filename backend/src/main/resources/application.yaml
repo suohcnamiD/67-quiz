@@ -24,8 +24,8 @@ spring:
         enabled: false
   servlet:
     multipart:
-      max-file-size: 2MB
-      max-request-size: 2MB
+      max-file-size: 5MB
+      max-request-size: 5MB
   datasource:
     url: ${DATABASE_URL:jdbc:mariadb://${DATABASE_HOST:localhost}:${DATABASE_PORT:3306}/${DATABASE_NAME:main}}
     username: ${DATABASE_USERNAME:user}
