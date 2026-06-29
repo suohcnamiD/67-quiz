@@ -130,6 +130,42 @@ test('non-eligible user cannot submit a rating without finishing', async ({ page
   expect(body.errors?.[0]?.code).toBe('RATING_NOT_ELIGIBLE')
 })
 
+test('saving a rating does NOT show a network-error toast (regression)', async ({ page }) => {
+  page.on('dialog', async (d) => { await d.accept() })
+  await register(page)
+  const quizId = await makeQuiz(page, `No-toast ${Date.now()}`)
+  await attemptAndFinish(page, quizId)
+
+  await page.locator('.rate__star').nth(6).click()
+  await page.getByRole('button', { name: /submit rating/i }).click()
+  await expect(page.getByText('Saved.')).toBeVisible({ timeout: 5_000 })
+
+  // The toast stack mounts toasts as .toast nodes inside a Teleport to body.
+  // The interceptor used to fire "Network problem…" when vue-query cancelled
+  // a stale request during cache invalidation. Verify it doesn't.
+  await page.waitForTimeout(800)
+  await expect(page.locator('.toast--error')).toHaveCount(0)
+  await expect(page.getByText(/network problem/i)).toHaveCount(0)
+})
+
+test('star widget uses one accessible radiogroup, not ten buttons (regression)', async ({ page }) => {
+  page.on('dialog', async (d) => { await d.accept() })
+  await register(page)
+  const quizId = await makeQuiz(page, `Stars ${Date.now()}`)
+  await attemptAndFinish(page, quizId)
+
+  // The new design is a single role="radiogroup" with 10 radio inputs and
+  // label wrappers. No individual <button> per star.
+  await expect(page.getByRole('radiogroup', { name: /score from 1 to 10/i })).toBeVisible()
+  await expect(page.getByRole('radio')).toHaveCount(10)
+  // Score labels are inline body text, not uppercase eyebrow labels.
+  await page.locator('.rate__star').nth(4).click()
+  const hint = page.getByText('You picked 5 / 10.')
+  await expect(hint).toBeVisible()
+  // text-transform should NOT be uppercase on this hint.
+  await expect(hint).toHaveCSS('text-transform', 'none')
+})
+
 test('rating with an out-of-range score is rejected', async ({ page }) => {
   page.on('dialog', async (d) => { await d.accept() })
   await register(page)

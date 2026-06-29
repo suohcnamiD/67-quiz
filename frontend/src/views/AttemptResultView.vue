@@ -138,6 +138,7 @@ const dismissed = ref(isDismissed())
 watch(quizId, () => { dismissed.value = isDismissed() })
 
 const ratingScore = ref<number | null>(null)
+const ratingHover = ref<number | null>(null)
 const ratingComment = ref('')
 const ratingSaving = ref(false)
 const ratingError = ref<string | null>(null)
@@ -244,20 +245,36 @@ function dismissRating() {
           @click="dismissRating"
         >Maybe later</button>
       </div>
-      <fieldset class="rate__stars" :disabled="ratingSaving">
-        <legend class="visually-hidden">Score from 1 to 10</legend>
-        <button
+      <div
+        class="rate__stars"
+        role="radiogroup"
+        aria-label="Score from 1 to 10"
+        @mouseleave="ratingHover = null"
+      >
+        <label
           v-for="n in 10"
           :key="n"
-          type="button"
-          class="rate__star"
-          :class="{ 'rate__star--on': ratingScore != null && n <= ratingScore }"
-          :aria-pressed="ratingScore === n"
-          :aria-label="`${n} out of 10`"
-          @click="ratingScore = n"
-        >★</button>
-      </fieldset>
-      <p class="rate__hint label-sm muted" v-if="ratingScore != null">
+          :class="[
+            'rate__star',
+            { 'rate__star--filled': (ratingHover ?? ratingScore ?? 0) >= n },
+            { 'rate__star--preview': ratingHover != null && ratingHover >= n && (ratingScore ?? 0) < n },
+          ]"
+          @mouseenter="ratingHover = n"
+        >
+          <input
+            type="radio"
+            name="rating-score"
+            class="visually-hidden"
+            :value="n"
+            :checked="ratingScore === n"
+            :disabled="ratingSaving"
+            @change="ratingScore = n"
+          />
+          <span aria-hidden="true">★</span>
+          <span class="visually-hidden">{{ n }} out of 10</span>
+        </label>
+      </div>
+      <p class="rate__hint body-md muted" v-if="ratingScore != null">
         You picked {{ ratingScore }} / 10.
       </p>
       <textarea
@@ -276,7 +293,7 @@ function dismissRating() {
           :disabled="ratingScore == null"
           @click="saveRating"
         >{{ myRating ? 'Update rating' : 'Submit rating' }}</Button>
-        <span v-if="ratingSaved && !ratingError" class="rate__saved label-sm">Saved.</span>
+        <span v-if="ratingSaved && !ratingError" class="rate__saved body-md">Saved.</span>
       </div>
     </Card>
 
@@ -634,34 +651,38 @@ function dismissRating() {
 }
 .rate__dismiss:hover { color: var(--on-surface); }
 .rate__stars {
-  display: flex;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 8px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  width: fit-content;
+  max-width: 100%;
   flex-wrap: wrap;
-  gap: 4px;
-  border: 0;
-  padding: 0;
-  margin: 0;
 }
 .rate__star {
-  appearance: none;
-  background: transparent;
-  border: 1px solid var(--outline-variant);
-  border-radius: var(--radius);
-  width: 40px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
   height: 40px;
-  color: var(--on-surface-variant);
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   line-height: 1;
+  color: var(--on-surface-variant);
   cursor: pointer;
-  transition: color 120ms, background-color 120ms, border-color 120ms;
+  transition: color 120ms ease, transform 120ms ease;
+  user-select: none;
 }
-.rate__star:hover {
-  border-color: var(--on-surface-variant);
-  color: var(--on-surface);
-}
-.rate__star--on {
-  background: var(--primary-container);
-  border-color: var(--primary-container);
-  color: var(--on-primary-container);
+.rate__star:hover { transform: scale(1.08); }
+.rate__star--filled { color: var(--primary-container); }
+.rate__star--preview { color: color-mix(in srgb, var(--primary-container) 65%, transparent); }
+.rate__star input:focus-visible + span {
+  outline: 2px solid var(--primary-container);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 .rate__hint {
   margin: 0;
@@ -702,8 +723,9 @@ function dismissRating() {
 }
 @media (max-width: 640px) {
   .rate__star {
-    width: 36px;
+    width: 28px;
     height: 36px;
+    font-size: 1.35rem;
   }
 }
 </style>

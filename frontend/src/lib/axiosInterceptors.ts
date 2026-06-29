@@ -1,4 +1,4 @@
-import { isAxiosError } from 'axios'
+import { isAxiosError, isCancel } from 'axios'
 import type { Router } from 'vue-router'
 import { AXIOS_INSTANCE } from './axios'
 import { errorMessage, firstErrorCode, httpStatus } from './errors'
@@ -28,7 +28,13 @@ export function installAxiosInterceptors(router: Router): void {
   AXIOS_INSTANCE.interceptors.response.use(
     (response) => response,
     (error: unknown) => {
+      // Cancellations look like network failures (no response, ERR_CANCELED).
+      // vue-query cancels in-flight requests on navigation and on cache
+      // invalidation — surfacing a "network problem" toast for those is
+      // wrong. Skip the rejection unchanged.
+      if (isCancel(error)) return Promise.reject(error)
       if (!isAxiosError(error)) return Promise.reject(error)
+      if (error.code === 'ERR_CANCELED') return Promise.reject(error)
 
       const status = httpStatus(error)
       const url = error.config?.url
