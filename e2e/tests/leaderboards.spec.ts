@@ -103,3 +103,50 @@ test('a user with fewer than 3 attempts does not get a "you" rank on players', a
   await expect(page.getByRole('heading', { name: 'Leaderboards' })).toBeVisible()
   await expect(page.locator('.you')).toHaveCount(0)
 })
+
+test('players board orders entries by avg score descending', async ({ page, browser }) => {
+  // Build three users with distinct averages: 100%, ~67%, 33%.
+  // Each user takes 3 attempts of the same quiz, picking the right option
+  // a different number of times.
+  const owner = await registerUI(page)
+  const quizId = await makeQuiz(page.request, `Order ${Date.now()}`)
+  expect(owner).toBeTruthy()
+
+  async function userWithAvg(picks: Array<'true' | 'false'>): Promise<string> {
+    const ctx = await browser.newContext()
+    const username = `o${Date.now().toString(36)}${Math.floor(Math.random() * 1000)}`.slice(0, 16)
+    await ctx.request.post(`${BASE}/api/authentication/register`, {
+      data: { username, password: PASSWORD },
+      headers: { 'Content-Type': 'application/json' },
+    })
+    for (const pick of picks) {
+      await makeAndFinishAttempt(ctx.request, quizId, pick)
+    }
+    await ctx.close()
+    return username
+  }
+
+  // High: 3/3 correct → 100%
+  const high = await userWithAvg(['true', 'true', 'true'])
+  // Mid: 2/3 correct → 66.7%
+  const mid = await userWithAvg(['true', 'true', 'false'])
+  // Low: 1/3 correct → 33.3%
+  const low = await userWithAvg(['true', 'false', 'false'])
+
+  // Load the players board and capture rendered text in row order.
+  await page.goto('/app/leaderboards')
+  await expect(page.locator('.row').first()).toBeVisible({ timeout: 10_000 })
+
+  // Find each of our three rows and read their .row__rank.
+  async function rankOf(username: string): Promise<number> {
+    const row = page.locator('.row', { hasText: username }).first()
+    await expect(row).toBeVisible({ timeout: 10_000 })
+    const rankText = await row.locator('.row__rank').innerText()
+    return parseInt(rankText.replace('#', ''), 10)
+  }
+
+  const [hr, mr, lr] = await Promise.all([rankOf(high), rankOf(mid), rankOf(low)])
+  // Strict ordering: high comes before mid which comes before low.
+  expect(hr).toBeLessThan(mr)
+  expect(mr).toBeLessThan(lr)
+})

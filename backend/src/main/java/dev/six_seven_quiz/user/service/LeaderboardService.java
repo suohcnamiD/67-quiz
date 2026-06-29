@@ -73,9 +73,14 @@ public class LeaderboardService {
             if (counted < MIN_PLAYER_ATTEMPTS) continue;
             rows.add(new PlayerRow(user, sumPercent / counted, counted));
         }
-        rows.sort(Comparator
-                .comparingDouble(PlayerRow::avg).reversed()
-                .thenComparingLong(PlayerRow::attempts).reversed());
+        // Sort by avg DESC, attempts DESC. Build the natural-order comparator
+        // first, then reverse the composed result — chaining .reversed() per
+        // key would flip the second key back to ascending.
+        rows.sort(
+                Comparator.comparingDouble(PlayerRow::avg)
+                        .thenComparingLong(PlayerRow::attempts)
+                        .reversed()
+        );
 
         return paginate(rows, page, caller, PlayerRow::user, PlayerRow::avg, r -> (long) r.attempts());
     }
