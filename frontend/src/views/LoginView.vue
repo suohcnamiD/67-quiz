@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { login } from '@/api/authentication-controller/authentication-controller'
 import { useAuthStore } from '@/stores/auth'
-import { errorMessage } from '@/lib/errors'
+import { errorMessage, firstErrorCode, validationFieldErrors } from '@/lib/errors'
 import Button from '@/components/Button.vue'
 import Input from '@/components/Input.vue'
 import Card from '@/components/Card.vue'
@@ -11,19 +11,35 @@ import Card from '@/components/Card.vue'
 const username = ref('')
 const password = ref('')
 const errorText = ref<string | null>(null)
+const usernameError = ref<string | null>(null)
+const passwordError = ref<string | null>(null)
 const submitting = ref(false)
 const auth = useAuthStore()
 const router = useRouter()
 
-async function submit() {
+function clearErrors() {
   errorText.value = null
+  usernameError.value = null
+  passwordError.value = null
+}
+
+async function submit() {
+  clearErrors()
   submitting.value = true
   try {
     const res = await login({ username: username.value, password: password.value })
     auth.markAuthenticated(res.roles ?? [])
     router.push('/app')
   } catch (e) {
-    errorText.value = errorMessage(e)
+    const code = firstErrorCode(e)
+    if (code === 'UNAUTHORIZED') {
+      errorText.value = errorMessage(e)
+    } else {
+      const fieldErrors = validationFieldErrors(e)
+      if (fieldErrors.username) usernameError.value = fieldErrors.username
+      if (fieldErrors.password) passwordError.value = fieldErrors.password
+      if (!fieldErrors.username && !fieldErrors.password) errorText.value = errorMessage(e)
+    }
   } finally {
     submitting.value = false
   }
@@ -35,9 +51,20 @@ async function submit() {
     <Card>
       <h1 class="headline-lg">Sign in</h1>
       <form class="form" @submit.prevent="submit">
-        <Input v-model="username" label="Username" autocomplete="username" />
-        <Input v-model="password" label="Password" type="password" autocomplete="current-password" />
-        <p v-if="errorText" class="form__error label-md">{{ errorText }}</p>
+        <Input
+          v-model="username"
+          label="Username"
+          autocomplete="username"
+          :error="usernameError ?? undefined"
+        />
+        <Input
+          v-model="password"
+          label="Password"
+          type="password"
+          autocomplete="current-password"
+          :error="passwordError ?? undefined"
+        />
+        <p v-if="errorText" class="form__error label-md" role="alert">{{ errorText }}</p>
         <Button type="submit" :loading="submitting" full-width>Sign in</Button>
       </form>
       <p class="footnote body-md">

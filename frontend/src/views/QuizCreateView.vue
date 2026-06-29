@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { createQuiz } from '@/api/quiz-controller/quiz-controller'
-import { errorMessage } from '@/lib/errors'
+import { errorMessage, validationFieldErrors } from '@/lib/errors'
 import Button from '@/components/Button.vue'
 import Input from '@/components/Input.vue'
 import Card from '@/components/Card.vue'
@@ -12,16 +12,24 @@ const name = ref('')
 const minutes = ref('15')
 const submitting = ref(false)
 const errorText = ref<string | null>(null)
+const nameError = ref<string | null>(null)
+const minutesError = ref<string | null>(null)
+
+function clearErrors() {
+  errorText.value = null
+  nameError.value = null
+  minutesError.value = null
+}
 
 async function submit() {
-  errorText.value = null
+  clearErrors()
   const mins = Number(minutes.value)
   if (!name.value.trim()) {
-    errorText.value = 'Give the quiz a name.'
+    nameError.value = 'Give the quiz a name.'
     return
   }
   if (!Number.isFinite(mins) || mins <= 0) {
-    errorText.value = 'Duration must be a positive number of minutes.'
+    minutesError.value = 'Duration must be a positive number of minutes.'
     return
   }
   submitting.value = true
@@ -32,7 +40,12 @@ async function submit() {
     })
     if (quiz.id) router.push(`/app/quiz/${quiz.id}`)
   } catch (e) {
-    errorText.value = errorMessage(e)
+    const fieldErrors = validationFieldErrors(e)
+    if (fieldErrors.quizName) nameError.value = fieldErrors.quizName
+    if (fieldErrors.quizDuration) minutesError.value = fieldErrors.quizDuration
+    if (!fieldErrors.quizName && !fieldErrors.quizDuration) {
+      errorText.value = errorMessage(e)
+    }
   } finally {
     submitting.value = false
   }
@@ -45,9 +58,19 @@ async function submit() {
       <h1 class="headline-lg">New quiz</h1>
       <p class="subtitle body-md">Set the rules. Add questions next.</p>
       <form class="form" @submit.prevent="submit">
-        <Input v-model="name" label="Quiz name" placeholder="e.g. Trivia Showdown" />
-        <Input v-model="minutes" label="Duration (minutes)" type="number" />
-        <p v-if="errorText" class="form__error label-md">{{ errorText }}</p>
+        <Input
+          v-model="name"
+          label="Quiz name"
+          placeholder="e.g. Trivia Showdown"
+          :error="nameError ?? undefined"
+        />
+        <Input
+          v-model="minutes"
+          label="Duration (minutes)"
+          type="number"
+          :error="minutesError ?? undefined"
+        />
+        <p v-if="errorText" class="form__error label-md" role="alert">{{ errorText }}</p>
         <div class="actions">
           <Button variant="ghost" @click="router.push('/app')">Cancel</Button>
           <Button type="submit" :loading="submitting">Create</Button>

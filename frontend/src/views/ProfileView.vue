@@ -12,7 +12,7 @@ import {
   getGetProfileByUsernameQueryKey,
 } from '@/api/user-profile-controller/user-profile-controller'
 import { useAuthStore } from '@/stores/auth'
-import { errorMessage } from '@/lib/errors'
+import { errorMessage, firstErrorCode, validationFieldErrors } from '@/lib/errors'
 import { scrollAndFlash } from '@/lib/scrollAndFlash'
 import { confirmDialog } from '@/lib/confirmDialog'
 import Button from '@/components/Button.vue'
@@ -42,16 +42,24 @@ const detailsName = ref('')
 const detailsBio = ref('')
 const savingDetails = ref(false)
 const detailsError = ref<string | null>(null)
+const detailsNameError = ref<string | null>(null)
+const detailsBioError = ref<string | null>(null)
+
+function clearDetailsErrors() {
+  detailsError.value = null
+  detailsNameError.value = null
+  detailsBioError.value = null
+}
 
 function openDetailsModal() {
   detailsName.value = profile.value?.displayName ?? profile.value?.username ?? ''
   detailsBio.value = profile.value?.bio ?? ''
-  detailsError.value = null
+  clearDetailsErrors()
   detailsOpen.value = true
 }
 
 async function saveDetails() {
-  detailsError.value = null
+  clearDetailsErrors()
   savingDetails.value = true
   try {
     const updated = await updateOwnProfile({
@@ -69,7 +77,18 @@ async function saveDetails() {
     }
     detailsOpen.value = false
   } catch (e) {
-    detailsError.value = errorMessage(e)
+    const code = firstErrorCode(e)
+    const msg = errorMessage(e)
+    if (code === 'INVALID_DISPLAY_NAME') {
+      detailsNameError.value = msg
+    } else if (code === 'INVALID_BIO') {
+      detailsBioError.value = msg
+    } else {
+      const fieldErrors = validationFieldErrors(e)
+      if (fieldErrors.displayName) detailsNameError.value = fieldErrors.displayName
+      if (fieldErrors.bio) detailsBioError.value = fieldErrors.bio
+      if (!fieldErrors.displayName && !fieldErrors.bio) detailsError.value = msg
+    }
   } finally {
     savingDetails.value = false
   }
@@ -164,7 +183,7 @@ async function removeAvatar() {
 // button), focus should land on the upload action; the dialog itself takes
 // focus first, that's fine.
 watch(detailsOpen, (open) => {
-  if (!open) detailsError.value = null
+  if (!open) clearDetailsErrors()
 })
 watch(avatarOpen, (open) => {
   if (!open) avatarError.value = null
@@ -263,8 +282,8 @@ function scrollToAuthored() {
     <!-- Modals — only one open at a time. -->
     <Modal :open="detailsOpen" title="Edit profile" @close="detailsOpen = false">
       <form id="details-form" class="form" @submit.prevent="saveDetails">
-        <Input v-model="detailsName" label="Display name" />
-        <Input v-model="detailsBio" label="Bio" placeholder="Short blurb about you" />
+        <Input v-model="detailsName" label="Display name" :error="detailsNameError ?? undefined" />
+        <Input v-model="detailsBio" label="Bio" placeholder="Short blurb about you" :error="detailsBioError ?? undefined" />
         <p v-if="detailsError" class="banner label-md" role="alert">{{ detailsError }}</p>
       </form>
       <template #footer>
