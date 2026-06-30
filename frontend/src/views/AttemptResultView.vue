@@ -74,26 +74,14 @@ function optState(o: FinishedOptionDto, q: FinishedQuestionDto): OptState {
 }
 
 /**
- * Scoring per option, by question type:
- *  - SINGLE_CHOICE earns 1 point IFF the picked option is correct.
- *    Every other option contributes 0 — including the unpicked correct one
- *    (which the user "missed") and the unpicked wrong ones (which they
- *    "skipped" but get no credit for).
- *  - MULTI_CHOICE is per-option: a correctly classified option (picked when
- *    correct, or unpicked when wrong) earns +1; the inverse earns 0.
- *
- * Chip is always rendered so the user can see at a glance which options
- * actually contributed to the score — previously single-choice skipped
- * options were chipless, hiding the correct-but-unpicked answer entirely.
+ * Chip rendered only on options the user actually picked. The chip shows
+ * whether that pick earned a point or not. Unpicked options don't get a
+ * chip — the question header's earned/max score does that math.
  */
-function chipFor(o: FinishedOptionDto, q: FinishedQuestionDto): { score: '+1' | '0'; tone: 'win' | 'lose' } {
+function pickedChip(o: FinishedOptionDto, q: FinishedQuestionDto): '+1' | '0' | null {
+  if (!o.selected) return null
   const state = optState(o, q)
-  if (q.type === 'SINGLE_CHOICE') {
-    return state === 'correct' ? { score: '+1', tone: 'win' } : { score: '0', tone: 'lose' }
-  }
-  // Multi-choice: correctly classified (correct+selected OR wrong+unpicked) earns +1.
-  if (state === 'correct' || state === 'skipped') return { score: '+1', tone: 'win' }
-  return { score: '0', tone: 'lose' }
+  return state === 'correct' ? '+1' : '0'
 }
 // Stable ordering: things you got right first, then things you got wrong.
 const sortRank: Record<OptState, number> = { correct: 0, skipped: 1, missed: 2, wrong: 3 }
@@ -340,7 +328,7 @@ function dismissRating() {
           <li
             v-for="o in sortedOptions(q)"
             :key="o.id"
-            :class="['opt', `opt--${optState(o, q)}`, `opt--${chipFor(o, q).tone}`, { 'opt--picked': o.selected }]"
+            :class="['opt', `opt--${optState(o, q)}`, { 'opt--picked': o.selected }]"
           >
             <span class="opt__pick" :aria-label="o.selected ? 'You picked this' : 'You did not pick this'">
               <span class="opt__pick-box">
@@ -355,7 +343,7 @@ function dismissRating() {
               class="opt__image"
               loading="lazy"
             />
-            <span class="opt__chip">{{ chipFor(o, q).score }}</span>
+            <span v-if="pickedChip(o, q)" class="opt__chip">{{ pickedChip(o, q) }}</span>
           </li>
         </ul>
       </li>
@@ -636,45 +624,29 @@ function dismissRating() {
   font-variant-numeric: tabular-nums;
 }
 
-/* Outcome tones drive the chip + surface tint. */
-.opt--win {
-  --opt-bg: color-mix(in srgb, var(--on-secondary-container) 12%, var(--surface-container-low));
-  --opt-border: color-mix(in srgb, var(--on-secondary-container) 40%, transparent);
+/* Palette by option state. Green only when the user actually picked the
+ * right answer; red only when they picked a wrong one. Everything else
+ * stays neutral so the eye lands on what the user did, not what they
+ * could've done. */
+.opt--correct {
+  --opt-bg: color-mix(in srgb, var(--on-secondary-container) 14%, var(--surface-container-low));
+  --opt-border: color-mix(in srgb, var(--on-secondary-container) 45%, transparent);
   --opt-accent: var(--on-secondary-container);
 }
-.opt--lose {
-  --opt-bg: color-mix(in srgb, var(--on-error-container) 12%, var(--surface-container-low));
-  --opt-border: color-mix(in srgb, var(--on-error-container) 45%, transparent);
+.opt--wrong {
+  --opt-bg: color-mix(in srgb, var(--on-error-container) 14%, var(--surface-container-low));
+  --opt-border: color-mix(in srgb, var(--on-error-container) 50%, transparent);
   --opt-accent: var(--on-error-container);
 }
-.opt--neutral {
-  /* Used for single-choice options the user didn't pick — no score signal. */
-  --opt-bg: var(--surface-container-low);
-  --opt-border: var(--outline-variant);
-  --opt-accent: var(--on-surface-variant);
-}
-
-/* Skipped distractors are technically wins but visually quieter so the
-   reader's eye is drawn to picks and mistakes first. */
-.opt--skipped {
-  --opt-bg: var(--surface-container-low);
-  --opt-border: var(--outline-variant);
-}
-.opt--skipped .opt__chip {
-  background: transparent;
-  color: var(--on-secondary-container);
-  border: 1px solid color-mix(in srgb, var(--on-secondary-container) 40%, transparent);
-}
-
-/* Missed: this WAS the right answer but the user didn't pick it. Tint
-   green so the correct answer is unambiguous, but keep the chip at 0
-   (no points earned). Overrides the .opt--lose tone applied by
-   chipFor() so red doesn't fight the "this is the right answer" message. */
+/* The right answer the user didn't pick — neutral fill so it doesn't
+ * compete with the user's actual correct picks, but a dashed accent
+ * border marks it as "this is what you should've picked". */
 .opt--missed {
-  --opt-bg: color-mix(in srgb, var(--on-secondary-container) 12%, var(--surface-container-low));
-  --opt-border: color-mix(in srgb, var(--on-secondary-container) 50%, transparent);
-  --opt-accent: var(--on-secondary-container);
+  --opt-border: color-mix(in srgb, var(--on-secondary-container) 55%, transparent);
+  border-style: dashed;
 }
+/* Skipped wrong distractors: plain neutral, no signal. */
+.opt--skipped { /* defaults */ }
 
 /* ----- Rating widget ----- */
 .rate {
