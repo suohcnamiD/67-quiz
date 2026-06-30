@@ -27,6 +27,7 @@ import dev.six_seven_quiz.quiz.repository.QuizRepository;
 import dev.six_seven_quiz.user.ApplicationUser;
 import dev.six_seven_quiz.user.ApplicationUserService;
 import dev.six_seven_quiz.user.profile.component.mapper.UserProfileMapper;
+import dev.six_seven_quiz.user.profile.dto.AuthorSummaryDto;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.transaction.Transactional;
@@ -110,14 +111,33 @@ public class AttemptService {
     }
 
     private QuizSummaryDto quizToSummary(Quiz quiz, ApplicationUser user) {
+        // The attempts.quiz_id FK is ON DELETE SET NULL — when an author deletes
+        // their quiz, every attempt of that quiz survives but loses its quiz
+        // reference. Emit a tombstone DTO so old score history still renders.
+        if (quiz == null) {
+            return new QuizSummaryDto(
+                    "Deleted quiz",
+                    0,
+                    0,
+                    java.time.Duration.ZERO,
+                    null,
+                    false,
+                    false,
+                    null,
+                    new QuizRatingSummaryDto(null, 0L)
+            );
+        }
         int questionCount = questionRepository.countByQuiz_QuizId(quiz.getId());
-        boolean areYouAuthor = quiz.getAuthor().equals(user);
+        boolean areYouAuthor = quiz.getAuthor() != null && quiz.getAuthor().equals(user);
         long ratingCount = quizRatingRepository.countForQuiz(quiz.getId());
         Double ratingAvg = ratingCount > 0
                 ? quizRatingRepository.averageScoreForQuiz(quiz.getId()).orElse(null)
                 : null;
         QuizRatingSummaryDto ratingSummary = new QuizRatingSummaryDto(ratingAvg, ratingCount);
-        return quizMapper.toSummary(quiz, questionCount, areYouAuthor, userProfileMapper.toAuthorSummary(quiz.getAuthor()), ratingSummary);
+        AuthorSummaryDto authorSummary = quiz.getAuthor() != null
+                ? userProfileMapper.toAuthorSummary(quiz.getAuthor())
+                : null;
+        return quizMapper.toSummary(quiz, questionCount, areYouAuthor, authorSummary, ratingSummary);
     }
 
     private void validateUserAttemptOwnership(ApplicationUser user, Attempt attempt) {
