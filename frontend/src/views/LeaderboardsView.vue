@@ -72,30 +72,20 @@ function closeExplainer() {
 const explainerLines = computed<string[]>(() => {
   const e = explainerEntry.value
   if (!e) return []
+  const who = e.user?.displayName ?? e.user?.username ?? 'This player'
   if (tab.value === 'players') {
     const attempts = Number(e.secondaryValue ?? 0)
     const trueAvg = Number(e.tertiaryValue ?? 0)
     const rating = Number(e.primaryValue ?? 0)
-    // Reconstruct sumOfPercentages so the formula reads as it computed.
-    const sumPercent = trueAvg * attempts
-    const numerator = sumPercent + 5 * 50
-    const denominator = attempts + 5
     return [
-      `${e.user?.displayName ?? e.user?.username ?? 'This player'} sits at rank #${e.rank} on the players board.`,
-      `Their true accuracy across ${attempts} finished attempts averages ${fmtPercent(trueAvg)}, but ranking uses a derived rating that blends accuracy with volume.`,
-      `rating = (sumOfPercentages + K · priorMean) / (attempts + K)`,
-      `        = (${fmtPercent(trueAvg)} × ${attempts} + 5 × 50%) / (${attempts} + 5)`,
-      `        = (${sumPercent.toFixed(1)} + 250) / ${denominator}`,
-      `        = ${numerator.toFixed(1)} / ${denominator}`,
-      `        = ${rating.toFixed(2)}`,
-      `That's why a heavier player with a lower raw average can outrank a lighter player with a higher one — five "virtual" attempts at 50% are folded in until enough real attempts wash them out.`,
+      `${who} answered correctly ${fmtPercent(trueAvg)} of the time across ${attempts} finished ${attempts === 1 ? 'attempt' : 'attempts'}.`,
+      `Their rating is ${rating.toFixed(1)} — a small-sample correction nudges new players toward 50% until they've taken enough attempts for their accuracy to speak for itself.`,
     ]
   }
+  const ratings = Number(e.secondaryValue ?? 0)
+  const avg = Number(e.primaryValue ?? 0)
   return [
-    `${e.user?.displayName ?? e.user?.username ?? 'This author'} sits at rank #${e.rank} on the authors board.`,
-    `Their score is the plain average rating across all their authored quizzes, computed across ${e.secondaryValue} total ratings.`,
-    `No prior, no shrinkage — community ratings already encode a judgment, so we don't double-count.`,
-    `Tiebreak is by total rating count.`,
+    `${who} averages ${avg.toFixed(1)} / 10 across ${ratings} ${ratings === 1 ? 'rating' : 'ratings'} on their quizzes.`,
   ]
 })
 </script>
@@ -104,16 +94,6 @@ const explainerLines = computed<string[]>(() => {
   <section class="head">
     <div>
       <h1 class="headline-lg">Leaderboards</h1>
-      <p v-if="tab === 'players'" class="subtitle body-md muted">
-        Players are ranked by a derived <strong>rating</strong> that combines accuracy with attempt volume — a player
-        with many attempts at 80% can sit above a player with one lucky 100%. Tap the
-        <span aria-hidden="true">?</span> next to any row to see how that player's rating was calculated. Qualifying:
-        at least 3 finished attempts.
-      </p>
-      <p v-else class="subtitle body-md muted">
-        Authors are ranked by the average rating across their quizzes. Tiebreak is by total rating count. Qualifying:
-        at least 5 ratings across your quizzes.
-      </p>
     </div>
     <div class="tabs" role="tablist" aria-label="Leaderboard">
       <button
