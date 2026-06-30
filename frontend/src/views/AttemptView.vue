@@ -224,8 +224,8 @@ watch(remainingMs, (ms) => {
           </div>
           <p class="body-lg q-text">{{ q.text }}</p>
           <img
-            v-if="q.hasImage && q.id"
-            :src="questionImageUrl(q.id)"
+            v-if="q.hasImage && q.questionId"
+            :src="questionImageUrl(q.questionId)"
             alt=""
             class="q-image"
             loading="lazy"
@@ -353,16 +353,20 @@ watch(remainingMs, (ms) => {
 .q-image {
   display: block;
   max-width: 100%;
-  max-height: 320px;
+  max-height: 240px;
+  width: auto;
+  object-fit: contain;
   border-radius: var(--radius-lg);
-  margin: 0 0 var(--space-md);
+  margin: 0 auto var(--space-lg);
 }
 .opt__image {
-  max-width: 100%;
-  max-height: 160px;
+  display: block;
+  max-width: 160px;
+  max-height: 100px;
+  width: auto;
+  object-fit: contain;
   border-radius: var(--radius);
   margin-top: var(--space-xs);
-  align-self: stretch;
 }
 .opts {
   list-style: none;

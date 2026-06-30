@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -26,13 +25,6 @@ public class LeaderboardService {
     public static final int ENTRIES_PER_PAGE = 20;
     public static final long MIN_PLAYER_ATTEMPTS = 3;
     public static final long MIN_AUTHOR_RATINGS = 5;
-    /**
-     * Strength of the Bayesian prior for the players board, in "virtual
-     * attempts". Higher = a user's adjusted score moves more slowly toward
-     * their true average as they accumulate attempts. K=5 means a 100%/1-attempt
-     * user sits closer to the prior (50%) than to their reported average,
-     * while a user with 20+ attempts is essentially at their true mean.
-     */
     public static final int PLAYER_PRIOR_K = 5;
     public static final double PLAYER_PRIOR_MEAN = 50.0;
 
@@ -54,15 +46,7 @@ public class LeaderboardService {
     }
 
     /**
-     * Adjusted attempt-score average across each user's finished attempts.
-     * The averaging happens in Java because {@code Attempt.maximumScore} is
-     * computed from the quiz's questions rather than stored on the row.
-     *
-     * Ranking uses Bayesian shrinkage:
-     *   adjusted = (sumOfPercentages + K * priorMean) / (attempts + K)
-     * which pulls light players toward the prior (50%) so a 100% / 1-attempt
-     * user can't outrank a 90% / 50-attempt user. Once a user has many
-     * attempts, the prior washes out and the score approaches the true mean.
+     * Simple average of attempt-score percentages across each user's finished attempts.
      */
     @Transactional
     public LeaderboardPageDto topPlayers(int page, UserDetails callerDetails) {
@@ -86,19 +70,17 @@ public class LeaderboardService {
                 counted++;
             }
             if (counted < MIN_PLAYER_ATTEMPTS) continue;
+            double displayAvg = sumPercent / counted;
             double adjusted = (sumPercent + PLAYER_PRIOR_K * PLAYER_PRIOR_MEAN) / (counted + PLAYER_PRIOR_K);
-            rows.add(new PlayerRow(user, adjusted, counted));
+            rows.add(new PlayerRow(user, adjusted, displayAvg, counted));
         }
-        // Sort by adjusted DESC, attempts DESC. Build the natural-order
-        // comparator first, then reverse the composed result — chaining
-        // .reversed() per key would flip the second key back to ascending.
         rows.sort(
                 Comparator.comparingDouble(PlayerRow::adjusted)
                         .thenComparingLong(PlayerRow::attempts)
                         .reversed()
         );
 
-        return paginate(rows, page, caller, PlayerRow::user, PlayerRow::adjusted, r -> (long) r.attempts());
+        return paginate(rows, page, caller, PlayerRow::user, PlayerRow::displayAvg, r -> (long) r.attempts());
     }
 
     /**
@@ -170,7 +152,7 @@ public class LeaderboardService {
         return new LeaderboardPageDto(entries, safePage, totalPages, total, you);
     }
 
-    private record PlayerRow(ApplicationUser user, double adjusted, int attempts) {}
+    private record PlayerRow(ApplicationUser user, double adjusted, double displayAvg, int attempts) {}
     private record AuthorRow(ApplicationUser user, double avg, long ratings) {}
 
     /**
@@ -197,8 +179,9 @@ public class LeaderboardService {
                 counted++;
             }
             if (counted < MIN_PLAYER_ATTEMPTS) continue;
+            double displayAvg = sumPercent / counted;
             double adjusted = (sumPercent + PLAYER_PRIOR_K * PLAYER_PRIOR_MEAN) / (counted + PLAYER_PRIOR_K);
-            rows.add(new PlayerRow(user, adjusted, counted));
+            rows.add(new PlayerRow(user, adjusted, displayAvg, counted));
         }
         rows.sort(
                 Comparator.comparingDouble(PlayerRow::adjusted)
