@@ -7,7 +7,7 @@ const BASE_URL = process.env.QUIZ_BASE_URL ?? 'http://localhost:8080'
 
 // Axios instance that stores the session cookie across requests
 const http: AxiosInstance = axios.create({
-  baseURL: BASE_URL,
+  baseURL: `${BASE_URL}/api`,
   withCredentials: true,
 })
 
