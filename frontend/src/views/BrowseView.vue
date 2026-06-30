@@ -149,6 +149,17 @@ function fmtRelative(iso?: string): string {
   if (Math.abs(diffDay) < 30) return diffSec >= 0 ? `${diffDay} days ago` : `in ${Math.abs(diffDay)} days`
   return new Date(iso).toLocaleDateString()
 }
+
+function scrollToPastResults() {
+  const el = document.getElementById('past-results')
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  } else {
+    // Section may not be rendered yet (finished-attempts still loading). Set
+    // the hash; the existing watchEffect handles the scroll once it mounts.
+    router.replace({ path: '/app', hash: '#past-results' })
+  }
+}
 </script>
 
 <template>
@@ -160,13 +171,31 @@ function fmtRelative(iso?: string): string {
       <h1 class="hero__title">Welcome back, {{ greetingName }}.</h1>
     </div>
     <ul class="stats">
-      <li class="stat">
-        <span class="stat__label label-sm muted">Quizzes authored</span>
-        <span class="stat__value">{{ me?.quizzesAuthored ?? 0 }}</span>
+      <li>
+        <button
+          type="button"
+          class="stat stat--link"
+          :disabled="(me?.quizzesAuthored ?? 0) === 0"
+          :aria-label="`${me?.quizzesAuthored ?? 0} quizzes authored — go to your profile`"
+          @click="router.push('/app/profile')"
+        >
+          <span class="stat__label label-sm muted">Quizzes authored</span>
+          <span class="stat__value">{{ me?.quizzesAuthored ?? 0 }}</span>
+          <span class="stat__chevron" aria-hidden="true">›</span>
+        </button>
       </li>
-      <li class="stat">
-        <span class="stat__label label-sm muted">Attempts taken</span>
-        <span class="stat__value">{{ me?.attemptsTaken ?? 0 }}</span>
+      <li>
+        <button
+          type="button"
+          class="stat stat--link"
+          :disabled="(me?.attemptsTaken ?? 0) === 0"
+          :aria-label="`${me?.attemptsTaken ?? 0} attempts taken — jump to past results`"
+          @click="scrollToPastResults"
+        >
+          <span class="stat__label label-sm muted">Attempts taken</span>
+          <span class="stat__value">{{ me?.attemptsTaken ?? 0 }}</span>
+          <span class="stat__chevron" aria-hidden="true">›</span>
+        </button>
       </li>
       <li class="stat">
         <span class="stat__label label-sm muted">Average score</span>
@@ -415,6 +444,45 @@ function fmtRelative(iso?: string): string {
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+  width: 100%;
+  text-align: left;
+  position: relative;
+}
+.stat--link {
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease;
+}
+.stat--link:not(:disabled):hover {
+  border-color: var(--outline);
+  background: var(--surface-container-high);
+}
+.stat--link:not(:disabled):active {
+  transform: translateY(1px);
+}
+.stat--link:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+.stat--link:disabled .stat__chevron {
+  display: none;
+}
+.stat__chevron {
+  position: absolute;
+  top: 50%;
+  right: var(--space-md);
+  transform: translateY(-50%);
+  color: var(--on-surface-variant);
+  font-size: 1.5rem;
+  line-height: 1;
+  font-weight: 300;
+  transition: transform 120ms ease, color 120ms ease;
+}
+.stat--link:not(:disabled):hover .stat__chevron {
+  transform: translateY(-50%) translateX(2px);
+  color: var(--on-surface);
 }
 .stat__value {
   font-size: 1.75rem;

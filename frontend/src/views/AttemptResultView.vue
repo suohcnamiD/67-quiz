@@ -69,22 +69,28 @@ function optState(o: FinishedOptionDto, q: FinishedQuestionDto): OptState {
   if (o.correct && !o.selected) return 'missed'
   return 'skipped'
 }
-// The chip just says "+1 you got the point" (green) or "0 you didn't" (red).
-// Skipped options on single-choice are neutral (no chip shown).
-const optMeta: Record<OptState, { score: '+1' | '0' | null; tone: 'win' | 'lose' | 'neutral' }> = {
-  correct: { score: '+1', tone: 'win' },
-  skipped: { score: '+1', tone: 'win' },
-  wrong:   { score: '0',  tone: 'lose' },
-  missed:  { score: '0',  tone: 'lose' },
-}
-function chipFor(o: FinishedOptionDto, q: FinishedQuestionDto): { score: '+1' | '0' | null; tone: 'win' | 'lose' | 'neutral' } {
+
+/**
+ * Scoring per option, by question type:
+ *  - SINGLE_CHOICE earns 1 point IFF the picked option is correct.
+ *    Every other option contributes 0 — including the unpicked correct one
+ *    (which the user "missed") and the unpicked wrong ones (which they
+ *    "skipped" but get no credit for).
+ *  - MULTI_CHOICE is per-option: a correctly classified option (picked when
+ *    correct, or unpicked when wrong) earns +1; the inverse earns 0.
+ *
+ * Chip is always rendered so the user can see at a glance which options
+ * actually contributed to the score — previously single-choice skipped
+ * options were chipless, hiding the correct-but-unpicked answer entirely.
+ */
+function chipFor(o: FinishedOptionDto, q: FinishedQuestionDto): { score: '+1' | '0'; tone: 'win' | 'lose' } {
   const state = optState(o, q)
-  if (q.type === 'SINGLE_CHOICE' && state === 'skipped') {
-    // Don't show "+1 for skipping" on every non-picked option — the question is
-    // worth 1 point total and only the picked option drives it.
-    return { score: null, tone: 'neutral' }
+  if (q.type === 'SINGLE_CHOICE') {
+    return state === 'correct' ? { score: '+1', tone: 'win' } : { score: '0', tone: 'lose' }
   }
-  return optMeta[state]
+  // Multi-choice: correctly classified (correct+selected OR wrong+unpicked) earns +1.
+  if (state === 'correct' || state === 'skipped') return { score: '+1', tone: 'win' }
+  return { score: '0', tone: 'lose' }
 }
 // Stable ordering: things you got right first, then things you got wrong.
 const sortRank: Record<OptState, number> = { correct: 0, skipped: 1, missed: 2, wrong: 3 }
@@ -346,7 +352,7 @@ function dismissRating() {
               class="opt__image"
               loading="lazy"
             />
-            <span v-if="chipFor(o, q).score !== null" class="opt__chip">{{ chipFor(o, q).score }}</span>
+            <span class="opt__chip">{{ chipFor(o, q).score }}</span>
           </li>
         </ul>
       </li>

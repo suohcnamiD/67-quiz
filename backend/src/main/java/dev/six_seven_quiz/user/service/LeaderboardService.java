@@ -46,7 +46,17 @@ public class LeaderboardService {
     }
 
     /**
-     * Simple average of attempt-score percentages across each user's finished attempts.
+     * Players board: ranks users by a Bayesian-shrunk score that combines
+     * accuracy with attempt volume, so a 100%/1-attempt user can't outrank
+     * a 90%/50-attempt user.
+     *
+     *   adjusted = (sumOfPercentages + K * priorMean) / (attempts + K)
+     *
+     * with K=5 and priorMean=50.0. We return the adjusted value as
+     * primaryValue (the headline metric the row sorts by), the attempt
+     * count as secondaryValue, and the user's true average accuracy as
+     * tertiaryValue so the FE can show both numbers side-by-side and
+     * explain why the order isn't just "highest %25 wins".
      */
     @Transactional
     public LeaderboardPageDto topPlayers(int page, UserDetails callerDetails) {
@@ -80,7 +90,13 @@ public class LeaderboardService {
                         .reversed()
         );
 
-        return paginate(rows, page, caller, PlayerRow::user, PlayerRow::displayAvg, r -> (long) r.attempts());
+        return paginate(
+                rows, page, caller,
+                PlayerRow::user,
+                PlayerRow::adjusted,
+                r -> (long) r.attempts(),
+                PlayerRow::displayAvg
+        );
     }
 
     /**
@@ -107,7 +123,7 @@ public class LeaderboardService {
         }
         // The JPQL query already sorts; preserve that order. Stable.
 
-        return paginate(rows, page, caller, AuthorRow::user, AuthorRow::avg, AuthorRow::ratings);
+        return paginate(rows, page, caller, AuthorRow::user, AuthorRow::avg, AuthorRow::ratings, r -> null);
     }
 
     private <R> LeaderboardPageDto paginate(
@@ -116,7 +132,8 @@ public class LeaderboardService {
             ApplicationUser caller,
             java.util.function.Function<R, ApplicationUser> userOf,
             java.util.function.ToDoubleFunction<R> primaryOf,
-            java.util.function.ToLongFunction<R> secondaryOf
+            java.util.function.ToLongFunction<R> secondaryOf,
+            java.util.function.Function<R, Double> tertiaryOf
     ) {
         long total = rows.size();
         int totalPages = (int) Math.max(1, Math.ceil(total / (double) ENTRIES_PER_PAGE));
@@ -131,7 +148,8 @@ public class LeaderboardService {
                     i + 1,
                     userProfileMapper.toAuthorSummary(userOf.apply(row)),
                     primaryOf.applyAsDouble(row),
-                    secondaryOf.applyAsLong(row)
+                    secondaryOf.applyAsLong(row),
+                    tertiaryOf.apply(row)
             ));
         }
 
@@ -143,7 +161,8 @@ public class LeaderboardService {
                         i + 1,
                         userProfileMapper.toAuthorSummary(caller),
                         primaryOf.applyAsDouble(row),
-                        secondaryOf.applyAsLong(row)
+                        secondaryOf.applyAsLong(row),
+                        tertiaryOf.apply(row)
                 );
                 break;
             }

@@ -7,7 +7,10 @@ import {
 } from '@/api/leaderboard-controller/leaderboard-controller'
 import Avatar from '@/components/Avatar.vue'
 import Button from '@/components/Button.vue'
+import Modal from '@/components/Modal.vue'
 import type { LeaderboardEntryDto } from '@/api/openAPIDefinition.schemas'
+
+defineOptions({ name: 'LeaderboardsView' })
 
 type Tab = 'players' | 'authors'
 
@@ -34,31 +37,83 @@ const totalElements = computed(() => current.value.data.value?.totalElements ?? 
 const you = computed<LeaderboardEntryDto | null>(() => current.value.data.value?.you ?? null)
 const isLoading = computed(() => current.value.isLoading.value)
 
-const primaryLabel = computed(() => (tab.value === 'players' ? 'Score' : 'Avg rating'))
+const primaryLabel = computed(() => (tab.value === 'players' ? 'Rating' : 'Avg rating'))
 const secondaryLabel = computed(() => (tab.value === 'players' ? 'attempts' : 'ratings'))
-const qualifierHint = computed(() =>
-  tab.value === 'players'
-    ? 'Score combines your accuracy with how many attempts you’ve taken. New players shrink toward 50% until enough attempts settle the score. Qualifying: at least 3 finished attempts.'
-    : 'Qualifying: at least 5 ratings across your quizzes.',
-)
 
-function fmtPrimary(v: number | undefined): string {
+// Players board: rating is a derived score on a 0–100 scale, not a percent —
+// hence the title-cased label and no % suffix. Authors board: avg rating is
+// on a 1–10 scale, one decimal.
+function fmtPrimary(v: number | null | undefined): string {
   if (v == null) return '—'
-  if (tab.value === 'players') return `${Math.round(v)}%`
-  // Rating board: one decimal, trim trailing .0
+  if (tab.value === 'players') return v.toFixed(1).replace(/\.0$/, '')
   return v.toFixed(1).replace(/\.0$/, '')
+}
+function fmtPercent(v: number | null | undefined): string {
+  if (v == null) return '—'
+  return `${Math.round(v)}%`
 }
 
 function openProfile(username?: string) {
   if (username) router.push({ name: 'user-profile', params: { username } })
 }
+
+// ----- Explainer modal --------------------------------------------------
+const explainerOpen = ref(false)
+const explainerEntry = ref<LeaderboardEntryDto | null>(null)
+
+function openExplainer(entry: LeaderboardEntryDto) {
+  explainerEntry.value = entry
+  explainerOpen.value = true
+}
+function closeExplainer() {
+  explainerOpen.value = false
+}
+
+const explainerLines = computed<string[]>(() => {
+  const e = explainerEntry.value
+  if (!e) return []
+  if (tab.value === 'players') {
+    const attempts = Number(e.secondaryValue ?? 0)
+    const trueAvg = Number(e.tertiaryValue ?? 0)
+    const rating = Number(e.primaryValue ?? 0)
+    // Reconstruct sumOfPercentages so the formula reads as it computed.
+    const sumPercent = trueAvg * attempts
+    const numerator = sumPercent + 5 * 50
+    const denominator = attempts + 5
+    return [
+      `${e.user?.displayName ?? e.user?.username ?? 'This player'} sits at rank #${e.rank} on the players board.`,
+      `Their true accuracy across ${attempts} finished attempts averages ${fmtPercent(trueAvg)}, but ranking uses a derived rating that blends accuracy with volume.`,
+      `rating = (sumOfPercentages + K · priorMean) / (attempts + K)`,
+      `        = (${fmtPercent(trueAvg)} × ${attempts} + 5 × 50%) / (${attempts} + 5)`,
+      `        = (${sumPercent.toFixed(1)} + 250) / ${denominator}`,
+      `        = ${numerator.toFixed(1)} / ${denominator}`,
+      `        = ${rating.toFixed(2)}`,
+      `That's why a heavier player with a lower raw average can outrank a lighter player with a higher one — five "virtual" attempts at 50% are folded in until enough real attempts wash them out.`,
+    ]
+  }
+  return [
+    `${e.user?.displayName ?? e.user?.username ?? 'This author'} sits at rank #${e.rank} on the authors board.`,
+    `Their score is the plain average rating across all their authored quizzes, computed across ${e.secondaryValue} total ratings.`,
+    `No prior, no shrinkage — community ratings already encode a judgment, so we don't double-count.`,
+    `Tiebreak is by total rating count.`,
+  ]
+})
 </script>
 
 <template>
   <section class="head">
     <div>
       <h1 class="headline-lg">Leaderboards</h1>
-      <p class="subtitle body-md">{{ qualifierHint }}</p>
+      <p v-if="tab === 'players'" class="subtitle body-md muted">
+        Players are ranked by a derived <strong>rating</strong> that combines accuracy with attempt volume — a player
+        with many attempts at 80% can sit above a player with one lucky 100%. Tap the
+        <span aria-hidden="true">?</span> next to any row to see how that player's rating was calculated. Qualifying:
+        at least 3 finished attempts.
+      </p>
+      <p v-else class="subtitle body-md muted">
+        Authors are ranked by the average rating across their quizzes. Tiebreak is by total rating count. Qualifying:
+        at least 5 ratings across your quizzes.
+      </p>
     </div>
     <div class="tabs" role="tablist" aria-label="Leaderboard">
       <button
@@ -78,12 +133,32 @@ function openProfile(username?: string) {
     </div>
   </section>
 
-  <p v-if="you" class="you label-md" role="status">
+  <div v-if="you" class="you" role="status">
     <span class="you__rank">#{{ you.rank }}</span>
-    <span>You are ranked {{ you.rank }} of {{ totalElements }} —</span>
-    <strong>{{ fmtPrimary(you.primaryValue) }}</strong>
-    <span class="muted">({{ you.secondaryValue }} {{ secondaryLabel }})</span>
-  </p>
+    <div class="you__body">
+      <p class="you__line body-md">
+        You are ranked {{ you.rank }} of {{ totalElements }}.
+      </p>
+      <p class="you__metrics body-md">
+        <strong>{{ fmtPrimary(you.primaryValue) }}</strong>
+        <span class="you__metric-label muted">{{ primaryLabel }}</span>
+        <template v-if="tab === 'players' && you.tertiaryValue != null">
+          <span class="you__sep muted">·</span>
+          <strong>{{ fmtPercent(you.tertiaryValue) }}</strong>
+          <span class="you__metric-label muted">true average</span>
+        </template>
+        <span class="you__sep muted">·</span>
+        <strong>{{ you.secondaryValue }}</strong>
+        <span class="you__metric-label muted">{{ secondaryLabel }}</span>
+      </p>
+    </div>
+    <button
+      type="button"
+      class="info-btn"
+      aria-label="Explain how this rank was computed"
+      @click="openExplainer(you)"
+    >?</button>
+  </div>
 
   <p v-if="isLoading" class="empty body-md">Loading…</p>
   <p v-else-if="!entries.length" class="empty body-md">
@@ -113,13 +188,24 @@ function openProfile(username?: string) {
         />
         <span class="row__name">{{ entry.user?.displayName ?? entry.user?.username ?? '—' }}</span>
       </button>
-      <span class="row__primary" :title="primaryLabel">
+      <span class="row__primary">
         <strong>{{ fmtPrimary(entry.primaryValue) }}</strong>
-        <span class="label-sm muted">{{ primaryLabel }}</span>
+        <span class="row__label muted">{{ primaryLabel }}</span>
       </span>
-      <span class="row__secondary label-sm muted">
-        {{ entry.secondaryValue }} {{ secondaryLabel }}
+      <span v-if="tab === 'players' && entry.tertiaryValue != null" class="row__tertiary" :title="`Raw accuracy average across ${entry.secondaryValue} attempts`">
+        <strong>{{ fmtPercent(entry.tertiaryValue) }}</strong>
+        <span class="row__label muted">true avg</span>
       </span>
+      <span class="row__secondary">
+        <strong>{{ entry.secondaryValue }}</strong>
+        <span class="row__label muted">{{ secondaryLabel }}</span>
+      </span>
+      <button
+        type="button"
+        class="info-btn"
+        aria-label="Explain this rank"
+        @click="openExplainer(entry)"
+      >?</button>
     </li>
   </ol>
 
@@ -128,6 +214,17 @@ function openProfile(username?: string) {
     <span class="label-sm muted">Page {{ currentPage + 1 }} / {{ totalPages }}</span>
     <Button variant="ghost" :disabled="currentPage + 1 >= totalPages" @click="currentPage = currentPage + 1">Next</Button>
   </div>
+
+  <Modal :open="explainerOpen" title="How this rank was computed" @close="closeExplainer">
+    <div class="explainer">
+      <p v-for="(line, i) in explainerLines" :key="i" :class="['explainer__line', { 'explainer__line--mono': line.includes('=') || line.includes('rating =') }]">
+        {{ line }}
+      </p>
+    </div>
+    <template #footer>
+      <Button @click="closeExplainer">Got it</Button>
+    </template>
+  </Modal>
 </template>
 
 <style scoped>
@@ -140,9 +237,10 @@ function openProfile(username?: string) {
   flex-wrap: wrap;
 }
 .subtitle {
-  color: var(--on-surface-variant);
   margin: var(--space-xs) 0 0;
+  max-width: 56ch;
 }
+.muted { color: var(--on-surface-variant); }
 .tabs {
   display: inline-flex;
   background: var(--surface-container);
@@ -172,8 +270,7 @@ function openProfile(username?: string) {
 .you {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
-  flex-wrap: wrap;
+  gap: var(--space-md);
   padding: var(--space-sm) var(--space-md);
   background: var(--primary-container);
   color: var(--on-primary-container);
@@ -182,12 +279,30 @@ function openProfile(username?: string) {
   position: sticky;
   top: var(--space-md);
   z-index: 1;
+  flex-wrap: wrap;
 }
 .you__rank {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-  font-size: 1.1rem;
+  font-size: 1.25rem;
 }
+.you__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.you__line { margin: 0; font-weight: 600; }
+.you__metrics {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  font-variant-numeric: tabular-nums;
+}
+.you__metric-label, .you__sep { font-size: 0.85rem; }
 
 .empty {
   color: var(--on-surface-variant);
@@ -203,7 +318,7 @@ function openProfile(username?: string) {
 }
 .row {
   display: grid;
-  grid-template-columns: 56px 1fr auto auto;
+  grid-template-columns: 56px minmax(0, 1fr) auto auto auto auto;
   align-items: center;
   gap: var(--space-md);
   padding: 10px var(--space-md);
@@ -244,23 +359,55 @@ function openProfile(username?: string) {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.row__primary {
+.row__primary, .row__tertiary, .row__secondary {
   display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
+  flex-direction: column;
+  align-items: flex-end;
   font-variant-numeric: tabular-nums;
   color: var(--on-surface);
+  line-height: 1.1;
 }
-.row__primary strong {
-  font-size: 1.15rem;
+.row__primary strong, .row__tertiary strong, .row__secondary strong {
+  font-size: 1.1rem;
   font-weight: 800;
 }
-.row__secondary {
-  min-width: max-content;
-}
-.muted {
+.row__primary strong { color: var(--on-surface); }
+.row__tertiary strong, .row__secondary strong {
+  font-weight: 600;
   color: var(--on-surface-variant);
+  font-size: 0.95rem;
 }
+.row__label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 1px;
+}
+
+.info-btn {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--outline-variant);
+  color: var(--on-surface-variant);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-weight: 700;
+  line-height: 1;
+  font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease;
+}
+.info-btn:hover {
+  color: var(--on-surface);
+  border-color: var(--outline);
+  background: var(--surface-container-high);
+}
+
 .pager {
   display: flex;
   align-items: center;
@@ -269,7 +416,26 @@ function openProfile(username?: string) {
   margin-top: var(--space-lg);
 }
 
-@media (max-width: 640px) {
+.explainer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.explainer__line {
+  margin: 0;
+  color: var(--on-surface);
+}
+.explainer__line--mono {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  background: var(--surface-container-lowest);
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+@media (max-width: 760px) {
   .head {
     flex-direction: column;
     align-items: stretch;
@@ -283,14 +449,22 @@ function openProfile(username?: string) {
   .row {
     grid-template-columns: 44px 1fr auto;
     grid-template-areas:
-      "rank user primary"
-      "rank user secondary";
-    row-gap: 2px;
+      "rank user info"
+      "rank metrics metrics";
+    row-gap: var(--space-xs);
   }
   .row__rank { grid-area: rank; }
   .row__user { grid-area: user; }
-  .row__primary { grid-area: primary; }
-  .row__secondary { grid-area: secondary; justify-self: end; }
+  .row__primary, .row__tertiary, .row__secondary {
+    grid-area: metrics;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 4px;
+  }
+  .row__primary { grid-row: 2; grid-column: 2; justify-self: start; }
+  .row__tertiary { grid-row: 2; grid-column: 2; justify-self: center; }
+  .row__secondary { grid-row: 2; grid-column: 2; justify-self: end; }
+  .info-btn { grid-area: info; }
   .you {
     position: static;
   }
