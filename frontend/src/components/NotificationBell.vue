@@ -19,6 +19,10 @@ const qc = useQueryClient()
 
 const open = ref(false)
 const root = ref<HTMLElement | null>(null)
+// Computed top offset (px) for the mobile dropdown, which uses position:fixed
+// so the menu always pins to the viewport rather than its near-edge trigger.
+// Recomputed each time the menu opens.
+const mobileTop = ref(0)
 
 // Unread count drives the badge. Poll every 30s so it picks up server-side
 // emissions (e.g. someone rated your quiz while you sit on the dashboard).
@@ -42,6 +46,10 @@ const markRead = useMarkNotificationRead()
 const markAllRead = useMarkAllNotificationsRead()
 
 function toggle() {
+  if (!open.value) {
+    const rect = root.value?.getBoundingClientRect()
+    if (rect) mobileTop.value = Math.round(rect.bottom + 6)
+  }
   open.value = !open.value
 }
 function close() {
@@ -180,7 +188,13 @@ onUnmounted(() => {
     </button>
 
     <Transition name="menu">
-      <div v-if="open" class="bell__menu" role="menu" aria-label="Recent notifications">
+      <div
+        v-if="open"
+        class="bell__menu"
+        role="menu"
+        aria-label="Recent notifications"
+        :style="{ '--mobile-top': mobileTop + 'px' }"
+      >
         <header class="bell__head">
           <span class="bell__title body-md">Notifications</span>
           <button
@@ -364,11 +378,19 @@ onUnmounted(() => {
 .menu-enter-from, .menu-leave-to { opacity: 0; transform: translateY(-4px); }
 .menu-enter-active, .menu-leave-active { transition: opacity 160ms ease, transform 160ms ease; }
 
+/* On narrow viewports the trigger sits against the right edge of the header,
+ * so anchoring the menu to it with right: 0 + a near-viewport width pushes
+ * the left edge off-screen. Pin the menu to the viewport instead, with
+ * symmetric side margins. */
 @media (max-width: 640px) {
   .bell__menu {
-    right: 0;
-    left: auto;
-    width: min(360px, calc(100vw - 2 * var(--space-md)));
+    position: fixed;
+    top: var(--mobile-top, 56px);
+    left: var(--space-md);
+    right: var(--space-md);
+    width: auto;
+    max-width: none;
+    max-height: calc(100vh - var(--mobile-top, 56px) - var(--space-md));
   }
 }
 </style>
