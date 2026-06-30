@@ -1,0 +1,55 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-leaderboard-snapshots-table
+      author: hubenko
+      changes:
+        - createTable:
+            tableName: leaderboard_snapshots
+            remarks: Periodic per-user rank captures so the snapshot job can detect drops.
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: leaderboard_snapshots_pk
+              - column:
+                  name: user_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: board
+                  type: VARCHAR(16)
+                  constraints:
+                    nullable: false
+                  remarks: PLAYERS or AUTHORS.
+              - column:
+                  name: rank
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: snapshot_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: leaderboard_snapshots
+            baseColumnNames: user_id
+            referencedTableName: users
+            referencedColumnNames: id
+            constraintName: leaderboard_snapshots_user_fk
+            onDelete: CASCADE
+        - createIndex:
+            tableName: leaderboard_snapshots
+            indexName: leaderboard_snapshots_user_board_ix
+            columns:
+              - column:
+                  name: user_id
+              - column:
+                  name: board
+              - column:
+                  name: snapshot_at
+                  descending: true

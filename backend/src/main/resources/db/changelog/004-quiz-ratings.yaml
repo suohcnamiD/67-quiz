@@ -1,0 +1,76 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-quiz-ratings-table
+      author: hubenko
+      changes:
+        - createTable:
+            tableName: quiz_ratings
+            remarks: One rating (1-10 + optional comment) per (user, quiz). Captured after a user finishes an attempt.
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: quiz_ratings_pk
+              - column:
+                  name: quiz_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: user_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: score
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: comment
+                  type: VARCHAR(500)
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: quiz_ratings
+            baseColumnNames: quiz_id
+            referencedTableName: quizzes
+            referencedColumnNames: id
+            constraintName: quiz_ratings_quiz_fk
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: quiz_ratings
+            baseColumnNames: user_id
+            referencedTableName: users
+            referencedColumnNames: id
+            constraintName: quiz_ratings_user_fk
+            onDelete: CASCADE
+        - addUniqueConstraint:
+            tableName: quiz_ratings
+            columnNames: quiz_id, user_id
+            constraintName: quiz_ratings_quiz_user_uk
+        - createIndex:
+            tableName: quiz_ratings
+            indexName: quiz_ratings_quiz_ix
+            columns:
+              - column:
+                  name: quiz_id
+
+  - changeSet:
+      id: check-quiz-rating-score-range
+      author: hubenko
+      changes:
+        - sql:
+            sql: ALTER TABLE quiz_ratings ADD CONSTRAINT quiz_ratings_score_range_ck CHECK (score BETWEEN 1 AND 10)
+            stripComments: true

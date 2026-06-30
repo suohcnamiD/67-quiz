@@ -54,7 +54,7 @@ test('AttemptView header stacks: Finish button is full-width on mobile', async (
   await page.goto(`/app/attempt/${attempt.id}`)
   await page.waitForLoadState('networkidle')
 
-  const finishBtn = page.getByRole('button', { name: /finish attempt/i })
+  const finishBtn = page.getByRole('button', { name: /finish attempt/i }).first()
   const btnW = await finishBtn.evaluate((b) => (b as HTMLElement).getBoundingClientRect().width)
   // Mobile rule expands the button to fill the available row.
   expect(btnW).toBeGreaterThan(300)

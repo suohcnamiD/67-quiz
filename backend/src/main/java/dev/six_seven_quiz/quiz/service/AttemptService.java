@@ -10,7 +10,10 @@ import dev.six_seven_quiz.quiz.dto.response.attempt.AttemptOptionDto;
 import dev.six_seven_quiz.quiz.dto.response.viewing.FinishedAttemptSummaryDto;
 import dev.six_seven_quiz.quiz.dto.response.viewing.FinishedOptionDto;
 import dev.six_seven_quiz.quiz.dto.response.viewing.FinishedQuestionDto;
+import dev.six_seven_quiz.notification.model.NotificationType;
+import dev.six_seven_quiz.notification.service.NotificationService;
 import dev.six_seven_quiz.quiz.dto.response.viewing.QuizSummaryDto;
+import dev.six_seven_quiz.quiz.dto.response.QuizRatingSummaryDto;
 import dev.six_seven_quiz.quiz.exception.AttemptFinishedException;
 import dev.six_seven_quiz.quiz.exception.AttemptNotFoundException;
 import dev.six_seven_quiz.quiz.exception.NoAccessToAttemptException;
@@ -19,6 +22,7 @@ import dev.six_seven_quiz.quiz.model.*;
 import dev.six_seven_quiz.quiz.repository.AttemptQuestionRepository;
 import dev.six_seven_quiz.quiz.repository.QuestionRepository;
 import dev.six_seven_quiz.quiz.repository.QuizAttemptRepository;
+import dev.six_seven_quiz.quiz.repository.QuizRatingRepository;
 import dev.six_seven_quiz.quiz.repository.QuizRepository;
 import dev.six_seven_quiz.user.ApplicationUser;
 import dev.six_seven_quiz.user.ApplicationUserService;
@@ -49,6 +53,8 @@ public class AttemptService {
     private final QuestionRepository questionRepository;
     private final QuizMapper quizMapper;
     private final UserProfileMapper userProfileMapper;
+    private final QuizRatingRepository quizRatingRepository;
+    private final NotificationService notificationService;
 
     private Pageable produceSanitizedPageable(int page) {
         return PageRequest.of(page, ATTEMPTS_PER_PAGE);
@@ -57,7 +63,7 @@ public class AttemptService {
     @PersistenceContext
     private EntityManager entityManager;
 
-    public AttemptService(ApplicationUserService applicationUserService, QuizAttemptRepository quizAttemptRepository, QuizRepository quizRepository, AttemptMapper attemptMapper, OptionMapper optionMapper, AttemptQuestionMapper attemptQuestionMapper, AttemptQuestionRepository attemptQuestionRepository, QuestionRepository questionRepository, QuizMapper quizMapper, UserProfileMapper userProfileMapper) {
+    public AttemptService(ApplicationUserService applicationUserService, QuizAttemptRepository quizAttemptRepository, QuizRepository quizRepository, AttemptMapper attemptMapper, OptionMapper optionMapper, AttemptQuestionMapper attemptQuestionMapper, AttemptQuestionRepository attemptQuestionRepository, QuestionRepository questionRepository, QuizMapper quizMapper, UserProfileMapper userProfileMapper, QuizRatingRepository quizRatingRepository, NotificationService notificationService) {
         this.applicationUserService = applicationUserService;
         this.quizAttemptRepository = quizAttemptRepository;
         this.quizRepository = quizRepository;
@@ -67,6 +73,8 @@ public class AttemptService {
         this.questionRepository = questionRepository;
         this.quizMapper = quizMapper;
         this.userProfileMapper = userProfileMapper;
+        this.quizRatingRepository = quizRatingRepository;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -104,7 +112,12 @@ public class AttemptService {
     private QuizSummaryDto quizToSummary(Quiz quiz, ApplicationUser user) {
         int questionCount = questionRepository.countByQuiz_QuizId(quiz.getId());
         boolean areYouAuthor = quiz.getAuthor().equals(user);
-        return quizMapper.toSummary(quiz, questionCount, areYouAuthor, userProfileMapper.toAuthorSummary(quiz.getAuthor()));
+        long ratingCount = quizRatingRepository.countForQuiz(quiz.getId());
+        Double ratingAvg = ratingCount > 0
+                ? quizRatingRepository.averageScoreForQuiz(quiz.getId()).orElse(null)
+                : null;
+        QuizRatingSummaryDto ratingSummary = new QuizRatingSummaryDto(ratingAvg, ratingCount);
+        return quizMapper.toSummary(quiz, questionCount, areYouAuthor, userProfileMapper.toAuthorSummary(quiz.getAuthor()), ratingSummary);
     }
 
     private void validateUserAttemptOwnership(ApplicationUser user, Attempt attempt) {
@@ -185,6 +198,22 @@ public class AttemptService {
         attempt = quizAttemptRepository.save(attempt);
         entityManager.flush();
         entityManager.refresh(attempt);
+
+        // Notify the quiz author unless they took their own quiz.
+        ApplicationUser author = attempt.getQuiz().getAuthor();
+        if (!author.getId().equals(user.getId())) {
+            int maxScore = attempt.getMaximumScore();
+            int score = attempt.getEarnedScore();
+            java.util.Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("actorUsername", user.getUsername());
+            payload.put("actorDisplayName", user.getDisplayName());
+            payload.put("quizId", attempt.getQuiz().getId().toString());
+            payload.put("quizName", attempt.getQuiz().getName());
+            payload.put("attemptId", attempt.getId().toString());
+            payload.put("score", score);
+            payload.put("maxScore", maxScore);
+            notificationService.create(author, NotificationType.QUIZ_ATTEMPTED, payload);
+        }
 
         return attemptToFinishedSummary(attempt);
     }

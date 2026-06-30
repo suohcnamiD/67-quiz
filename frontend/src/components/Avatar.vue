@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 
+defineOptions({ name: 'UiAvatar' })
+
 const props = withDefaults(
   defineProps<{
     username?: string | null

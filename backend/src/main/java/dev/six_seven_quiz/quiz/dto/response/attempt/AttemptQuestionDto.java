@@ -11,6 +11,7 @@ public record AttemptQuestionDto(
         UUID id,
         String text,
         QuestionType type,
+        boolean hasImage,
         List<AttemptOptionDto> options
 ) {
 }

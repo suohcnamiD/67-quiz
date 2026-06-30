@@ -1,5 +1,6 @@
 package dev.six_seven_quiz.quiz.dto.response.viewing;
 
+import dev.six_seven_quiz.quiz.dto.response.QuizRatingSummaryDto;
 import dev.six_seven_quiz.user.profile.dto.AuthorSummaryDto;
 import org.springframework.hateoas.server.core.Relation;
 
@@ -14,6 +15,8 @@ public record QuizSummaryDto(
     Duration duration,
     UUID id,
     boolean youAreAuthor,
-    AuthorSummaryDto author
+    boolean hasCover,
+    AuthorSummaryDto author,
+    QuizRatingSummaryDto ratingSummary
 ) {
 }

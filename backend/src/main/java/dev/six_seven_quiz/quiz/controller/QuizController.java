@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/quiz")
+@RequestMapping("/quiz")
 public class QuizController {
 
     private final QuizService quizService;
@@ -28,7 +28,7 @@ public class QuizController {
 
 
     @DeleteMapping("/{quizId}")
-    public void delete(
+    public void deleteQuiz(
             @PathVariable @NotNull UUID quizId,
             @AuthenticationPrincipal UserDetails userDetails
     ) {

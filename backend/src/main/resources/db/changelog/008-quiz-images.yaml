@@ -1,0 +1,36 @@
+databaseChangeLog:
+  - changeSet:
+      id: add-quiz-cover-image-path
+      author: hubenko
+      changes:
+        - addColumn:
+            tableName: quizzes
+            columns:
+              - column:
+                  name: cover_image_path
+                  type: VARCHAR(255)
+                  remarks: Relative path under uploads/ to the cover JPEG; null = no cover.
+
+  - changeSet:
+      id: add-question-image-path
+      author: hubenko
+      changes:
+        - addColumn:
+            tableName: questions
+            columns:
+              - column:
+                  name: image_path
+                  type: VARCHAR(255)
+                  remarks: Relative path under uploads/ to the question image JPEG; null = no image.
+
+  - changeSet:
+      id: add-option-image-path
+      author: hubenko
+      changes:
+        - addColumn:
+            tableName: options
+            columns:
+              - column:
+                  name: image_path
+                  type: VARCHAR(255)
+                  remarks: Relative path under uploads/ to the option image JPEG; null = no image.

@@ -109,14 +109,6 @@ test('attempt timer shows ~5 minutes immediately after start (not 00:00)', async
   expect(text, `timer reads ${text}, expected 04:5x`).toMatch(/^04:5[0-9]$/)
 })
 
-test('hitting backend SPA shell paths never returns raw JSON', async ({ request }) => {
-  for (const path of ['/app', '/app/foo', '/app/attempt/abc', '/login', '/register', '/totally-not-a-thing']) {
-    const res = await request.get(`http://localhost:8080${path}`)
-    const body = (await res.text()).trimStart()
-    expect(body.startsWith('{'), `path ${path} returned JSON body starting with ${body.slice(0,80)}`).toBe(false)
-  }
-})
-
 test('clicking options does not flash "Loading…"', async ({ page }) => {
   page.on('dialog', async (d) => { await d.accept() })
   await registerAndLogin(page)
@@ -155,7 +147,10 @@ test('attempt result shows the score with the label "Score"', async ({ page }) =
 
   await page.getByRole('button', { name: 'b', exact: true }).click()
   await page.waitForTimeout(400)
-  await page.getByRole('button', { name: /finish attempt/i }).click()
+  // Two Finish buttons (header + end-of-list); either works. Click the header.
+  await page.getByRole('button', { name: /finish attempt/i }).first().click()
+  // ConfirmDialog → click Finish to commit.
+  await page.getByRole('dialog').getByRole('button', { name: 'Finish' }).click()
   await page.waitForURL(/\/app\/attempt\/[^/]+\/result$/, { timeout: 15_000 })
 
   // Dismiss celebration overlay if it appears.

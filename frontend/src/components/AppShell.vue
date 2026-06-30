@@ -2,8 +2,11 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
+import { confirmDialog } from '@/lib/confirmDialog'
 import Button from './Button.vue'
 import Avatar from './Avatar.vue'
+import BrandMark from './BrandMark.vue'
+import NotificationBell from './NotificationBell.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -20,8 +23,15 @@ function closeMenu() {
   menuOpen.value = false
 }
 
-function logout() {
+async function logout() {
   closeMenu()
+  const ok = await confirmDialog.open({
+    title: 'Sign out?',
+    body: "You'll need to sign in again to come back.",
+    confirmLabel: 'Sign out',
+    danger: true,
+  })
+  if (!ok) return
   // No backend logout endpoint exposed; clear locally and bounce to /login.
   auth.clear()
   router.push('/login')
@@ -46,6 +56,23 @@ function onKeydown(e: KeyboardEvent) {
     e.preventDefault()
     closeMenu()
     toggleRef.value?.focus()
+    return
+  }
+  // Quick-focus the BrowseView search input from anywhere in /app via
+  // `/` or ⌘K / Ctrl+K. Skip when typing in another input so the slash
+  // isn't intercepted mid-word.
+  const tag = (e.target as HTMLElement | null)?.tagName
+  const inField =
+    tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement | null)?.isContentEditable
+  const cmdK = (e.key === 'k' || e.key === 'K') && (e.metaKey || e.ctrlKey)
+  const slash = e.key === '/' && !inField
+  if (cmdK || slash) {
+    const input = document.querySelector<HTMLInputElement>('input[type="search"]')
+    if (input) {
+      e.preventDefault()
+      input.focus()
+      input.select()
+    }
   }
 }
 
@@ -63,12 +90,14 @@ onUnmounted(() => {
   <div class="shell">
     <header class="topbar">
       <div class="topbar__inner">
-        <RouterLink to="/app" class="brand">67quiz</RouterLink>
+        <RouterLink to="/app" class="brand"><BrandMark size="sm" /></RouterLink>
         <nav class="nav label-md" aria-label="Primary">
           <RouterLink to="/app" exact-active-class="router-link-active">Browse</RouterLink>
+          <RouterLink to="/app/leaderboards" exact-active-class="router-link-active">Leaderboards</RouterLink>
           <RouterLink to="/app/quiz/new" exact-active-class="router-link-active">New quiz</RouterLink>
         </nav>
         <div class="actions">
+          <NotificationBell v-if="auth.isAuthenticated()" />
           <RouterLink
             v-if="auth.isAuthenticated()"
             to="/app/profile"
@@ -112,6 +141,13 @@ onUnmounted(() => {
             @click="closeMenu"
           >Browse</RouterLink>
           <RouterLink
+            to="/app/leaderboards"
+            class="menu__item"
+            role="menuitem"
+            exact-active-class="menu__item--active"
+            @click="closeMenu"
+          >Leaderboards</RouterLink>
+          <RouterLink
             to="/app/quiz/new"
             class="menu__item"
             role="menuitem"
@@ -126,6 +162,14 @@ onUnmounted(() => {
             exact-active-class="menu__item--active"
             @click="closeMenu"
           >Your profile</RouterLink>
+          <RouterLink
+            v-if="auth.isAuthenticated()"
+            to="/app/notifications"
+            class="menu__item"
+            role="menuitem"
+            exact-active-class="menu__item--active"
+            @click="closeMenu"
+          >Notifications</RouterLink>
           <hr class="menu__sep" />
           <button
             type="button"

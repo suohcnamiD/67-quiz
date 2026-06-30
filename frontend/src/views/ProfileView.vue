@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQueryClient } from '@tanstack/vue-query'
 import {
@@ -12,11 +12,13 @@ import {
   getGetProfileByUsernameQueryKey,
 } from '@/api/user-profile-controller/user-profile-controller'
 import { useAuthStore } from '@/stores/auth'
-import { errorMessage } from '@/lib/errors'
+import { errorMessage, firstErrorCode, validationFieldErrors } from '@/lib/errors'
 import { scrollAndFlash } from '@/lib/scrollAndFlash'
+import { confirmDialog } from '@/lib/confirmDialog'
 import Button from '@/components/Button.vue'
 import Input from '@/components/Input.vue'
 import Avatar from '@/components/Avatar.vue'
+import ProfileComments from '@/components/ProfileComments.vue'
 import QuizCard from '@/components/QuizCard.vue'
 import Modal from '@/components/Modal.vue'
 
@@ -41,16 +43,24 @@ const detailsName = ref('')
 const detailsBio = ref('')
 const savingDetails = ref(false)
 const detailsError = ref<string | null>(null)
+const detailsNameError = ref<string | null>(null)
+const detailsBioError = ref<string | null>(null)
+
+function clearDetailsErrors() {
+  detailsError.value = null
+  detailsNameError.value = null
+  detailsBioError.value = null
+}
 
 function openDetailsModal() {
   detailsName.value = profile.value?.displayName ?? profile.value?.username ?? ''
   detailsBio.value = profile.value?.bio ?? ''
-  detailsError.value = null
+  clearDetailsErrors()
   detailsOpen.value = true
 }
 
 async function saveDetails() {
-  detailsError.value = null
+  clearDetailsErrors()
   savingDetails.value = true
   try {
     const updated = await updateOwnProfile({
@@ -68,7 +78,18 @@ async function saveDetails() {
     }
     detailsOpen.value = false
   } catch (e) {
-    detailsError.value = errorMessage(e)
+    const code = firstErrorCode(e)
+    const msg = errorMessage(e)
+    if (code === 'INVALID_DISPLAY_NAME') {
+      detailsNameError.value = msg
+    } else if (code === 'INVALID_BIO') {
+      detailsBioError.value = msg
+    } else {
+      const fieldErrors = validationFieldErrors(e)
+      if (fieldErrors.displayName) detailsNameError.value = fieldErrors.displayName
+      if (fieldErrors.bio) detailsBioError.value = fieldErrors.bio
+      if (!fieldErrors.displayName && !fieldErrors.bio) detailsError.value = msg
+    }
   } finally {
     savingDetails.value = false
   }
@@ -80,9 +101,19 @@ const avatarError = ref<string | null>(null)
 const uploadingAvatar = ref(false)
 const removingAvatar = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
+const previewUrl = ref<string | null>(null)
+
+function clearPreview() {
+  if (previewUrl.value) {
+    URL.revokeObjectURL(previewUrl.value)
+    previewUrl.value = null
+  }
+}
+onUnmounted(clearPreview)
 
 function openAvatarModal() {
   avatarError.value = null
+  clearPreview()
   avatarOpen.value = true
 }
 
@@ -94,6 +125,10 @@ async function onFilePicked(event: Event) {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
   if (!file) return
+  clearPreview()
+  // Show the just-picked file while the upload round-trips, so the user can
+  // see what's landing rather than staring at a spinner.
+  previewUrl.value = URL.createObjectURL(file)
   avatarError.value = null
   uploadingAvatar.value = true
   try {
@@ -110,6 +145,7 @@ async function onFilePicked(event: Event) {
     }
     // Close the modal on success so the user sees their new avatar on the hero.
     avatarOpen.value = false
+    clearPreview()
   } catch (e) {
     avatarError.value = errorMessage(e)
   } finally {
@@ -119,7 +155,13 @@ async function onFilePicked(event: Event) {
 }
 
 async function removeAvatar() {
-  if (!confirm('Remove your avatar?')) return
+  const ok = await confirmDialog.open({
+    title: 'Remove your avatar?',
+    body: 'You can upload a new one any time.',
+    confirmLabel: 'Remove',
+    danger: true,
+  })
+  if (!ok) return
   avatarError.value = null
   removingAvatar.value = true
   try {
@@ -142,7 +184,7 @@ async function removeAvatar() {
 // button), focus should land on the upload action; the dialog itself takes
 // focus first, that's fine.
 watch(detailsOpen, (open) => {
-  if (!open) detailsError.value = null
+  if (!open) clearDetailsErrors()
 })
 watch(avatarOpen, (open) => {
   if (!open) avatarError.value = null
@@ -192,6 +234,7 @@ function scrollToAuthored() {
       >
         <span class="stat__value">{{ profile.quizzesAuthored ?? 0 }}</span>
         <span class="stat__label label-sm">Quizzes authored</span>
+        <span class="stat__chevron" aria-hidden="true">›</span>
       </button>
       <button
         type="button"
@@ -202,6 +245,7 @@ function scrollToAuthored() {
       >
         <span class="stat__value">{{ profile.attemptsTaken ?? 0 }}</span>
         <span class="stat__label label-sm">Attempts taken</span>
+        <span class="stat__chevron" aria-hidden="true">›</span>
       </button>
       <div class="stat">
         <span class="stat__value">
@@ -234,6 +278,8 @@ function scrollToAuthored() {
 
     <p v-if="errorText" class="banner label-md" role="alert">{{ errorText }}</p>
 
+    <ProfileComments v-if="profile?.username" :username="profile.username" />
+
     <div class="bottom-actions">
       <Button variant="ghost" @click="router.push('/app')">Back to browse</Button>
     </div>
@@ -241,8 +287,8 @@ function scrollToAuthored() {
     <!-- Modals — only one open at a time. -->
     <Modal :open="detailsOpen" title="Edit profile" @close="detailsOpen = false">
       <form id="details-form" class="form" @submit.prevent="saveDetails">
-        <Input v-model="detailsName" label="Display name" />
-        <Input v-model="detailsBio" label="Bio" placeholder="Short blurb about you" />
+        <Input v-model="detailsName" label="Display name" :error="detailsNameError ?? undefined" />
+        <Input v-model="detailsBio" label="Bio" placeholder="Short blurb about you" :error="detailsBioError ?? undefined" />
         <p v-if="detailsError" class="banner label-md" role="alert">{{ detailsError }}</p>
       </form>
       <template #footer>
@@ -251,9 +297,18 @@ function scrollToAuthored() {
       </template>
     </Modal>
 
-    <Modal :open="avatarOpen" title="Change avatar" @close="avatarOpen = false">
+    <Modal :open="avatarOpen" title="Change avatar" @close="avatarOpen = false; clearPreview()">
       <div class="avatar-modal">
+        <img
+          v-if="previewUrl"
+          :src="previewUrl"
+          alt=""
+          class="avatar-preview"
+          width="120"
+          height="120"
+        />
         <Avatar
+          v-else
           :username="profile.username"
           :display-name="profile.displayName"
           :version="auth.avatarVersion"
@@ -280,7 +335,7 @@ function scrollToAuthored() {
           :loading="removingAvatar"
           @click="removeAvatar"
         >Remove</Button>
-        <Button variant="ghost" @click="avatarOpen = false">Cancel</Button>
+        <Button variant="ghost" @click="avatarOpen = false; clearPreview()">Cancel</Button>
         <Button :loading="uploadingAvatar" @click="pickAvatar">
           {{ profile.hasAvatar ? 'Replace…' : 'Upload…' }}
         </Button>
@@ -377,6 +432,7 @@ function scrollToAuthored() {
   border: 1px solid var(--outline-variant);
   border-radius: var(--radius-lg);
   text-align: left;
+  position: relative;
 }
 .stat--link {
   appearance: none;
@@ -395,6 +451,24 @@ function scrollToAuthored() {
 .stat--link:disabled {
   cursor: default;
   opacity: 0.85;
+}
+.stat--link:disabled .stat__chevron {
+  display: none;
+}
+.stat__chevron {
+  position: absolute;
+  top: 50%;
+  right: var(--space-md);
+  transform: translateY(-50%);
+  color: var(--on-surface-variant);
+  font-size: 1.5rem;
+  line-height: 1;
+  font-weight: 300;
+  transition: transform 120ms ease, color 120ms ease;
+}
+.stat--link:not(:disabled):hover .stat__chevron {
+  transform: translateY(-50%) translateX(2px);
+  color: var(--on-surface);
 }
 .stat__value {
   font-size: 2rem;
@@ -452,6 +526,13 @@ function scrollToAuthored() {
 }
 .avatar-modal .muted {
   max-width: 28rem;
+}
+.avatar-preview {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--outline-variant);
 }
 .file-input {
   display: none;

@@ -1,0 +1,15 @@
+databaseChangeLog:
+  - changeSet:
+      id: drop-sampler-fixture
+      author: hubenko
+      remarks: >-
+        The sampler user + its two demo quizzes used to seed on every boot for
+        the e2e suite. That seeder is now gated to non-prod profiles, but
+        existing prod databases still carry the sampler rows from earlier
+        boots. Drop them. Cascades through user_roles, quizzes, attempts,
+        ratings, comments, notifications — all tables have ON DELETE CASCADE
+        FKs on the recipient/author/target user column.
+      changes:
+        - sql:
+            sql: DELETE FROM users WHERE username = 'sampler'
+            stripComments: true

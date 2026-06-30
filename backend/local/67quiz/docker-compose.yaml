@@ -15,7 +15,7 @@ services:
       retries: 3
       start_period: 30s
   app:
-    image: ghcr.io/suohcnamid/67-quiz:latest
+    image: ghcr.io/suohcnamid/67-quiz:41e6302
     environment:
       - DATABASE_URL=jdbc:mariadb://db:3306/main
       - DATABASE_USERNAME=user

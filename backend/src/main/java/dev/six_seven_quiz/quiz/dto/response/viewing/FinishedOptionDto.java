@@ -9,7 +9,8 @@ public record FinishedOptionDto(
         UUID id,
         String text,
         boolean correct,
-        boolean selected
+        boolean selected,
+        boolean hasImage
 ) {
     public boolean isCorrectlySelected() {
         return correct == selected;

@@ -66,11 +66,6 @@ public class GlobalExceptionHandler {
         return Failure.status(NOT_FOUND).toResponseEntity();
     }
 
-    @ExceptionHandler(NoResourceFoundException.class)
-    public ResponseEntity<?> handleNoResourceFoundException(NoResourceFoundException exception) {
-        return Failure.status(NOT_FOUND).toResponseEntity();
-    }
-
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Failure> handleValidationExceptions(MethodArgumentNotValidException exception) {
         return Failure.of(
@@ -96,6 +91,11 @@ public class GlobalExceptionHandler {
                     return ApiError.of("VALIDATION_ERROR", details);
                 }).toList()
         ).toResponseEntity();
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Failure> handleNoResourceFoundException(NoResourceFoundException exception) {
+        return Failure.status(NOT_FOUND).toResponseEntity();
     }
 
     @ExceptionHandler(Exception.class)

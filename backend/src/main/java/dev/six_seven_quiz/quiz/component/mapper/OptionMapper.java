@@ -12,5 +12,6 @@ import org.mapstruct.ReportingPolicy;
 )
 public interface OptionMapper {
     @Mapping(source = "selected", target = "selected")
+    @Mapping(target = "hasImage", expression = "java(option.getImagePath() != null)")
     AttemptOptionDto toDto(Option option, boolean selected);
 }

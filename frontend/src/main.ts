@@ -6,6 +6,7 @@ import App from './App.vue'
 import './assets/main.css'
 import router from './router'
 import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
+import { installAxiosInterceptors } from './lib/axiosInterceptors'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,5 +28,7 @@ const app = createApp(App)
 app.use(createPinia())
 app.use(router)
 app.use(VueQueryPlugin, { queryClient })
+
+installAxiosInterceptors(router)
 
 app.mount('#app')

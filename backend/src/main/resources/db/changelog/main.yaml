@@ -11,3 +11,21 @@ databaseChangeLog:
   - include:
       file: 003-question-types.yaml
       relativeToChangelogFile: true
+  - include:
+      file: 004-quiz-ratings.yaml
+      relativeToChangelogFile: true
+  - include:
+      file: 005-profile-comments.yaml
+      relativeToChangelogFile: true
+  - include:
+      file: 006-notifications.yaml
+      relativeToChangelogFile: true
+  - include:
+      file: 007-leaderboard-snapshots.yaml
+      relativeToChangelogFile: true
+  - include:
+      file: 008-quiz-images.yaml
+      relativeToChangelogFile: true
+  - include:
+      file: 009-drop-sampler-fixture.yaml
+      relativeToChangelogFile: true

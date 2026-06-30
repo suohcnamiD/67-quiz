@@ -22,7 +22,7 @@ public class SearchService {
     private static final int MIN_QUERY_LENGTH = 2;
 
     /** Max results per side (quizzes / users). Search is a peek, not paged
-     *  browsing — for the latter we have /api/quiz and /api/users/{u}/quizzes. */
+     *  browsing — for the latter we have /quiz and /users/{u}/quizzes. */
     private static final int RESULTS_PER_SIDE = 10;
 
     private final QuizService quizService;

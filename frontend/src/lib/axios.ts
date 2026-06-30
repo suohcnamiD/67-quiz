@@ -12,5 +12,12 @@ export const customInstance = <T>(
   return AXIOS_INSTANCE({ ...config, ...options }).then(({ data }) => data);
 };
 
-export { firstErrorCode, firstError, errorMessage } from './errors';
+export {
+  firstErrorCode,
+  firstError,
+  errorMessage,
+  allErrors,
+  httpStatus,
+  validationFieldErrors,
+} from './errors';
 export type { ApiError, Failure } from './errors';

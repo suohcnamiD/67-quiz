@@ -1,0 +1,57 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-notifications-table
+      author: hubenko
+      changes:
+        - createTable:
+            tableName: notifications
+            remarks: One row per pushed notification. Recipient is the user who sees it.
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: notifications_pk
+              - column:
+                  name: recipient_user_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: type
+                  type: VARCHAR(40)
+                  constraints:
+                    nullable: false
+                  remarks: One of NotificationType (COMMENT_RECEIVED, QUIZ_RATED, QUIZ_ATTEMPTED, RANK_DROPPED).
+              - column:
+                  name: payload
+                  type: VARCHAR(2000)
+                  constraints:
+                    nullable: false
+                  remarks: JSON blob with type-specific fields (actor username, quiz id, rank delta, etc.).
+              - column:
+                  name: read_at
+                  type: TIMESTAMP
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: notifications
+            baseColumnNames: recipient_user_id
+            referencedTableName: users
+            referencedColumnNames: id
+            constraintName: notifications_recipient_fk
+            onDelete: CASCADE
+        - createIndex:
+            tableName: notifications
+            indexName: notifications_recipient_ix
+            columns:
+              - column:
+                  name: recipient_user_id
+              - column:
+                  name: created_at
+                  descending: true

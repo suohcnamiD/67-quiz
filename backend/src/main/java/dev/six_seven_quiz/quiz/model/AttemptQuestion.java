@@ -57,7 +57,8 @@ public class AttemptQuestion {
             option.getId(),
             option.getText(),
             option.isCorrect(),
-            selectedOptions.contains(option)
+            selectedOptions.contains(option),
+            option.getImagePath() != null
         )).toList();
     }
 

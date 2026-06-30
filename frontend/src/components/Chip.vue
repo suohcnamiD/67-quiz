@@ -1,4 +1,6 @@
 <script setup lang="ts">
+defineOptions({ name: 'UiChip' })
+
 defineProps<{ tone?: 'neutral' | 'success' | 'danger' | 'warning' }>()
 </script>
 

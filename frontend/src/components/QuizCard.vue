@@ -6,9 +6,11 @@ import {
   attemptQuiz,
   getGetAttemptsInProgressQueryKey,
 } from '@/api/attempt-controller/attempt-controller'
-import { _delete as deleteQuiz, getGetQuizzesQueryKey } from '@/api/quiz-controller/quiz-controller'
+import { deleteQuiz, getGetQuizzesQueryKey } from '@/api/quiz-controller/quiz-controller'
 import { getGetQuizzesByAuthorQueryKey } from '@/api/user-profile-controller/user-profile-controller'
 import { errorMessage } from '@/lib/errors'
+import { confirmDialog } from '@/lib/confirmDialog'
+import { coverUrl } from '@/lib/quizImages'
 import type { QuizSummaryDto } from '@/api/openAPIDefinition.schemas'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
@@ -48,6 +50,11 @@ function fmtDuration(iso?: string): string {
   return parts.join(' ') || '0s'
 }
 
+function fmtRating(avg: number | undefined): string {
+  if (avg == null) return '—'
+  return avg.toFixed(1).replace(/\.0$/, '')
+}
+
 async function startAttempt() {
   if (!props.quiz.id) return
   starting.value = true
@@ -64,7 +71,13 @@ async function startAttempt() {
 
 async function removeQuiz() {
   if (!props.quiz.id) return
-  if (!confirm('Delete this quiz? This cannot be undone.')) return
+  const ok = await confirmDialog.open({
+    title: 'Delete this quiz?',
+    body: 'This cannot be undone.',
+    confirmLabel: 'Delete',
+    danger: true,
+  })
+  if (!ok) return
   deleting.value = true
   try {
     await deleteQuiz(props.quiz.id)
@@ -85,6 +98,13 @@ async function removeQuiz() {
 
 <template>
   <Card>
+    <img
+      v-if="quiz.hasCover && quiz.id"
+      :src="coverUrl(quiz.id)"
+      alt=""
+      class="cover"
+      loading="lazy"
+    />
     <div class="row">
       <h3 class="headline-md">{{ quiz.name }}</h3>
       <Chip v-if="quiz.youAreAuthor">Your quiz</Chip>
@@ -109,6 +129,16 @@ async function removeQuiz() {
       <span>{{ fmtDuration(quiz.duration) }}</span>
       <span v-if="quiz.maximumScore != null">·</span>
       <span v-if="quiz.maximumScore != null">Max {{ quiz.maximumScore }} pts</span>
+      <span v-if="(quiz.ratingSummary?.count ?? 0) > 0">·</span>
+      <span
+        v-if="(quiz.ratingSummary?.count ?? 0) > 0"
+        class="rating"
+        :title="`Average rating: ${fmtRating(quiz.ratingSummary?.average ?? undefined)} / 10 from ${quiz.ratingSummary?.count} rating${quiz.ratingSummary?.count === 1 ? '' : 's'}`"
+      >
+        <span aria-hidden="true">★</span>
+        <span class="rating__avg">{{ fmtRating(quiz.ratingSummary?.average ?? undefined) }}</span>
+        <span class="rating__count muted">({{ quiz.ratingSummary?.count }})</span>
+      </span>
     </div>
     <div class="actions">
       <Button type="button" :loading="starting" @click="startAttempt">Start attempt</Button>
@@ -130,6 +160,14 @@ async function removeQuiz() {
 </template>
 
 <style scoped>
+.cover {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: var(--radius);
+  margin: calc(-1 * var(--space-md)) calc(-1 * var(--space-md)) var(--space-md);
+}
 .row {
   display: flex;
   align-items: center;
@@ -171,5 +209,21 @@ async function removeQuiz() {
   text-transform: none;
   letter-spacing: normal;
   font-weight: 600;
+}
+.rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--on-surface);
+  font-variant-numeric: tabular-nums;
+}
+.rating__avg {
+  font-weight: 700;
+}
+.rating__count {
+  color: var(--on-surface-variant);
+}
+.muted {
+  color: var(--on-surface-variant);
 }
 </style>

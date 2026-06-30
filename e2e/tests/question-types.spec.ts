@@ -172,12 +172,17 @@ test('authoring UI: switching to single-choice keeps only one correct option', a
   await opts.nth(1).fill('beta')
   await page.locator('input[type="checkbox"]').nth(0).check()
   await page.locator('input[type="checkbox"]').nth(1).check()
+  // Let Vue flush the v-model updates before we switch type.
+  await page.waitForTimeout(100)
 
   // Now flip to single-choice. The watcher should leave at most one "correct".
   await page.getByRole('button', { name: /single choice/i }).click()
   await page.waitForTimeout(100)
-  const radios = page.locator('input[type="radio"]')
-  const checkedCount = await radios.evaluateAll((els) =>
+  // The form uses a unified <input type="checkbox"> in both modes (visually
+  // styled as a radio in single mode). After the switch only one should be
+  // checked.
+  const correctInputs = page.locator('.opt-row__correct input[type="checkbox"]')
+  const checkedCount = await correctInputs.evaluateAll((els) =>
     (els as HTMLInputElement[]).filter((e) => e.checked).length,
   )
   expect(checkedCount).toBe(1)

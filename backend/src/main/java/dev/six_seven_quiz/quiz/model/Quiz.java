@@ -42,6 +42,9 @@ public class Quiz {
     @Column(name = "duration")
     private Duration duration;
 
+    @Column(name = "cover_image_path")
+    private String coverImagePath;
+
     @OneToMany(fetch = FetchType.EAGER, cascade = {CascadeType.DETACH, CascadeType.MERGE, CascadeType.PERSIST, CascadeType.REFRESH, CascadeType.REMOVE})
     @JoinTable(
             name = "quiz_questions",
@@ -85,6 +88,29 @@ public class Quiz {
     }
 
     public void addQuestion(QuestionData questionData) {
+        validateQuestionShape(questionData);
+
+        Question question = new Question(this, questionData.text(), questionData.type());
+        List<Option> createdOptions = optionsFromData(question, questionData);
+        question.addOptions(createdOptions);
+        this.questions.add(question);
+    }
+
+    /**
+     * Apply an edit to an existing question that already belongs to this
+     * quiz. Mirrors {@link #addQuestion(QuestionData)} for validation so
+     * single-choice "exactly one correct" + ">=2 options" rules apply both
+     * on create and edit.
+     */
+    public void editQuestion(Question question, QuestionData questionData) {
+        validateQuestionShape(questionData);
+
+        question.setText(questionData.text());
+        question.setType(questionData.type());
+        question.replaceOptions(optionsFromData(question, questionData));
+    }
+
+    private static void validateQuestionShape(QuestionData questionData) {
         if (questionData.type() == null) {
             throw new InvalidQuestionShapeException("Question type is required");
         }
@@ -92,9 +118,6 @@ public class Quiz {
         if (options == null || options.size() < 2) {
             throw new InvalidQuestionShapeException("A question needs at least two options");
         }
-
-        Question question = new Question(this, questionData.text(), questionData.type());
-
         int i = 0;
         long correctCount = 0;
         for (OptionData optionData : options) {
@@ -109,17 +132,25 @@ public class Quiz {
                     "Single-choice questions need exactly one correct option (got " + correctCount + ")"
             );
         }
+    }
 
-        List<Option> createdOptions = new ArrayList<>();
-        for (OptionData optionData : options) {
-            Option rawOption = new Option(question, optionData.text(), optionData.correct());
-            createdOptions.add(rawOption);
+    private static List<Option> optionsFromData(Question owner, QuestionData questionData) {
+        List<Option> created = new ArrayList<>();
+        for (OptionData optionData : questionData.options()) {
+            created.add(new Option(owner, optionData.text(), optionData.correct()));
         }
-        question.addOptions(createdOptions);
-        this.questions.add(question);
+        return created;
     }
 
     public Duration getDuration() {
         return duration;
+    }
+
+    public String getCoverImagePath() {
+        return coverImagePath;
+    }
+
+    public void setCoverImagePath(String coverImagePath) {
+        this.coverImagePath = coverImagePath;
     }
 }

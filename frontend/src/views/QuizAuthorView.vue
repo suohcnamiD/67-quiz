@@ -1,19 +1,36 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useGetQuiz, _delete as deleteQuiz, getGetQuizQueryKey } from '@/api/quiz-controller/quiz-controller'
-import { addQuizQuestion, deleteQuizQuestion } from '@/api/question-controller/question-controller'
+import { useGetQuiz, deleteQuiz, getGetQuizQueryKey } from '@/api/quiz-controller/quiz-controller'
+import {
+  addQuizQuestion,
+  deleteQuizQuestion,
+  editQuizQuestion,
+} from '@/api/question-controller/question-controller'
+import { useListRatings as useRatingList, useRatingSummary } from '@/api/quiz-rating-controller/quiz-rating-controller'
+import {
+  uploadQuizCover,
+  deleteQuizCover,
+  uploadQuestionImage,
+  deleteQuestionImage,
+  uploadOptionImage,
+  deleteOptionImage,
+} from '@/api/quiz-image-controller/quiz-image-controller'
 import { useQueryClient } from '@tanstack/vue-query'
 import { errorMessage } from '@/lib/errors'
+import { confirmDialog } from '@/lib/confirmDialog'
+import { coverUrl, questionImageUrl, optionImageUrl } from '@/lib/quizImages'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
-import Input from '@/components/Input.vue'
+import ImageUploader from '@/components/ImageUploader.vue'
 import Chip from '@/components/Chip.vue'
-import type { OptionData, AddQuestionRequest } from '@/api/openAPIDefinition.schemas'
+import Avatar from '@/components/Avatar.vue'
+import QuestionForm from '@/components/QuestionForm.vue'
+import type { OptionData, AddQuestionRequest, QuestionDto } from '@/api/openAPIDefinition.schemas'
 
 type QuestionType = AddQuestionRequest['type']
-const SINGLE: QuestionType = 'SINGLE_CHOICE'
 const MULTI: QuestionType = 'MULTI_CHOICE'
+const SINGLE: QuestionType = 'SINGLE_CHOICE'
 
 const route = useRoute()
 const router = useRouter()
@@ -22,76 +39,54 @@ const qc = useQueryClient()
 const quizId = computed(() => route.params.quizId as string)
 const quiz = useGetQuiz(quizId)
 
-const questionText = ref('')
-const questionType = ref<QuestionType>(MULTI)
-const optionRows = ref<OptionData[]>([
+// ---------- "Add a question" form ----------
+const addText = ref('')
+const addType = ref<QuestionType>(MULTI)
+const addOptions = ref<OptionData[]>([
   { text: '', correct: false },
   { text: '', correct: false },
 ])
 const submitting = ref(false)
 const errorText = ref<string | null>(null)
 
-function addOption() {
-  optionRows.value.push({ text: '', correct: false })
+const addSectionRef = ref<HTMLElement | null>(null)
+function scrollToAddForm() {
+  addSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
-function removeOption(i: number) {
-  if (optionRows.value.length > 2) optionRows.value.splice(i, 1)
-}
-function resetForm() {
-  questionText.value = ''
-  questionType.value = MULTI
-  optionRows.value = [
+
+function resetAddForm() {
+  addText.value = ''
+  addType.value = MULTI
+  addOptions.value = [
     { text: '', correct: false },
     { text: '', correct: false },
   ]
 }
 
-// When the author flips to single-choice, leave at most one option marked correct.
-// Picking another "correct" radio later will unset the others (handled via @change).
-watch(questionType, (next) => {
-  if (next === SINGLE) {
-    let kept = false
-    for (const row of optionRows.value) {
-      if (row.correct && !kept) {
-        kept = true
-      } else {
-        row.correct = false
-      }
-    }
+function validateShape(text: string, type: QuestionType, options: OptionData[]): string | null {
+  if (!text.trim()) return 'Question text is required.'
+  if (type === SINGLE && options.filter((o) => o.correct).length !== 1) {
+    return 'Single-choice questions need exactly one correct option.'
   }
-})
-
-function setSingleCorrect(i: number) {
-  // Radio behaviour for single-choice: clicking row i marks it correct and
-  // unticks everyone else.
-  for (let j = 0; j < optionRows.value.length; j++) {
-    const row = optionRows.value[j]
-    if (row) row.correct = j === i
-  }
+  return null
 }
 
 async function submitQuestion() {
   errorText.value = null
-  if (!questionText.value.trim()) {
-    errorText.value = 'Question text is required.'
+  const err = validateShape(addText.value, addType.value, addOptions.value)
+  if (err) {
+    errorText.value = err
     return
-  }
-  if (questionType.value === SINGLE) {
-    const correctCount = optionRows.value.filter((o) => o.correct).length
-    if (correctCount !== 1) {
-      errorText.value = 'Single-choice questions need exactly one correct option.'
-      return
-    }
   }
   submitting.value = true
   try {
     await addQuizQuestion({
       quizId: quizId.value,
-      text: questionText.value.trim(),
-      type: questionType.value,
-      options: optionRows.value.map((o) => ({ text: o.text?.trim() ?? '', correct: !!o.correct })),
+      text: addText.value.trim(),
+      type: addType.value,
+      options: addOptions.value.map((o) => ({ text: o.text?.trim() ?? '', correct: !!o.correct })),
     })
-    resetForm()
+    resetAddForm()
     qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) })
   } catch (e) {
     errorText.value = errorMessage(e)
@@ -100,9 +95,68 @@ async function submitQuestion() {
   }
 }
 
+// ---------- Inline edit ----------
+const editingId = ref<string | null>(null)
+const editText = ref('')
+const editType = ref<QuestionType>(MULTI)
+const editOptions = ref<OptionData[]>([])
+const savingEdit = ref(false)
+const editError = ref<string | null>(null)
+
+function startEdit(q: QuestionDto) {
+  if (!q.id) return
+  editingId.value = q.id
+  editText.value = q.text ?? ''
+  editType.value = (q.type as QuestionType) ?? MULTI
+  editOptions.value = (q.options ?? []).map((o) => ({
+    text: o.text ?? '',
+    correct: !!o.correct,
+  }))
+  editError.value = null
+}
+
+function cancelEdit() {
+  editingId.value = null
+  editError.value = null
+}
+
+async function saveEdit() {
+  if (!editingId.value) return
+  editError.value = null
+  const err = validateShape(editText.value, editType.value, editOptions.value)
+  if (err) {
+    editError.value = err
+    return
+  }
+  savingEdit.value = true
+  try {
+    await editQuizQuestion(editingId.value, {
+      text: editText.value.trim(),
+      type: editType.value,
+      options: editOptions.value.map((o) => ({ text: o.text?.trim() ?? '', correct: !!o.correct })),
+    })
+    qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) })
+    editingId.value = null
+  } catch (e) {
+    editError.value = errorMessage(e)
+  } finally {
+    savingEdit.value = false
+  }
+}
+
+// ---------- Remove question ----------
 const removingId = ref<string | null>(null)
 async function removeQuestion(id?: string) {
   if (!id) return
+  const ok = await confirmDialog.open({
+    title: 'Remove this question?',
+    body: 'This cannot be undone.',
+    confirmLabel: 'Remove',
+    danger: true,
+  })
+  if (!ok) return
+  // If the user happens to be editing the same question, drop the edit state.
+  if (editingId.value === id) cancelEdit()
   removingId.value = id
   errorText.value = null
   try {
@@ -116,7 +170,13 @@ async function removeQuestion(id?: string) {
 }
 
 async function removeQuiz() {
-  if (!confirm('Delete this quiz? This cannot be undone.')) return
+  const ok = await confirmDialog.open({
+    title: 'Delete this quiz?',
+    body: 'This cannot be undone.',
+    confirmLabel: 'Delete',
+    danger: true,
+  })
+  if (!ok) return
   errorText.value = null
   try {
     await deleteQuiz(quizId.value)
@@ -131,6 +191,87 @@ function typeLabel(t: QuestionType | undefined | null): string {
 }
 
 watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) }))
+
+// ---------- Cover image ----------
+const coverError = ref<string | null>(null)
+const coverPath = computed(() => quizId.value ? coverUrl(quizId.value) : null)
+
+async function onCoverUpload(file: File) {
+  if (!quizId.value) return
+  coverError.value = null
+  try {
+    await uploadQuizCover(quizId.value, { file })
+    qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) })
+  } catch (e) {
+    coverError.value = errorMessage(e)
+  }
+}
+
+async function onCoverDelete() {
+  if (!quizId.value) return
+  coverError.value = null
+  try {
+    await deleteQuizCover(quizId.value)
+    qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) })
+  } catch (e) {
+    coverError.value = errorMessage(e)
+  }
+}
+
+// ---------- Per-question + per-option images ----------
+async function onQuestionImageUpload(id: string, file: File) {
+  try {
+    await uploadQuestionImage(id, { file })
+    qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) })
+  } catch (e) { errorText.value = errorMessage(e) }
+}
+async function onQuestionImageDelete(id: string) {
+  try {
+    await deleteQuestionImage(id)
+    qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) })
+  } catch (e) { errorText.value = errorMessage(e) }
+}
+async function onOptionImageUpload(id: string, file: File) {
+  try {
+    await uploadOptionImage(id, { file })
+    qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) })
+  } catch (e) { errorText.value = errorMessage(e) }
+}
+async function onOptionImageDelete(id: string) {
+  try {
+    await deleteOptionImage(id)
+    qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) })
+  } catch (e) { errorText.value = errorMessage(e) }
+}
+
+// ---------- Ratings (paginated list + summary) ----------
+const ratingsPage = ref(0)
+const ratingsParams = computed(() => ({ page: ratingsPage.value }))
+const ratingsList = useRatingList(quizId, ratingsParams)
+const ratingsSummary = useRatingSummary(quizId)
+const ratings = computed(() => ratingsList.data.value?._embedded?.ratings ?? [])
+const ratingsTotalPages = computed(() => ratingsList.data.value?.page?.totalPages ?? 1)
+
+function fmtRating(avg: number | null | undefined): string {
+  if (avg == null) return '—'
+  return avg.toFixed(1).replace(/\.0$/, '')
+}
+
+function fmtRelative(iso?: string): string {
+  if (!iso) return ''
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return ''
+  const diffSec = Math.round((Date.now() - then) / 1000)
+  const abs = Math.abs(diffSec)
+  if (abs < 45) return 'just now'
+  const diffMin = Math.round(diffSec / 60)
+  if (Math.abs(diffMin) < 60) return `${diffMin} min ago`
+  const diffHr = Math.round(diffSec / 3600)
+  if (Math.abs(diffHr) < 24) return `${diffHr} h ago`
+  const diffDay = Math.round(diffSec / 86400)
+  if (Math.abs(diffDay) < 30) return `${diffDay} d ago`
+  return new Date(iso).toLocaleDateString()
+}
 </script>
 
 <template>
@@ -141,6 +282,17 @@ watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.v
     <Button @click="router.push('/app')">Back to browse</Button>
   </Card>
   <template v-else>
+    <section class="cover-section">
+      <h2 class="visually-hidden">Quiz cover</h2>
+      <ImageUploader
+        :has-image="!!quiz.data.value.hasCover"
+        :image-url="coverPath"
+        empty-label="Add cover image"
+        @upload="onCoverUpload"
+        @delete="onCoverDelete"
+      />
+      <p v-if="coverError" class="banner label-md" role="alert">{{ coverError }}</p>
+    </section>
     <header class="head">
       <div>
         <h1 class="headline-lg">{{ quiz.data.value.name }}</h1>
@@ -155,7 +307,14 @@ watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.v
     </header>
 
     <section class="section">
-      <h2 class="headline-md">Questions</h2>
+      <div class="section__head">
+        <h2 class="headline-md">Questions</h2>
+        <Button
+          v-if="(quiz.data.value.questions?.length ?? 0) >= 3"
+          variant="ghost"
+          @click="scrollToAddForm"
+        >+ Add another</Button>
+      </div>
       <div v-if="!(quiz.data.value.questions?.length)" class="empty body-md">
         No questions yet. Add one below.
       </div>
@@ -167,83 +326,158 @@ watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.v
                 <span class="label-sm muted">Q{{ i + 1 }}</span>
                 <Chip>{{ typeLabel(q.type) }}</Chip>
               </div>
-              <Button variant="danger" :loading="removingId === q.id" @click="removeQuestion(q.id)">Remove</Button>
+              <div class="qhead__actions">
+                <template v-if="editingId !== q.id">
+                  <Button variant="ghost" @click="startEdit(q)">Edit</Button>
+                  <Button
+                    variant="danger"
+                    :loading="removingId === q.id"
+                    @click="removeQuestion(q.id)"
+                  >Remove</Button>
+                </template>
+              </div>
             </div>
-            <p class="body-lg">{{ q.text }}</p>
-            <ul class="opts">
-              <li v-for="o in q.options ?? []" :key="o.id" :class="['opt', { 'opt--correct': o.correct }]">
-                <span>{{ o.text }}</span>
-                <Chip v-if="o.correct" tone="success">Correct</Chip>
-              </li>
-            </ul>
+
+            <template v-if="editingId !== q.id">
+              <p class="body-lg">{{ q.text }}</p>
+              <div class="q-image">
+                <ImageUploader
+                  :has-image="!!q.hasImage"
+                  :image-url="q.id ? questionImageUrl(q.id) : null"
+                  empty-label="Add question image"
+                  @upload="(file) => q.id && onQuestionImageUpload(q.id, file)"
+                  @delete="() => q.id && onQuestionImageDelete(q.id)"
+                />
+              </div>
+              <ul class="opts">
+                <li
+                  v-for="o in q.options ?? []"
+                  :key="o.id"
+                  :class="['opt', { 'opt--correct': o.correct }]"
+                >
+                  <div class="opt__row">
+                    <span class="opt__text">{{ o.text }}</span>
+                    <Chip v-if="o.correct" tone="success">Correct</Chip>
+                  </div>
+                  <div class="opt__image">
+                    <ImageUploader
+                      :has-image="!!o.hasImage"
+                      :image-url="o.id ? optionImageUrl(o.id) : null"
+                      empty-label="Add option image"
+                      @upload="(file) => o.id && onOptionImageUpload(o.id, file)"
+                      @delete="() => o.id && onOptionImageDelete(o.id)"
+                    />
+                  </div>
+                </li>
+              </ul>
+            </template>
+            <template v-else>
+              <form class="form" @submit.prevent="saveEdit">
+                <QuestionForm
+                  v-model:text="editText"
+                  v-model:type="editType"
+                  v-model:options="editOptions"
+                  :scope-id="`edit-${q.id}`"
+                />
+                <p v-if="editError" class="form__error label-md" role="alert">{{ editError }}</p>
+                <div class="edit-actions">
+                  <Button type="button" variant="ghost" @click="cancelEdit">Cancel</Button>
+                  <Button type="submit" :loading="savingEdit">Save changes</Button>
+                </div>
+              </form>
+            </template>
           </Card>
         </li>
       </ol>
     </section>
 
-    <section class="section">
+    <section class="section" ref="addSectionRef">
       <h2 class="headline-md">Add a question</h2>
       <Card>
         <form class="form" @submit.prevent="submitQuestion">
-          <div class="type-picker" role="radiogroup" aria-label="Question type">
-            <button
-              type="button"
-              :class="['type-pill', { 'type-pill--on': questionType === MULTI }]"
-              @click="questionType = MULTI"
-            >
-              Multi select
-            </button>
-            <button
-              type="button"
-              :class="['type-pill', { 'type-pill--on': questionType === SINGLE }]"
-              @click="questionType = SINGLE"
-            >
-              Single choice
-            </button>
-          </div>
-          <p class="type-hint label-sm muted">
-            <template v-if="questionType === SINGLE">Worth 1 point. Pick one correct option.</template>
-            <template v-else>+1 point per correctly classified option.</template>
-          </p>
-
-          <Input v-model="questionText" label="Question text" />
-          <div class="opts-form">
-            <p class="label-md muted">Options</p>
-            <div v-for="(o, i) in optionRows" :key="i" class="opt-row">
-              <input
-                type="text"
-                v-model="o.text"
-                placeholder="Option text"
-                class="opt-row__text"
-              />
-              <label class="opt-row__correct label-sm">
-                <input
-                  v-if="questionType === MULTI"
-                  type="checkbox"
-                  v-model="o.correct"
-                />
-                <input
-                  v-else
-                  type="radio"
-                  name="single-correct"
-                  :checked="o.correct"
-                  @change="setSingleCorrect(i)"
-                />
-                Correct
-              </label>
-              <Button variant="ghost" :disabled="optionRows.length <= 2" @click="removeOption(i)">×</Button>
-            </div>
-            <Button variant="ghost" type="button" @click="addOption">+ Add option</Button>
-          </div>
-          <p v-if="errorText" class="form__error label-md">{{ errorText }}</p>
+          <QuestionForm
+            v-model:text="addText"
+            v-model:type="addType"
+            v-model:options="addOptions"
+            scope-id="add"
+          />
+          <p v-if="errorText" class="form__error label-md" role="alert">{{ errorText }}</p>
           <Button type="submit" :loading="submitting">Add question</Button>
         </form>
       </Card>
+    </section>
+
+    <section class="section">
+      <div class="section__head">
+        <h2 class="headline-md">
+          Ratings
+          <span v-if="(ratingsSummary.data.value?.count ?? 0) > 0" class="muted label-md">
+            · {{ fmtRating(ratingsSummary.data.value?.average ?? null) }} / 10 from {{ ratingsSummary.data.value?.count }}
+          </span>
+        </h2>
+      </div>
+      <p v-if="ratingsList.isLoading.value" class="empty body-md">Loading…</p>
+      <p v-else-if="!ratings.length" class="empty body-md">
+        No ratings yet. Once people finish your quiz they can leave a rating + comment here.
+      </p>
+      <ul v-else class="rating-list">
+        <li v-for="r in ratings" :key="r.id" class="rating-item">
+          <div class="rating-item__head">
+            <RouterLink
+              v-if="r.author?.username"
+              :to="{ name: 'user-profile', params: { username: r.author.username } }"
+              class="rating-item__user"
+            >
+              <Avatar
+                :username="r.author.username"
+                :display-name="r.author.displayName"
+                :initials-only="!r.author.hasAvatar"
+                :size="28"
+              />
+              <span class="label-md">{{ r.author.displayName ?? r.author.username }}</span>
+            </RouterLink>
+            <span class="rating-item__score" :title="`${r.score} of 10`">
+              <span aria-hidden="true">★</span>
+              <span class="rating-item__score-value">{{ r.score }}</span>
+              <span class="muted">/ 10</span>
+            </span>
+            <span class="label-sm muted">{{ fmtRelative(r.createdAt) }}</span>
+          </div>
+          <p v-if="r.comment" class="rating-item__body body-md">{{ r.comment }}</p>
+        </li>
+      </ul>
+      <div v-if="ratingsTotalPages > 1" class="rating-pager">
+        <Button
+          variant="ghost"
+          :disabled="ratingsPage === 0"
+          @click="ratingsPage = Math.max(0, ratingsPage - 1)"
+        >Previous</Button>
+        <span class="label-sm muted">Page {{ ratingsPage + 1 }} / {{ ratingsTotalPages }}</span>
+        <Button
+          variant="ghost"
+          :disabled="ratingsPage + 1 >= ratingsTotalPages"
+          @click="ratingsPage = ratingsPage + 1"
+        >Next</Button>
+      </div>
     </section>
   </template>
 </template>
 
 <style scoped>
+.cover-section {
+  margin-bottom: var(--space-lg);
+}
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 .head {
   display: flex;
   justify-content: space-between;
@@ -260,7 +494,17 @@ watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.v
   margin: var(--space-xs) 0 0;
 }
 .section {
-  margin-bottom: var(--space-xl);
+  margin: var(--space-xl) 0;
+}
+.section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+.section__head h2 {
+  margin: 0;
 }
 .section h2 {
   margin: 0 0 var(--space-md);
@@ -279,11 +523,19 @@ watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.v
   align-items: center;
   gap: var(--space-sm);
   margin-bottom: var(--space-sm);
+  flex-wrap: wrap;
 }
 .qhead__title {
   display: inline-flex;
   align-items: center;
   gap: var(--space-sm);
+}
+.qhead__actions {
+  display: inline-flex;
+  gap: var(--space-sm);
+}
+.q-image {
+  margin: var(--space-sm) 0 0;
 }
 .opts {
   list-style: none;
@@ -295,11 +547,23 @@ watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.v
 }
 .opt {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: var(--space-sm);
   padding: var(--space-sm) var(--space-md);
   background: var(--surface-container-low);
   border-radius: var(--radius);
+}
+.opt__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+.opt__text {
+  word-break: break-word;
+}
+.opt__image {
+  /* No extra spacing — ImageUploader handles its own gap. */
 }
 .opt--correct {
   border: 1px solid var(--secondary-container);
@@ -312,64 +576,10 @@ watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.v
 .form__error {
   color: var(--error);
 }
-.type-picker {
-  display: inline-flex;
-  background: var(--surface-container-high);
-  border: 1px solid var(--outline-variant);
-  border-radius: 999px;
-  padding: 4px;
-  gap: 4px;
-  width: fit-content;
-}
-.type-pill {
-  appearance: none;
-  background: transparent;
-  border: 0;
-  color: var(--on-surface-variant);
-  padding: 6px 14px;
-  border-radius: 999px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 120ms ease, color 120ms ease;
-}
-.type-pill:hover {
-  color: var(--on-surface);
-}
-.type-pill--on {
-  background: var(--surface-container-low);
-  color: var(--on-surface);
-}
-.type-hint {
-  margin: 0;
-}
-.opts-form {
+.edit-actions {
   display: flex;
-  flex-direction: column;
+  justify-content: flex-end;
   gap: var(--space-sm);
-}
-.opt-row {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: var(--space-sm);
-  align-items: center;
-}
-.opt-row__text {
-  background: var(--surface-container-lowest);
-  border: 1px solid var(--outline-variant);
-  border-radius: var(--radius);
-  padding: 8px 12px;
-  color: var(--on-surface);
-  outline: none;
-}
-.opt-row__text:focus {
-  border-color: var(--primary-container);
-}
-.opt-row__correct {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  color: var(--on-surface-variant);
-  white-space: nowrap;
 }
 .empty {
   color: var(--on-surface-variant);
@@ -387,9 +597,65 @@ watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.v
   color: var(--on-surface-variant);
 }
 
-/* Mobile: stack the quiz title and the Back/Delete row, and let the
- * actions fill the row so both buttons stay readable instead of
- * line-breaking the labels. */
+/* ----- Ratings list ----- */
+.rating-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.rating-item {
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.rating-item__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+.rating-item__user {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--on-surface);
+  text-decoration: none;
+}
+.rating-item__user:hover {
+  text-decoration: underline;
+}
+.rating-item__score {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--on-surface);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.rating-item__score-value {
+  font-size: 1.05rem;
+}
+.rating-item__body {
+  margin: 0;
+  white-space: pre-wrap;
+  color: var(--on-surface);
+}
+.rating-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+
 @media (max-width: 480px) {
   .head {
     flex-direction: column;
@@ -399,6 +665,9 @@ watch(quizId, () => qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.v
   .head__actions {
     width: 100%;
     justify-content: flex-start;
+  }
+  .rating-item__score {
+    margin-left: 0;
   }
 }
 </style>

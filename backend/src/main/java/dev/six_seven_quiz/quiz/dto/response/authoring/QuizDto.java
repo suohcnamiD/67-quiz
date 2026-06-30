@@ -1,6 +1,5 @@
 package dev.six_seven_quiz.quiz.dto.response.authoring;
 
-import dev.six_seven_quiz.quiz.dto.response.viewing.QuestionSummaryDto;
 import org.springframework.hateoas.server.core.Relation;
 
 import java.time.Duration;
@@ -13,6 +12,7 @@ public record QuizDto(
     int questionCount,
     Duration duration,
     UUID id,
+    boolean hasCover,
     List<QuestionDto> questions
 ) {
 }

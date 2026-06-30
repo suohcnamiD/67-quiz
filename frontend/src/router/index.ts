@@ -4,7 +4,12 @@ import { useAuthStore } from '@/stores/auth'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    { path: '/', redirect: '/app' },
+    {
+      path: '/',
+      name: 'landing',
+      component: () => import('@/views/LandingView.vue'),
+      meta: { landing: true },
+    },
     {
       path: '/login',
       name: 'login',
@@ -26,6 +31,8 @@ const router = createRouter({
         { path: 'quiz/:quizId', name: 'quiz-author', component: () => import('@/views/QuizAuthorView.vue') },
         { path: 'attempt/:attemptId', name: 'attempt', component: () => import('@/views/AttemptView.vue') },
         { path: 'attempt/:attemptId/result', name: 'attempt-result', component: () => import('@/views/AttemptResultView.vue') },
+        { path: 'leaderboards', name: 'leaderboards', component: () => import('@/views/LeaderboardsView.vue') },
+        { path: 'notifications', name: 'notifications', component: () => import('@/views/NotificationsView.vue') },
         { path: 'profile', name: 'profile', component: () => import('@/views/ProfileView.vue') },
         { path: 'users/:username', name: 'user-profile', component: () => import('@/views/UserProfileView.vue') },
         // Anything else under /app is a real 404 — show the page inside the shell.
@@ -43,6 +50,10 @@ router.beforeEach(async (to) => {
   const auth = useAuthStore()
   if (auth.status === 'unknown') await auth.refresh()
 
+  const isLanding = to.matched.some((r) => r.meta.landing)
+  if (isLanding) {
+    return auth.isAuthenticated() ? { name: 'browse' } : true
+  }
   const wantsAnon = to.matched.some((r) => r.meta.anonymous)
   if (wantsAnon) {
     return auth.isAuthenticated() ? { name: 'browse' } : true

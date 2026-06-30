@@ -1,7 +1,17 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useGetFinishedAttempts } from '@/api/attempt-controller/attempt-controller'
+import { useQueryClient } from '@tanstack/vue-query'
+import { useGetFinishedAttempts, attemptQuiz } from '@/api/attempt-controller/attempt-controller'
+import {
+  useGetMine,
+  useUpsertMine,
+  getGetMineQueryKey,
+  getRatingSummaryQueryKey,
+} from '@/api/quiz-rating-controller/quiz-rating-controller'
+import { getGetQuizzesQueryKey } from '@/api/quiz-controller/quiz-controller'
+import { errorMessage, firstErrorCode } from '@/lib/errors'
+import { questionImageUrl, optionImageUrl } from '@/lib/quizImages'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import FinishCelebration from '@/components/FinishCelebration.vue'
@@ -9,12 +19,14 @@ import type { FinishedQuestionDto, FinishedOptionDto } from '@/api/openAPIDefini
 
 const route = useRoute()
 const router = useRouter()
+const qc = useQueryClient()
 const attemptId = computed(() => route.params.attemptId as string)
 
 const { data, isPending } = useGetFinishedAttempts({ page: 0 })
 const attempt = computed(() =>
   (data.value?._embedded?.attempts ?? []).find((a) => a.id === attemptId.value),
 )
+const quizId = computed(() => attempt.value?.quiz?.id)
 
 function questionScore(q: FinishedQuestionDto): { earned: number; max: number } {
   const opts = q.options ?? []
@@ -88,6 +100,97 @@ const showCelebration = ref(false)
 watch([justFinished, attempt], ([just, a]) => {
   if (just && a && !showCelebration.value) showCelebration.value = true
 }, { immediate: true })
+
+const tryAgainPending = ref(false)
+const tryAgainError = ref<string | null>(null)
+async function tryAgain() {
+  const quizId = attempt.value?.quiz?.id
+  if (!quizId) return
+  tryAgainPending.value = true
+  tryAgainError.value = null
+  try {
+    const fresh = await attemptQuiz({ quizId })
+    router.push(`/app/attempt/${fresh.id}`)
+  } catch (e) {
+    tryAgainError.value = errorMessage(e)
+  } finally {
+    tryAgainPending.value = false
+  }
+}
+
+// ----- Rating widget ---------------------------------------------------
+// We fetch the user's existing rating (if any) and let them upsert. The
+// widget is dismissible per-quiz via localStorage so re-visits don't nag.
+const ratingEnabled = computed(() => !!quizId.value)
+const myRatingQuery = useGetMine(
+  computed(() => quizId.value ?? ''),
+  { query: { enabled: ratingEnabled } },
+)
+// Backend returns 204 No Content when there's no rating yet; vue-query then
+// resolves data to undefined/null. Treat null/undefined as "no rating yet".
+const myRating = computed(() => myRatingQuery.data.value ?? null)
+
+const dismissKey = computed(() => quizId.value ? `quiz-rating-dismissed:${quizId.value}` : null)
+function isDismissed(): boolean {
+  if (!dismissKey.value) return false
+  try { return localStorage.getItem(dismissKey.value) === '1' } catch { return false }
+}
+const dismissed = ref(isDismissed())
+watch(quizId, () => { dismissed.value = isDismissed() })
+
+const ratingScore = ref<number | null>(null)
+const ratingHover = ref<number | null>(null)
+const ratingComment = ref('')
+const ratingSaving = ref(false)
+const ratingError = ref<string | null>(null)
+const ratingSaved = ref(false)
+
+watch(myRating, (r) => {
+  if (r) {
+    ratingScore.value = r.score ?? null
+    ratingComment.value = r.comment ?? ''
+  }
+}, { immediate: true })
+
+const showRatingWidget = computed(() => {
+  if (!quizId.value) return false
+  // Always show once the user has rated (so they can see + update it).
+  if (myRating.value) return true
+  return !dismissed.value
+})
+
+const upsertRating = useUpsertMine()
+async function saveRating() {
+  if (!quizId.value || ratingScore.value == null) return
+  ratingSaving.value = true
+  ratingError.value = null
+  try {
+    await upsertRating.mutateAsync({
+      quizId: quizId.value,
+      data: { score: ratingScore.value, comment: ratingComment.value || undefined },
+    })
+    ratingSaved.value = true
+    qc.invalidateQueries({ queryKey: getGetMineQueryKey(quizId.value) })
+    qc.invalidateQueries({ queryKey: getRatingSummaryQueryKey(quizId.value) })
+    qc.invalidateQueries({ queryKey: getGetQuizzesQueryKey() })
+    // Persist dismissal so the prompt doesn't keep insisting after a save.
+    if (dismissKey.value) {
+      try { localStorage.setItem(dismissKey.value, '1') } catch { /* ignore */ }
+    }
+  } catch (e) {
+    if (firstErrorCode(e) !== 'RATING_NOT_ELIGIBLE') console.error(e)
+    ratingError.value = errorMessage(e)
+  } finally {
+    ratingSaving.value = false
+  }
+}
+
+function dismissRating() {
+  dismissed.value = true
+  if (dismissKey.value) {
+    try { localStorage.setItem(dismissKey.value, '1') } catch { /* ignore */ }
+  }
+}
 </script>
 
 <template>
@@ -121,8 +224,79 @@ watch([justFinished, attempt], ([just, a]) => {
     </Card>
 
     <div class="actions">
+      <Button
+        v-if="attempt.quiz?.id"
+        :loading="tryAgainPending"
+        @click="tryAgain"
+      >Try again</Button>
       <Button variant="ghost" @click="router.push('/app')">Back to browse</Button>
     </div>
+    <p v-if="tryAgainError" class="banner label-md" role="alert">{{ tryAgainError }}</p>
+
+    <Card v-if="showRatingWidget" class="rate" aria-labelledby="rate-heading">
+      <div class="rate__head">
+        <h2 id="rate-heading" class="headline-md rate__title">
+          {{ myRating ? 'Your rating' : 'Rate this quiz' }}
+        </h2>
+        <button
+          v-if="!myRating"
+          type="button"
+          class="rate__dismiss label-sm"
+          aria-label="Dismiss rating prompt"
+          @click="dismissRating"
+        >Maybe later</button>
+      </div>
+      <div
+        class="rate__stars"
+        role="radiogroup"
+        aria-label="Score from 1 to 10"
+        @mouseleave="ratingHover = null"
+      >
+        <label
+          v-for="n in 10"
+          :key="n"
+          :class="[
+            'rate__star',
+            { 'rate__star--filled': (ratingHover ?? ratingScore ?? 0) >= n },
+            { 'rate__star--preview': ratingHover != null && ratingHover >= n && (ratingScore ?? 0) < n },
+          ]"
+          @mouseenter="ratingHover = n"
+        >
+          <input
+            type="radio"
+            name="rating-score"
+            class="visually-hidden"
+            :value="n"
+            :checked="ratingScore === n"
+            :disabled="ratingSaving"
+            @change="ratingScore = n"
+          />
+          <span aria-hidden="true">★</span>
+          <span class="visually-hidden">{{ n }} out of 10</span>
+        </label>
+      </div>
+      <p class="rate__hint body-md muted" v-if="ratingScore != null">
+        You picked {{ ratingScore }} / 10.
+      </p>
+      <textarea
+        v-model="ratingComment"
+        class="rate__comment"
+        :disabled="ratingSaving"
+        maxlength="500"
+        rows="3"
+        placeholder="Anything you want to say about this quiz? (optional)"
+        aria-label="Optional comment"
+      ></textarea>
+      <p v-if="ratingError" class="banner label-md" role="alert">{{ ratingError }}</p>
+      <div class="rate__actions">
+        <Button
+          :loading="ratingSaving"
+          :disabled="ratingScore == null"
+          @click="saveRating"
+        >{{ myRating ? 'Update rating' : 'Submit rating' }}</Button>
+        <span v-if="ratingSaved && !ratingError" class="rate__saved body-md">Saved.</span>
+      </div>
+    </Card>
 
     <ol class="qlist">
       <li v-for="(q, i) in attempt.questions ?? []" :key="q.id" class="question">
@@ -146,6 +320,13 @@ watch([justFinished, attempt], ([just, a]) => {
             <span class="qhead__score-max">{{ questionScore(q).max }}</span>
           </div>
         </header>
+        <img
+          v-if="q.hasImage && q.id"
+          :src="questionImageUrl(q.id)"
+          alt=""
+          class="q-image"
+          loading="lazy"
+        />
         <ul class="opts">
           <li
             v-for="o in sortedOptions(q)"
@@ -158,6 +339,13 @@ watch([justFinished, attempt], ([just, a]) => {
               </span>
             </span>
             <span class="opt__text">{{ o.text }}</span>
+            <img
+              v-if="o.hasImage && o.id"
+              :src="optionImageUrl(o.id)"
+              alt=""
+              class="opt__image"
+              loading="lazy"
+            />
             <span v-if="chipFor(o, q).score !== null" class="opt__chip">{{ chipFor(o, q).score }}</span>
           </li>
         </ul>
@@ -278,7 +466,15 @@ watch([justFinished, attempt], ([just, a]) => {
 .actions {
   display: flex;
   justify-content: flex-end;
+  gap: var(--space-sm);
   margin: 0 0 var(--space-lg);
+}
+.banner {
+  margin: 0 0 var(--space-lg);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--error-container);
+  color: var(--on-error-container);
+  border-radius: var(--radius);
 }
 
 /* ----- Question list — flat, no nested cards ----- */
@@ -337,6 +533,22 @@ watch([justFinished, attempt], ([just, a]) => {
 .qhead__score-value { font-size: 1rem; }
 .qhead__score-divider { opacity: 0.5; }
 .qhead__score-max { font-size: 0.875rem; opacity: 0.7; }
+
+.q-image {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: var(--radius-lg);
+  margin: 0 0 var(--space-md);
+}
+.opt__image {
+  grid-column: 2 / -1;
+  justify-self: start;
+  max-width: 100%;
+  max-height: 140px;
+  border-radius: var(--radius);
+  margin-top: var(--space-xs);
+}
 
 /* ----- Options ----- */
 .opts {
@@ -440,5 +652,111 @@ watch([justFinished, attempt], ([just, a]) => {
   background: transparent;
   color: var(--on-secondary-container);
   border: 1px solid color-mix(in srgb, var(--on-secondary-container) 40%, transparent);
+}
+
+/* ----- Rating widget ----- */
+.rate {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin: 0 0 var(--space-lg);
+}
+.rate__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+.rate__title {
+  margin: 0;
+}
+.rate__dismiss {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: var(--on-surface-variant);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+.rate__dismiss:hover { color: var(--on-surface); }
+.rate__stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 8px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  width: fit-content;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+.rate__star {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 40px;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--on-surface-variant);
+  cursor: pointer;
+  transition: color 120ms ease, transform 120ms ease;
+  user-select: none;
+}
+.rate__star:hover { transform: scale(1.08); }
+.rate__star--filled { color: var(--primary-container); }
+.rate__star--preview { color: color-mix(in srgb, var(--primary-container) 65%, transparent); }
+.rate__star input:focus-visible + span {
+  outline: 2px solid var(--primary-container);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.rate__hint {
+  margin: 0;
+}
+.rate__comment {
+  width: 100%;
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius);
+  color: var(--on-surface);
+  padding: 10px 12px;
+  font: inherit;
+  resize: vertical;
+  min-height: 72px;
+}
+.rate__comment:focus {
+  outline: none;
+  border-color: var(--primary-container);
+}
+.rate__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+.rate__saved {
+  color: var(--on-secondary-container);
+}
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+@media (max-width: 640px) {
+  .rate__star {
+    width: 28px;
+    height: 36px;
+    font-size: 1.35rem;
+  }
 }
 </style>

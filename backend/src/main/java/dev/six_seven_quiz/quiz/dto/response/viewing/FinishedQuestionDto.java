@@ -11,6 +11,7 @@ public record FinishedQuestionDto(
         UUID id,
         String text,
         QuestionType type,
+        boolean hasImage,
         List<FinishedOptionDto> options
 ) {
 }

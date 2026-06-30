@@ -2,12 +2,14 @@ package dev.six_seven_quiz.quiz.service;
 
 import dev.six_seven_quiz.quiz.component.mapper.QuizMapper;
 import dev.six_seven_quiz.quiz.dto.request.CreateQuizRequest;
+import dev.six_seven_quiz.quiz.dto.response.QuizRatingSummaryDto;
 import dev.six_seven_quiz.quiz.dto.response.authoring.QuizDto;
 import dev.six_seven_quiz.quiz.dto.response.viewing.QuizSummaryDto;
 import dev.six_seven_quiz.quiz.exception.QuizNotFoundException;
 import dev.six_seven_quiz.quiz.model.Quiz;
 import dev.six_seven_quiz.quiz.repository.QuestionRepository;
 import dev.six_seven_quiz.quiz.repository.QuizAttemptRepository;
+import dev.six_seven_quiz.quiz.repository.QuizRatingRepository;
 import dev.six_seven_quiz.quiz.repository.QuizRepository;
 import dev.six_seven_quiz.quiz.validator.QuizValidator;
 import dev.six_seven_quiz.user.ApplicationUser;
@@ -36,13 +38,15 @@ public class QuizService {
     private final QuizMapper quizMapper;
     private final QuestionRepository questionRepository;
     private final UserProfileMapper userProfileMapper;
+    private final QuizRatingRepository quizRatingRepository;
 
-    public QuizService(ApplicationUserService applicationUserService, QuizRepository quizRepository, QuizMapper quizMapper, QuizAttemptRepository quizAttemptRepository, QuestionRepository questionRepository, UserProfileMapper userProfileMapper) {
+    public QuizService(ApplicationUserService applicationUserService, QuizRepository quizRepository, QuizMapper quizMapper, QuizAttemptRepository quizAttemptRepository, QuestionRepository questionRepository, UserProfileMapper userProfileMapper, QuizRatingRepository quizRatingRepository) {
         this.applicationUserService = applicationUserService;
         this.quizRepository = quizRepository;
         this.quizMapper = quizMapper;
         this.questionRepository = questionRepository;
         this.userProfileMapper = userProfileMapper;
+        this.quizRatingRepository = quizRatingRepository;
     }
 
     public QuizDto createQuiz(UserDetails userDetails, CreateQuizRequest request) {
@@ -90,7 +94,12 @@ public class QuizService {
     private QuizSummaryDto quizToSummary(Quiz quiz, ApplicationUser user) {
         int questionCount = questionRepository.countByQuiz_QuizId(quiz.getId());
         boolean areYouAuthor = quiz.getAuthor().equals(user);
-        return quizMapper.toSummary(quiz, questionCount, areYouAuthor, userProfileMapper.toAuthorSummary(quiz.getAuthor()));
+        long ratingCount = quizRatingRepository.countForQuiz(quiz.getId());
+        Double ratingAvg = ratingCount > 0
+                ? quizRatingRepository.averageScoreForQuiz(quiz.getId()).orElse(null)
+                : null;
+        QuizRatingSummaryDto ratingSummary = new QuizRatingSummaryDto(ratingAvg, ratingCount);
+        return quizMapper.toSummary(quiz, questionCount, areYouAuthor, userProfileMapper.toAuthorSummary(quiz.getAuthor()), ratingSummary);
     }
 
     private Pageable produceSanitizedPageable(int page) {

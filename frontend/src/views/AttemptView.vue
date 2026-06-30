@@ -4,6 +4,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useGetAttemptsInProgress, useGetFinishedAttempts, commitAttemptActions, finishAttempt, getGetAttemptsInProgressQueryKey, getGetFinishedAttemptsQueryKey } from '@/api/attempt-controller/attempt-controller'
 import { useQueryClient } from '@tanstack/vue-query'
 import { errorMessage, firstErrorCode } from '@/lib/errors'
+import { confirmDialog } from '@/lib/confirmDialog'
+import { questionImageUrl, optionImageUrl } from '@/lib/quizImages'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
@@ -50,6 +52,7 @@ const totalQuestions = computed(() => attempt.value?.questions?.length ?? 0)
 
 const errorText = ref<string | null>(null)
 const togglingKey = ref<string | null>(null)
+const pulseKey = ref<string | null>(null)
 async function toggleOption(
   questionId: string | undefined,
   optionId: string | undefined,
@@ -59,11 +62,18 @@ async function toggleOption(
   if (!questionId || !optionId) return
   if (remainingMs.value <= 0) return
   const isSingle = questionType === 'SINGLE_CHOICE'
-  // Single-choice clicks on the already-picked option are a no-op — once you've
-  // picked, you can only switch, not unselect.
-  if (isSingle && currentlySelected) return
-  const next = isSingle ? true : !currentlySelected
   const key = `${questionId}:${optionId}`
+  // Single-choice clicks on the already-picked option are a no-op — once you've
+  // picked, you can only switch, not unselect. Pulse the button so the click
+  // doesn't feel ignored.
+  if (isSingle && currentlySelected) {
+    pulseKey.value = key
+    setTimeout(() => {
+      if (pulseKey.value === key) pulseKey.value = null
+    }, 280)
+    return
+  }
+  const next = isSingle ? true : !currentlySelected
   togglingKey.value = key
   errorText.value = null
 
@@ -115,8 +125,13 @@ async function toggleOption(
 }
 
 const finishing = ref(false)
-const autoFinished = ref(false)
-async function finishCore() {
+// Auto-finish lifecycle when the timer hits zero. We track this separately
+// from `finishing` so a failed auto-attempt leaves a Retry banner without
+// stranding the user.
+type AutoFinishState = 'idle' | 'attempting' | 'succeeded' | 'failed'
+const autoFinishState = ref<AutoFinishState>('idle')
+const autoFinished = computed(() => autoFinishState.value !== 'idle')
+async function finishCore(viaAuto = false) {
   finishing.value = true
   errorText.value = null
   try {
@@ -127,9 +142,11 @@ async function finishCore() {
     if (firstErrorCode(e) !== 'ATTEMPT_ALREADY_FINISHED') {
       errorText.value = errorMessage(e)
       finishing.value = false
+      if (viaAuto) autoFinishState.value = 'failed'
       return
     }
   }
+  if (viaAuto) autoFinishState.value = 'succeeded'
   // Navigate first, then invalidate. If we invalidated before navigating,
   // the in-progress query would drop this attempt and the AttemptView
   // would briefly render "Attempt not found" between frames.
@@ -141,8 +158,17 @@ async function finishCore() {
   finishing.value = false
 }
 async function finish() {
-  if (!confirm('Finish this attempt?')) return
+  const ok = await confirmDialog.open({
+    title: 'Finish this attempt?',
+    body: "You won't be able to change answers after finishing.",
+    confirmLabel: 'Finish',
+  })
+  if (!ok) return
   await finishCore()
+}
+async function retryAutoFinish() {
+  autoFinishState.value = 'attempting'
+  await finishCore(true)
 }
 
 watch([attempt, isFinished, settled], ([a, fin, s]) => {
@@ -152,13 +178,13 @@ watch([attempt, isFinished, settled], ([a, fin, s]) => {
 })
 
 // When the timer runs out, finish on the user's behalf and bounce to result.
-// Fire exactly once — guarded by autoFinished and by the in-flight finishing flag.
+// If the auto-attempt fails, show a Retry banner instead of stranding the user.
 watch(remainingMs, (ms) => {
   if (ms > 0) return
-  if (autoFinished.value || finishing.value) return
+  if (autoFinishState.value !== 'idle' || finishing.value) return
   if (!attempt.value) return
-  autoFinished.value = true
-  void finishCore()
+  autoFinishState.value = 'attempting'
+  void finishCore(true)
 })
 </script>
 
@@ -182,6 +208,11 @@ watch(remainingMs, (ms) => {
 
     <p v-if="errorText" class="banner label-md">{{ errorText }}</p>
 
+    <div v-if="autoFinishState === 'failed'" class="banner banner--retry" role="alert">
+      <span>Time's up, but we couldn't finish your attempt automatically.</span>
+      <Button variant="primary" :loading="finishing" @click="retryAutoFinish">Retry finish</Button>
+    </div>
+
     <ol class="qlist">
       <li v-for="(q, i) in attempt.questions ?? []" :key="q.id">
         <Card>
@@ -192,6 +223,13 @@ watch(remainingMs, (ms) => {
             </span>
           </div>
           <p class="body-lg q-text">{{ q.text }}</p>
+          <img
+            v-if="q.hasImage && q.id"
+            :src="questionImageUrl(q.id)"
+            alt=""
+            class="q-image"
+            loading="lazy"
+          />
           <ul class="opts">
             <li v-for="o in q.options ?? []" :key="o.id">
               <button
@@ -201,6 +239,7 @@ watch(remainingMs, (ms) => {
                   { 'opt--selected': o.selected },
                   q.type === 'SINGLE_CHOICE' ? 'opt--radio' : 'opt--checkbox',
                 ]"
+                :data-pulse="pulseKey === `${q.id}:${o.id}` ? 'true' : null"
                 :disabled="togglingKey === `${q.id}:${o.id}`"
                 @click="toggleOption(q.id, o.id, o.selected, q.type)"
               >
@@ -208,12 +247,22 @@ watch(remainingMs, (ms) => {
                   <span v-if="o.selected" class="opt__dot" />
                 </span>
                 <span class="opt__text">{{ o.text }}</span>
+                <img
+                  v-if="o.hasImage && o.id"
+                  :src="optionImageUrl(o.id)"
+                  alt=""
+                  class="opt__image"
+                  loading="lazy"
+                />
               </button>
             </li>
           </ul>
         </Card>
       </li>
     </ol>
+    <div v-if="remainingMs > 0" class="finish-foot">
+      <Button :loading="finishing" @click="finish">Finish attempt</Button>
+    </div>
   </template>
   <div v-else-if="finishing || autoFinished" class="empty body-md">Loading…</div>
   <Card v-else class="notfound">
@@ -263,6 +312,13 @@ watch(remainingMs, (ms) => {
   color: var(--on-error-container);
   border-radius: var(--radius);
 }
+.banner--retry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
 .qlist {
   list-style: none;
   padding: 0;
@@ -270,6 +326,20 @@ watch(remainingMs, (ms) => {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
+}
+.finish-foot {
+  margin-top: var(--space-xl);
+  display: flex;
+  justify-content: center;
+}
+.finish-foot :deep(button) {
+  min-width: 16rem;
+}
+@media (max-width: 640px) {
+  .finish-foot :deep(button) {
+    width: 100%;
+    min-width: 0;
+  }
 }
 .qhead {
   display: flex;
@@ -279,6 +349,20 @@ watch(remainingMs, (ms) => {
 }
 .q-text {
   margin: 0 0 var(--space-md);
+}
+.q-image {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: var(--radius-lg);
+  margin: 0 0 var(--space-md);
+}
+.opt__image {
+  max-width: 100%;
+  max-height: 160px;
+  border-radius: var(--radius);
+  margin-top: var(--space-xs);
+  align-self: stretch;
 }
 .opts {
   list-style: none;
@@ -308,6 +392,17 @@ watch(remainingMs, (ms) => {
 .opt--selected {
   border-color: var(--primary-container);
   background: var(--surface-container);
+}
+.opt[data-pulse] {
+  animation: opt-pulse 280ms ease;
+}
+@keyframes opt-pulse {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.015); border-color: var(--primary-container); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .opt[data-pulse] { animation: none; }
 }
 .opt__marker {
   display: inline-flex;
