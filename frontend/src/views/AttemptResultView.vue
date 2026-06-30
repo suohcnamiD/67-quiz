@@ -552,6 +552,7 @@ function dismissRating() {
 }
 .opt__image {
   grid-column: 2 / -1;
+  grid-row: 2;
   justify-self: start;
   max-width: 100%;
   max-height: 140px;
@@ -620,6 +621,8 @@ function dismissRating() {
 
 /* The chip communicates the point outcome only. +1 / 0 — that's it. */
 .opt__chip {
+  grid-column: 3;
+  grid-row: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -672,21 +675,6 @@ function dismissRating() {
   --opt-border: color-mix(in srgb, var(--on-secondary-container) 50%, transparent);
   --opt-accent: var(--on-secondary-container);
 }
-.opt--missed::before {
-  content: 'Correct answer';
-  position: absolute;
-  top: -8px;
-  left: var(--space-md);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  padding: 2px 6px;
-  background: var(--on-secondary-container);
-  color: #000;
-  border-radius: 4px;
-}
-.opt--missed { position: relative; }
 
 /* ----- Rating widget ----- */
 .rate {
