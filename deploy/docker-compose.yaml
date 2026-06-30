@@ -1,0 +1,40 @@
+services:
+  db:
+    image: mariadb:latest
+    environment:
+      MYSQL_ROOT_PASSWORD: example
+      MYSQL_DATABASE: main
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    volumes:
+      - sixseven_data:/var/lib/mysql
+  backend:
+    image: ghcr.io/suohcnamid/67-quiz:599b68d # for the latest release
+    environment:
+      - DATABASE_URL=jdbc:mariadb://db:3306/main
+      - DATABASE_USERNAME=user
+      - DATABASE_PASSWORD=password
+    depends_on:
+      db:
+        condition: service_healthy
+  frontend:
+    image: ghcr.io/suohcnamid/67-quiz-frontend:599b68d # for the latest release
+    depends_on:
+      - backend
+
+  caddy:
+    image: caddy:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+
+volumes:
+  sixseven_data:
