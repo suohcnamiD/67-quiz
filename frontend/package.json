@@ -18,6 +18,8 @@
     "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/plus-jakarta-sans": "^5.2.8",
     "@tanstack/vue-query": "^5.100.9",
     "axios": "^1.16.0",
     "orval": "^8.9.1",
