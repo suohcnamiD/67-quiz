@@ -8,6 +8,7 @@ import Button from '@/components/Button.vue'
 import Input from '@/components/Input.vue'
 import Card from '@/components/Card.vue'
 import BrandMark from '@/components/BrandMark.vue'
+import ShaderBackground from '@/components/ShaderBackground.vue'
 
 const username = ref('')
 const password = ref('')
@@ -49,6 +50,7 @@ async function submit() {
 
 <template>
   <div class="page">
+    <ShaderBackground />
     <Card>
       <header class="auth-head">
         <RouterLink to="/" class="brand-link" aria-label="67quiz home"><BrandMark size="md" /></RouterLink>
@@ -85,10 +87,13 @@ async function submit() {
   justify-content: center;
   min-height: 100vh;
   padding: var(--space-xl) var(--margin-mobile);
+  background: #050000;
 }
 .page > :deep(.card) {
   width: 100%;
   max-width: 420px;
+  position: relative;
+  z-index: 1;
 }
 .subtitle {
   color: var(--on-surface-variant);

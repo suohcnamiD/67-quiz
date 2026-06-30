@@ -23,7 +23,8 @@ A complete catalogue of every feature in the codebase as of this writing, organi
 15. [Branding & shared UI primitives](#15-branding--shared-ui-primitives)
 16. [Error handling pipeline](#16-error-handling-pipeline)
 17. [Infrastructure, build, deploy](#17-infrastructure-build-deploy)
-18. [Testing](#18-testing)
+19. [Browser APIs](#19-browser-apis)
+20. [Testing](#20-testing)
 
 ---
 
@@ -445,7 +446,22 @@ Reuses error codes `INVALID_IMAGE` and `AVATAR_TOO_LARGE` rather than fragmentin
 
 **Local dev DB** — `backend/local/67quiz/docker-compose.yaml` runs MariaDB; `podman compose -f ... up -d` brings it up on port 3306 with the credentials the default `application.yaml` expects.
 
-## 18. Testing
+## 19. Browser APIs
+
+The frontend uses the following [Web APIs](https://developer.mozilla.org/en-US/docs/Web/API) directly — each counts as a distinct integration:
+
+| API | Where | Purpose |
+|---|---|---|
+| **WebGL API** (`HTMLCanvasElement.getContext('webgl')`) | `components/ShaderBackground.vue` | Full GLSL vertex + fragment shader pipeline for the animated lava-plasma background on the landing, login, and register pages. Compiles shader programs, manages a WebGL buffer and uniform locations, drives a 60 fps `TRIANGLE_STRIP` render loop. |
+| **Canvas API** (`HTMLCanvasElement`) | `components/ShaderBackground.vue` | The canvas DOM element that the WebGL context renders into. |
+| **ResizeObserver API** | `components/ShaderBackground.vue` | Syncs the WebGL drawing-buffer resolution to the CSS layout size whenever the element or viewport is resized, preventing blurry renders on window resize or mobile rotation. |
+| **requestAnimationFrame / cancelAnimationFrame** | `components/ShaderBackground.vue`, `components/FinishCelebration.vue` | Frame-accurate animation loops — the shader render loop and the confetti score-counter animation both use `rAF` and clean up via `cancelAnimationFrame` on unmount. |
+| **AbortSignal / AbortController** | All generated API clients (`src/api/**`) | Every HTTP request accepts a `signal?: AbortSignal` so TanStack Query can cancel in-flight requests on component unmount or cache invalidation without leaving dangling network calls. |
+| **FormData API** | `src/api/user-profile-controller/user-profile-controller.ts` | Constructs multipart `FormData` payloads for avatar uploads (`PUT /users/me/avatar`). The same pattern is reused for quiz-image uploads. |
+| **History API** (`createWebHistory`) | `src/router/index.ts` | Vue Router uses `window.history.pushState` / `replaceState` for SPA navigation with clean URLs (no hash). |
+| **matchMedia API** (`window.matchMedia`) | `src/lib/scrollAndFlash.ts` | Reads the `prefers-reduced-motion` media query before triggering scroll-flash animations so users with vestibular disorders get a reduced-motion experience. |
+
+## 20. Testing
 
 **Backend** — `BackendApplicationTests` loads the full Spring context, exercising bean wiring and Liquibase against the real DB. Run with `./gradlew test`.
 
