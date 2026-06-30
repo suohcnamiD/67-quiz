@@ -190,6 +190,37 @@ watch(avatarOpen, (open) => {
   if (!open) avatarError.value = null
 })
 
+// --- Claude MCP install prompt -------------------------------------------
+const mcpOpen = ref(false)
+const mcpCopied = ref(false)
+
+function mcpPrompt(): string {
+  const frontendUrl = window.location.origin
+  const backendUrl = `${window.location.protocol}//${window.location.hostname}${window.location.port === '5173' ? ':8080' : ''}`
+  return `Please install the 67-quiz MCP server for me. Follow these steps exactly:
+
+1. Download this ZIP file: ${frontendUrl}/mcp-bundle.zip
+2. Unzip it to a folder on your computer: ~/67-quiz-mcp/
+3. Inside that folder, run: npm install
+4. Register the MCP server in Claude Code:
+
+   claude mcp add 67-quiz --scope user -e QUIZ_BASE_URL=${backendUrl} -- node ~/67-quiz-mcp/index.js
+
+5. Verify it works:
+
+   claude mcp list
+
+   You should see: 67-quiz: node ~/67-quiz-mcp/index.js - ✓ Connected
+
+After that you will have these tools available: login, create_quiz, add_question, list_quizzes, get_quiz, delete_quiz.`
+}
+
+async function copyMcpPrompt() {
+  await navigator.clipboard.writeText(mcpPrompt())
+  mcpCopied.value = true
+  setTimeout(() => { mcpCopied.value = false }, 2000)
+}
+
 function scrollToAuthored() {
   scrollAndFlash('authored-section')
 }
@@ -275,6 +306,27 @@ function scrollToAuthored() {
         />
       </div>
     </section>
+
+    <section class="mcp-section" aria-labelledby="mcp-heading">
+      <div class="mcp-section__head">
+        <div>
+          <h2 id="mcp-heading" class="headline-md">Claude Integration</h2>
+          <p class="body-md muted">Let Claude create and manage quizzes on your behalf.</p>
+        </div>
+        <Button @click="mcpOpen = true">Install MCP</Button>
+      </div>
+    </section>
+
+    <Modal :open="mcpOpen" title="Install 67-quiz MCP" @close="mcpOpen = false">
+      <p class="body-md mcp-modal__intro">
+        Copy the prompt below and paste it into Claude. Claude will install the MCP server for you automatically — no manual steps needed.
+      </p>
+      <pre class="mcp-prompt">{{ mcpPrompt() }}</pre>
+      <template #footer>
+        <Button variant="ghost" @click="mcpOpen = false">Close</Button>
+        <Button @click="copyMcpPrompt">{{ mcpCopied ? '✓ Copied!' : 'Copy prompt' }}</Button>
+      </template>
+    </Modal>
 
     <p v-if="errorText" class="banner label-md" role="alert">{{ errorText }}</p>
 
@@ -548,6 +600,47 @@ function scrollToAuthored() {
   }
   .head__actions {
     width: 100%;
+  }
+}
+.mcp-section {
+  margin-bottom: var(--space-xl);
+  padding: var(--space-lg);
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+}
+.mcp-section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+.mcp-section__head h2 {
+  margin: 0 0 var(--space-xs);
+}
+.mcp-modal__intro {
+  margin: 0 0 var(--space-md);
+  color: var(--on-surface-variant);
+}
+.mcp-prompt {
+  background: var(--surface-container-high);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  font-family: monospace;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--on-surface);
+  margin: 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+@media (max-width: 600px) {
+  .mcp-section__head {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>

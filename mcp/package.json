@@ -1,0 +1,20 @@
+{
+  "name": "67-quiz-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for 67-quiz — create and manage quizzes via Claude",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "axios": "^1.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0"
+  }
+}

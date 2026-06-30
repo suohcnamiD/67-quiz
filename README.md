@@ -1,35 +1,15 @@
 # 67-quiz
 
-## Deploying (low-cortisol)
-For ease of use, the workflow in the repository builds and publishes a Docker Image automatically that contains the bundled app (BE + FE).
-Compose:
+
+## Deploying
+
+```bash
+git clone https://github.com/suohcnamiD/67-quiz
+cd 67-quiz/deploy
+docker compose up -d
 ```
-services:
-  db:
-    image: mariadb:latest
-    environment:
-      MYSQL_ROOT_PASSWORD: example
-      MYSQL_DATABASE: main
-      MYSQL_USER: user
-      MYSQL_PASSWORD: password
-    healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
-  app:
-    image: ghcr.io/suohcnamid/67-quiz:latest
-    environment:
-      - DATABASE_URL=jdbc:mariadb://db:3306/main
-      - DATABASE_USERNAME=user
-      - DATABASE_PASSWORD=password
-    ports:
-      - "8080:8080"
-    depends_on:
-      db:
-        condition: service_healthy
-```
+
+After the containers are up, you can access the app at http://localhost.
 
 ## Intro
 Good day well-respected sirs, this is a repo for 67 Quiz.

@@ -78,7 +78,7 @@ public class SecurityConfiguration {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(List.of(
                 "http://192.168.*.*:5173",
-                "http://localhost:5173",
+                "http://localhost",
                 "https://output.center"
         ));
 

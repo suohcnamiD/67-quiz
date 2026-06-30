@@ -9,6 +9,7 @@ import java.util.UUID;
 @Relation(collectionRelation = "questions", itemRelation = "question")
 public record AttemptQuestionDto(
         UUID id,
+        UUID questionId,
         String text,
         QuestionType type,
         boolean hasImage,

@@ -141,7 +141,13 @@ async function removeQuiz() {
       </span>
     </div>
     <div class="actions">
-      <Button type="button" :loading="starting" @click="startAttempt">Start attempt</Button>
+      <Button
+        type="button"
+        :loading="starting"
+        :disabled="!quiz.questionCount || quiz.questionCount < 1"
+        :title="!quiz.questionCount || quiz.questionCount < 1 ? 'Add at least one question to start' : undefined"
+        @click="startAttempt"
+      >Start attempt</Button>
       <Button
         v-if="showAuthorActions && quiz.youAreAuthor"
         type="button"
