@@ -6,9 +6,9 @@ A complete catalogue of every feature in the codebase as of this writing, organi
 
 ## Table of contents
 
-1. [Authentication & sessions](#1-authentication--sessions)
-2. [Browser APIs](#2-browser-apis)
-3. [Claude MCP Integration](#3-claude-mcp-integration)
+1. [Browser APIs](#1-browser-apis)
+2. [Claude MCP Integration](#2-claude-mcp-integration)
+3. [Authentication & sessions](#3-authentication--sessions)
 4. [Authorization](#4-authorization)
 5. [User accounts & profiles](#5-user-accounts--profiles)
 6. [Avatars](#6-avatars)
@@ -29,30 +29,7 @@ A complete catalogue of every feature in the codebase as of this writing, organi
 
 ---
 
-## 1. Authentication & sessions
-
-Three endpoints under `/api/authentication`, all under `authentication/`:
-
-- **Register** — `POST /authentication/register` (`AuthenticationController` → `RegistrationService`). Validates username (5–16 chars, regex `^[a-zA-Z][a-zA-Z0-9_]+$`), password (≥8 chars), checks uniqueness, hashes with `BCryptPasswordEncoder`, then auto-logs in the new user. Domain exceptions: `DuplicateUsernameException`, `InvalidUsernameException`, `UsernameTooShortException`, `UsernameTooLongException`, `PasswordTooShortException`.
-- **Login** — `POST /authentication/login` (`LogInService.loginUser`). Authenticates via Spring Security's `AuthenticationManager`, builds a `SecurityContext`, writes it to the JDBC session under `HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY`. Wrong password → `UNAUTHORIZED` (401).
-- **Logout** — `POST /authentication/logout` (Spring default), clears the session.
-
-Plus `GET /authentication/me` (`AuthenticationStateController`) for the FE's anonymous-probe pattern.
-
-**Session storage** is Spring Session JDBC with `initialize-schema: never` (`application.yaml`) — the schema lives in `db/changelog/000-security.yaml`, not the Spring Session bootstrapper. Session cookies are HTTP-only, `same-site=lax`, `secure` defaulting to false so plain-HTTP prod containers work out of the box (overridable via `SERVER_SESSION_COOKIE_SECURE`).
-
-**Security configuration** (`shared/configuration/SecurityConfiguration.java`):
-- CSRF disabled globally.
-- CORS allows `http://localhost:5173`, `http://192.168.*.*:5173`, `https://output.center`; all methods + headers; credentials allowed.
-- Public endpoints: `/`, `/index.html`, `/assets/**`, `/favicon.ico`, OpenAPI docs, Swagger UI, `/authentication/**`.
-- Everything else requires `authenticated()`.
-
-**Frontend** (`stores/auth.ts`, `router/index.ts`):
-- `useAuthStore` tracks `status: 'unknown' | 'authenticated' | 'anonymous'`, plus `username`, `displayName`, `hasAvatar`, `avatarVersion` (bumped after upload so the cached `<img>` refetches).
-- Router guard waits for the first auth probe before resolving any route; routes marked `meta.anonymous` redirect authenticated users away, `meta.landing` does the same, the rest redirect to `/login?next=…` if anonymous.
-- Login/register forms surface field-level errors via the `Input.error` prop, populated from `validationFieldErrors(e)` in `lib/errors.ts`.
-
-## 2. Browser APIs
+## 1. Browser APIs
 
 The frontend uses the following [Web APIs](https://developer.mozilla.org/en-US/docs/Web/API) directly — each counts as a distinct integration:
 
@@ -68,7 +45,7 @@ The frontend uses the following [Web APIs](https://developer.mozilla.org/en-US/d
 | **matchMedia API** (`window.matchMedia`) | `src/lib/scrollAndFlash.ts` | Reads the `prefers-reduced-motion` media query before triggering scroll-flash animations so users with vestibular disorders get a reduced-motion experience. |
 | **Clipboard API** (`navigator.clipboard.writeText`) | `src/views/ProfileView.vue` | Copies the MCP install prompt to the clipboard when the user clicks "Copy prompt" in the Claude Integration modal. |
 
-## 3. Claude MCP Integration
+## 2. Claude MCP Integration
 
 A Model Context Protocol (MCP) server that allows Claude to create and manage quizzes on behalf of any logged-in user.
 
@@ -93,6 +70,30 @@ A Model Context Protocol (MCP) server that allows Claude to create and manage qu
 | `add_question` | Add a single/multi-choice question with options to a quiz |
 | `get_quiz` | Get full quiz details including all questions and options |
 | `delete_quiz` | Delete a quiz the caller authored |
+
+## 3. Authentication & sessions
+
+Three endpoints under `/api/authentication`, all under `authentication/`:
+
+- **Register** — `POST /authentication/register` (`AuthenticationController` → `RegistrationService`). Validates username (5–16 chars, regex `^[a-zA-Z][a-zA-Z0-9_]+$`), password (≥8 chars), checks uniqueness, hashes with `BCryptPasswordEncoder`, then auto-logs in the new user. Domain exceptions: `DuplicateUsernameException`, `InvalidUsernameException`, `UsernameTooShortException`, `UsernameTooLongException`, `PasswordTooShortException`.
+- **Login** — `POST /authentication/login` (`LogInService.loginUser`). Authenticates via Spring Security's `AuthenticationManager`, builds a `SecurityContext`, writes it to the JDBC session under `HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY`. Wrong password → `UNAUTHORIZED` (401).
+- **Logout** — `POST /authentication/logout` (Spring default), clears the session.
+
+Plus `GET /authentication/me` (`AuthenticationStateController`) for the FE's anonymous-probe pattern.
+
+**Session storage** is Spring Session JDBC with `initialize-schema: never` (`application.yaml`) — the schema lives in `db/changelog/000-security.yaml`, not the Spring Session bootstrapper. Session cookies are HTTP-only, `same-site=lax`, `secure` defaulting to false so plain-HTTP prod containers work out of the box (overridable via `SERVER_SESSION_COOKIE_SECURE`).
+
+**Security configuration** (`shared/configuration/SecurityConfiguration.java`):
+- CSRF disabled globally.
+- CORS allows `http://localhost:5173`, `http://192.168.*.*:5173`, `https://output.center`; all methods + headers; credentials allowed.
+- Public endpoints: `/`, `/index.html`, `/assets/**`, `/favicon.ico`, OpenAPI docs, Swagger UI, `/authentication/**`.
+- Everything else requires `authenticated()`.
+
+**Frontend** (`stores/auth.ts`, `router/index.ts`):
+- `useAuthStore` tracks `status: 'unknown' | 'authenticated' | 'anonymous'`, plus `username`, `displayName`, `hasAvatar`, `avatarVersion` (bumped after upload so the cached `<img>` refetches).
+- Router guard waits for the first auth probe before resolving any route; routes marked `meta.anonymous` redirect authenticated users away, `meta.landing` does the same, the rest redirect to `/login?next=…` if anonymous.
+- Login/register forms surface field-level errors via the `Input.error` prop, populated from `validationFieldErrors(e)` in `lib/errors.ts`.
+
 
 ## 4. Authorization
 
