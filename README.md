@@ -1,48 +1,14 @@
 # 67-quiz
 
 ## Deploying
-The workflow builds and publishes two Docker Images: one for the backend and one for the frontend. You can use them to deploy the app.
-Compose:
-```
-services:
-  db:
-    image: mariadb:latest
-    environment:
-      MYSQL_ROOT_PASSWORD: example
-      MYSQL_DATABASE: main
-      MYSQL_USER: user
-      MYSQL_PASSWORD: password
-    healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
-    volumes:
-      - sixseven_data:/var/lib/mysql
-  backend:
-    image: ghcr.io/suohcnamid/67-quiz:latest # for the latest release
-    environment:
-      - DATABASE_URL=jdbc:mariadb://db:3306/main
-      - DATABASE_USERNAME=user
-      - DATABASE_PASSWORD=password
-    ports:
-      - "127.0.0.1:10005:8080"
-    depends_on:
-      db:
-        condition: service_healthy
-  frontend:
-    image: ghcr.io/suohcnamid/67-quiz-frontend:latest # for the latest release
-    ports:
-      - "127.0.0.1:10004:80"
-    depends_on:
-      - backend
 
-volumes:
-  sixseven_data:
+```bash
+git clone https://github.com/suohcnamiD/67-quiz
+cd 67-quiz/deploy
+docker compose up -d
 ```
 
-To deploy dev builds, see available tags in the [packages](https://github.com/suohcnamiD?tab=packages&repo_name=67-quiz). The tags for backend and frontend are the same.
+After the containers are up, you can access the app at http://localhost.
 
 ## Intro
 Good day well-respected sirs, this is a repo for 67 Quiz.
