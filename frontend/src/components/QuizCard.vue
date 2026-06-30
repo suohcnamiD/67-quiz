@@ -105,6 +105,13 @@ async function removeQuiz() {
       class="cover"
       loading="lazy"
     />
+    <div v-else class="cover cover--placeholder" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <circle cx="8.5" cy="10.5" r="1.5" />
+        <path d="M21 16l-4.5-4.5L7 21" />
+      </svg>
+    </div>
     <div class="row">
       <h3 class="headline-md">{{ quiz.name }}</h3>
       <Chip v-if="quiz.youAreAuthor">Your quiz</Chip>
@@ -169,10 +176,18 @@ async function removeQuiz() {
 .cover {
   display: block;
   width: 100%;
-  max-height: 180px;
+  height: 180px;
   object-fit: cover;
-  border-radius: var(--radius);
-  margin: calc(-1 * var(--space-md)) calc(-1 * var(--space-md)) var(--space-md);
+  border-radius: var(--radius) var(--radius) 0 0;
+  margin: calc(-1 * var(--space-lg)) calc(-1 * var(--space-lg)) var(--space-md);
+}
+.cover--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-container-low);
+  color: var(--on-surface-variant);
+  opacity: 0.5;
 }
 .row {
   display: flex;

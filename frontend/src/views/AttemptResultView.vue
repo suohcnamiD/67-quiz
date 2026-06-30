@@ -61,8 +61,11 @@ const tone = computed<'great' | 'good' | 'tried'>(() => {
 type OptState = 'correct' | 'wrong' | 'missed' | 'skipped'
 function optState(o: FinishedOptionDto, q: FinishedQuestionDto): OptState {
   if (q.type === 'SINGLE_CHOICE') {
-    if (!o.selected) return 'skipped'
-    return o.correct ? 'correct' : 'wrong'
+    if (o.selected) return o.correct ? 'correct' : 'wrong'
+    // Unpicked: highlight the correct one as "missed" so the user can see
+    // which option was the right answer when they picked wrong; the rest
+    // stay neutral "skipped".
+    return o.correct ? 'missed' : 'skipped'
   }
   if (o.correct && o.selected) return 'correct'
   if (!o.correct && o.selected) return 'wrong'
@@ -659,6 +662,31 @@ function dismissRating() {
   color: var(--on-secondary-container);
   border: 1px solid color-mix(in srgb, var(--on-secondary-container) 40%, transparent);
 }
+
+/* Missed: this WAS the right answer but the user didn't pick it. Tint
+   green so the correct answer is unambiguous, but keep the chip at 0
+   (no points earned). Overrides the .opt--lose tone applied by
+   chipFor() so red doesn't fight the "this is the right answer" message. */
+.opt--missed {
+  --opt-bg: color-mix(in srgb, var(--on-secondary-container) 12%, var(--surface-container-low));
+  --opt-border: color-mix(in srgb, var(--on-secondary-container) 50%, transparent);
+  --opt-accent: var(--on-secondary-container);
+}
+.opt--missed::before {
+  content: 'Correct answer';
+  position: absolute;
+  top: -8px;
+  left: var(--space-md);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  background: var(--on-secondary-container);
+  color: #000;
+  border-radius: 4px;
+}
+.opt--missed { position: relative; }
 
 /* ----- Rating widget ----- */
 .rate {
