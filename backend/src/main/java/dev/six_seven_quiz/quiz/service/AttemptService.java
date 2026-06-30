@@ -27,6 +27,7 @@ import dev.six_seven_quiz.quiz.repository.QuizRepository;
 import dev.six_seven_quiz.user.ApplicationUser;
 import dev.six_seven_quiz.user.ApplicationUserService;
 import dev.six_seven_quiz.user.profile.component.mapper.UserProfileMapper;
+import dev.six_seven_quiz.user.profile.dto.AuthorSummaryDto;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.transaction.Transactional;
@@ -110,14 +111,33 @@ public class AttemptService {
     }
 
     private QuizSummaryDto quizToSummary(Quiz quiz, ApplicationUser user) {
+        // The attempts.quiz_id FK is ON DELETE SET NULL — when an author deletes
+        // their quiz, every attempt of that quiz survives but loses its quiz
+        // reference. Emit a tombstone DTO so old score history still renders.
+        if (quiz == null) {
+            return new QuizSummaryDto(
+                    "Deleted quiz",
+                    0,
+                    0,
+                    java.time.Duration.ZERO,
+                    null,
+                    false,
+                    false,
+                    null,
+                    new QuizRatingSummaryDto(null, 0L)
+            );
+        }
         int questionCount = questionRepository.countByQuiz_QuizId(quiz.getId());
-        boolean areYouAuthor = quiz.getAuthor().equals(user);
+        boolean areYouAuthor = quiz.getAuthor() != null && quiz.getAuthor().equals(user);
         long ratingCount = quizRatingRepository.countForQuiz(quiz.getId());
         Double ratingAvg = ratingCount > 0
                 ? quizRatingRepository.averageScoreForQuiz(quiz.getId()).orElse(null)
                 : null;
         QuizRatingSummaryDto ratingSummary = new QuizRatingSummaryDto(ratingAvg, ratingCount);
-        return quizMapper.toSummary(quiz, questionCount, areYouAuthor, userProfileMapper.toAuthorSummary(quiz.getAuthor()), ratingSummary);
+        AuthorSummaryDto authorSummary = quiz.getAuthor() != null
+                ? userProfileMapper.toAuthorSummary(quiz.getAuthor())
+                : null;
+        return quizMapper.toSummary(quiz, questionCount, areYouAuthor, authorSummary, ratingSummary);
     }
 
     private void validateUserAttemptOwnership(ApplicationUser user, Attempt attempt) {
@@ -199,16 +219,20 @@ public class AttemptService {
         entityManager.flush();
         entityManager.refresh(attempt);
 
-        // Notify the quiz author unless they took their own quiz.
-        ApplicationUser author = attempt.getQuiz().getAuthor();
-        if (!author.getId().equals(user.getId())) {
+        // Notify the quiz author unless they took their own quiz. The quiz can
+        // have been deleted between the attempt start and finish (quiz_attempts
+        // .quiz_id is ON DELETE SET NULL), so guard both the quiz and its
+        // author against null before emitting.
+        Quiz finishedQuiz = attempt.getQuiz();
+        ApplicationUser author = finishedQuiz != null ? finishedQuiz.getAuthor() : null;
+        if (author != null && !author.getId().equals(user.getId())) {
             int maxScore = attempt.getMaximumScore();
             int score = attempt.getEarnedScore();
             java.util.Map<String, Object> payload = new java.util.HashMap<>();
             payload.put("actorUsername", user.getUsername());
             payload.put("actorDisplayName", user.getDisplayName());
-            payload.put("quizId", attempt.getQuiz().getId().toString());
-            payload.put("quizName", attempt.getQuiz().getName());
+            payload.put("quizId", finishedQuiz.getId().toString());
+            payload.put("quizName", finishedQuiz.getName());
             payload.put("attemptId", attempt.getId().toString());
             payload.put("score", score);
             payload.put("maxScore", maxScore);
