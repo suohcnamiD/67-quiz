@@ -1,7 +1,7 @@
 # 67-quiz
 
-## Deploying (low-cortisol)
-For ease of use, the workflow in the repository builds and publishes a Docker Image automatically that contains the bundled app (BE + FE).
+## Deploying
+The workflow builds and publishes two Docker Images: one for the backend and one for the frontend. You can use them to deploy the app.
 Compose:
 ```
 services:
@@ -18,18 +18,31 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
-  app:
-    image: ghcr.io/suohcnamid/67-quiz:latest
+    volumes:
+      - sixseven_data:/var/lib/mysql
+  backend:
+    image: ghcr.io/suohcnamid/67-quiz:latest # for the latest release
     environment:
       - DATABASE_URL=jdbc:mariadb://db:3306/main
       - DATABASE_USERNAME=user
       - DATABASE_PASSWORD=password
     ports:
-      - "8080:8080"
+      - "127.0.0.1:10005:8080"
     depends_on:
       db:
         condition: service_healthy
+  frontend:
+    image: ghcr.io/suohcnamid/67-quiz-frontend:latest # for the latest release
+    ports:
+      - "127.0.0.1:10004:80"
+    depends_on:
+      - backend
+
+volumes:
+  sixseven_data:
 ```
+
+To deploy dev builds, see available tags in the [packages](https://github.com/suohcnamiD?tab=packages&repo_name=67-quiz). The tags for backend and frontend are the same.
 
 ## Intro
 Good day well-respected sirs, this is a repo for 67 Quiz.
