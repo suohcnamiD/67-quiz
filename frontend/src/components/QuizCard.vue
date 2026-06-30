@@ -175,11 +175,11 @@ async function removeQuiz() {
 <style scoped>
 .cover {
   display: block;
-  width: 100%;
+  width: calc(100% + 2 * var(--space-lg) + 2px);
   height: 180px;
   object-fit: cover;
-  border-radius: var(--radius) var(--radius) 0 0;
-  margin: calc(-1 * var(--space-lg)) calc(-1 * var(--space-lg)) var(--space-md);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  margin: calc(-1 * var(--space-lg) - 1px) calc(-1 * var(--space-lg) - 1px) var(--space-md);
 }
 .cover--placeholder {
   display: flex;
