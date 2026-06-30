@@ -6,29 +6,72 @@ A complete catalogue of every feature in the codebase as of this writing, organi
 
 ## Table of contents
 
-1. [Authentication & sessions](#1-authentication--sessions)
-2. [Authorization](#2-authorization)
-3. [User accounts & profiles](#3-user-accounts--profiles)
-4. [Avatars](#4-avatars)
-5. [Quiz authoring](#5-quiz-authoring)
-6. [Quiz taking (attempts)](#6-quiz-taking-attempts)
-7. [Quiz ratings](#7-quiz-ratings)
-8. [Leaderboards](#8-leaderboards)
-9. [Profile comments](#9-profile-comments)
-10. [Notifications](#10-notifications)
-11. [Quiz images (cover / question / option)](#11-quiz-images-cover--question--option)
-12. [Search & discovery](#12-search--discovery)
-13. [Dashboard](#13-dashboard)
-14. [Navigation & app shell](#14-navigation--app-shell)
-15. [Branding & shared UI primitives](#15-branding--shared-ui-primitives)
-16. [Error handling pipeline](#16-error-handling-pipeline)
-17. [Infrastructure, build, deploy](#17-infrastructure-build-deploy)
-19. [Browser APIs](#19-browser-apis)
+1. [Browser APIs](#1-browser-apis)
+2. [Claude MCP Integration](#2-claude-mcp-integration)
+3. [Authentication & sessions](#3-authentication--sessions)
+4. [Authorization](#4-authorization)
+5. [User accounts & profiles](#5-user-accounts--profiles)
+6. [Avatars](#6-avatars)
+7. [Quiz authoring](#7-quiz-authoring)
+8. [Quiz taking (attempts)](#8-quiz-taking-attempts)
+9. [Quiz ratings](#9-quiz-ratings)
+10. [Leaderboards](#10-leaderboards)
+11. [Profile comments](#11-profile-comments)
+12. [Notifications](#12-notifications)
+13. [Quiz images (cover / question / option)](#13-quiz-images-cover--question--option)
+14. [Search & discovery](#14-search--discovery)
+15. [Dashboard](#15-dashboard)
+16. [Navigation & app shell](#16-navigation--app-shell)
+17. [Branding & shared UI primitives](#17-branding--shared-ui-primitives)
+18. [Error handling pipeline](#18-error-handling-pipeline)
+19. [Infrastructure, build, deploy](#19-infrastructure-build-deploy)
 20. [Testing](#20-testing)
 
 ---
 
-## 1. Authentication & sessions
+## 1. Browser APIs
+
+The frontend uses the following [Web APIs](https://developer.mozilla.org/en-US/docs/Web/API) directly — each counts as a distinct integration:
+
+| API | Where | Purpose |
+|---|---|---|
+| **WebGL API** (`HTMLCanvasElement.getContext('webgl')`) | `components/ShaderBackground.vue` | Full GLSL vertex + fragment shader pipeline for the animated lava-plasma background on the landing, login, and register pages. Compiles shader programs, manages a WebGL buffer and uniform locations, drives a 60 fps `TRIANGLE_STRIP` render loop. |
+| **Canvas API** (`HTMLCanvasElement`) | `components/ShaderBackground.vue` | The canvas DOM element that the WebGL context renders into. |
+| **ResizeObserver API** | `components/ShaderBackground.vue` | Syncs the WebGL drawing-buffer resolution to the CSS layout size whenever the element or viewport is resized, preventing blurry renders on window resize or mobile rotation. |
+| **requestAnimationFrame / cancelAnimationFrame** | `components/ShaderBackground.vue`, `components/FinishCelebration.vue` | Frame-accurate animation loops — the shader render loop and the confetti score-counter animation both use `rAF` and clean up via `cancelAnimationFrame` on unmount. |
+| **AbortSignal / AbortController** | All generated API clients (`src/api/**`) | Every HTTP request accepts a `signal?: AbortSignal` so TanStack Query can cancel in-flight requests on component unmount or cache invalidation without leaving dangling network calls. |
+| **FormData API** | `src/api/user-profile-controller/user-profile-controller.ts` | Constructs multipart `FormData` payloads for avatar uploads (`PUT /users/me/avatar`). The same pattern is reused for quiz-image uploads. |
+| **History API** (`createWebHistory`) | `src/router/index.ts` | Vue Router uses `window.history.pushState` / `replaceState` for SPA navigation with clean URLs (no hash). |
+| **matchMedia API** (`window.matchMedia`) | `src/lib/scrollAndFlash.ts` | Reads the `prefers-reduced-motion` media query before triggering scroll-flash animations so users with vestibular disorders get a reduced-motion experience. |
+| **Clipboard API** (`navigator.clipboard.writeText`) | `src/views/ProfileView.vue` | Copies the MCP install prompt to the clipboard when the user clicks "Copy prompt" in the Claude Integration modal. |
+
+## 2. Claude MCP Integration
+
+A Model Context Protocol (MCP) server that allows Claude to create and manage quizzes on behalf of any logged-in user.
+
+**Install flow** (`views/ProfileView.vue`):
+- Every authenticated user sees a "Claude Integration" card on their profile page.
+- Clicking **Install MCP** opens a modal with a ready-made prompt.
+- Clicking **Copy prompt** copies it to the clipboard (Clipboard API).
+- The user pastes the prompt into Claude — Claude downloads the ZIP, installs dependencies, and registers the server automatically. No manual steps required.
+
+**MCP server** (`mcp/src/index.ts`, served as `frontend/public/mcp-bundle-v2.zip`):
+- Built with `@modelcontextprotocol/sdk`, communicates with Claude Desktop / Claude Code over stdio.
+- `QUIZ_BASE_URL` env var points at the backend (injected dynamically from `window.location` at prompt generation time).
+- Session cookie is stored in memory for the lifetime of the process.
+
+**Available tools:**
+
+| Tool | Description |
+|---|---|
+| `login` | Authenticate with username + password; stores the session cookie |
+| `list_quizzes` | List all quizzes (paginated) |
+| `create_quiz` | Create a new quiz with a name and duration |
+| `add_question` | Add a single/multi-choice question with options to a quiz |
+| `get_quiz` | Get full quiz details including all questions and options |
+| `delete_quiz` | Delete a quiz the caller authored |
+
+## 3. Authentication & sessions
 
 Three endpoints under `/api/authentication`, all under `authentication/`:
 
@@ -51,14 +94,15 @@ Plus `GET /authentication/me` (`AuthenticationStateController`) for the FE's ano
 - Router guard waits for the first auth probe before resolving any route; routes marked `meta.anonymous` redirect authenticated users away, `meta.landing` does the same, the rest redirect to `/login?next=…` if anonymous.
 - Login/register forms surface field-level errors via the `Input.error` prop, populated from `validationFieldErrors(e)` in `lib/errors.ts`.
 
-## 2. Authorization
+
+## 4. Authorization
 
 - `Role` entity (`authorization/Role.java`) joined to users via `user_roles` (many-to-many, eager-fetched on `ApplicationUser`).
 - `SecurityConfiguration.userDetailsService` translates roles to `SimpleGrantedAuthority("ROLE_" + name)`.
 - `@EnableMethodSecurity(jsr250Enabled = true)` is on, but in practice **all authorization is owner-based, not role-based**: services explicitly check `quiz.getAuthor().equals(user)` (`QuizValidator.requireOwner`) and similar for attempts, ratings, comments. There's no `@RolesAllowed` in production code.
 - The Failure/`NO_ACCESS_TO_QUIZ` / `NO_ACCESS_TO_ATTEMPT` / `NO_ACCESS_TO_COMMENT` paths return 403 with structured errors so the FE can map them to specific copy.
 
-## 3. User accounts & profiles
+## 5. User accounts & profiles
 
 **`ApplicationUser`** (`user/ApplicationUser.java`):
 - PK: UUID. Fields: `username` (unique, immutable), `password` (bcrypt hash), `displayName` (defaults to username at register), `bio` (≤280 chars), `avatarPath` (relative path, nullable), `roles` (eager many-to-many).
@@ -76,7 +120,7 @@ Plus `GET /authentication/me` (`AuthenticationStateController`) for the FE's ano
 - Public view at `/app/users/:username` shows the same stats but no edit affordances.
 - Both pages mount the shared `ProfileComments` component (see §9).
 
-## 4. Avatars
+## 6. Avatars
 
 Distinct from the broader quiz-image pipeline because it predates it.
 
@@ -98,7 +142,7 @@ Distinct from the broader quiz-image pipeline because it predates it.
 - Optimistic preview while upload round-trips; on success, `useAuthStore.bumpAvatarVersion()` increments a counter the topbar `<img>` uses as a query string so the browser refetches.
 - Errors: `INVALID_IMAGE` ("That image couldn't be read..."), `AVATAR_TOO_LARGE` (resolver interpolates `details.maxBytes` into "That image is over 2 MB.").
 
-## 5. Quiz authoring
+## 7. Quiz authoring
 
 **Domain model** (`quiz/model/`):
 - **`Quiz`** — `id` UUID, `name`, `author` (ManyToOne), `duration` (Duration, e.g. `PT5M`), `coverImagePath`, `questions` (eager OneToMany via junction `quiz_questions(quiz_id, question_id, position)` ordered by `@OrderColumn`).
@@ -132,7 +176,7 @@ Distinct from the broader quiz-image pipeline because it predates it.
 - `components/QuestionForm.vue` — controlled by the parent, handles the type toggle, blank-option validation client-side, marker rendering (radio for single, checkbox for multi).
 - New questions and options get IDs only after they're persisted, so image upload is gated to the read-only display mode of each saved card.
 
-## 6. Quiz taking (attempts)
+## 8. Quiz taking (attempts)
 
 **Domain** (`quiz/model/`):
 - **`Attempt`** — `id`, `user`, `quiz`, `finished`, `startedAt`, `finishDeadline`, `questions` (eager ordered list of `AttemptQuestion`, cascade ALL, orphan removal). Constructor `new Attempt(user, quiz, deadline)` snapshots the quiz's questions into `AttemptQuestion`s at start time so subsequent edits to the source quiz don't bleed into in-flight attempts.
@@ -152,7 +196,7 @@ Distinct from the broader quiz-image pipeline because it predates it.
 - `views/AttemptView.vue` — sticky progress bar (questions left, time remaining), tabular-numeral timer, per-option button. Option toggles fire `commitAttemptActions` optimistically with cache update + rollback on failure. Single-choice already-picked clicks animate a pulse instead of toggling (radio-like behaviour). Auto-finish on timer reaching 0 routes to the result view. Question and option images render lazily.
 - `views/AttemptResultView.vue` — result hero with score ring (conic gradient, colour by percentage band: green ≥85%, yellow ≥50%, red <50%), per-question card with the option sort: correctly classified first, then skipped, then missed, then wrong. Rating widget mounted inline (see §7). Confetti via `components/FinishCelebration.vue` on initial visit (controlled by `?just=1` query param).
 
-## 7. Quiz ratings
+## 9. Quiz ratings
 
 Captured after a user finishes an attempt of a quiz. **One rating per (user, quiz)**; updatable in place; doesn't re-notify.
 
@@ -179,7 +223,7 @@ The `ratingSummary` is also embedded into every `QuizSummaryDto` (`average`, `co
 
 Resolver `INVALID_RATING` interpolates the min/max from details into "Rating must be between 1 and 10." `RATING_NOT_ELIGIBLE` resolves to "Finish the quiz before rating it." Both in `lib/errors.ts`.
 
-## 8. Leaderboards
+## 10. Leaderboards
 
 Two global boards, **paginated server-side, with the caller's overall rank computed across the full qualifying population**.
 
@@ -208,7 +252,7 @@ Both return `LeaderboardPageDto{entries[], page, totalPages, totalElements, you}
 
 Internal helpers `LeaderboardService.rankedPlayerIds()` / `rankedAuthorIds()` return the unpaginated ranking — used by the snapshot job (see §10).
 
-## 9. Profile comments
+## 11. Profile comments
 
 Basic: post + list + delete. No edits, no replies, no threading.
 
@@ -229,7 +273,7 @@ Basic: post + list + delete. No edits, no replies, no threading.
 - Delete uses the shared `confirmDialog`.
 - Mounted on both own profile and public profile views.
 
-## 10. Notifications
+## 12. Notifications
 
 Four trigger types reach a single inbox per user.
 
@@ -270,7 +314,7 @@ Four trigger types reach a single inbox per user.
 - `views/NotificationsView.vue` — full history at `/app/notifications`. Same activation behaviour, paginated, mark-all-read button.
 - Mobile thumb menu carries a Notifications link.
 
-## 11. Quiz images (cover / question / option)
+## 13. Quiz images (cover / question / option)
 
 Generalisation of the avatar pipeline to three new attachment points. Same Twelvemonkeys WebP plugin handles decoding.
 
@@ -309,7 +353,7 @@ Reuses error codes `INVALID_IMAGE` and `AVATAR_TOO_LARGE` rather than fragmentin
 - `views/AttemptResultView.vue` — same in the read-only view.
 - `components/QuizCard.vue` — full-width cover image above the card title when `hasCover`.
 
-## 12. Search & discovery
+## 14. Search & discovery
 
 `SearchController` (`search/controller/SearchController.java`) exposes one endpoint:
 
@@ -324,7 +368,7 @@ Reuses error codes `INVALID_IMAGE` and `AVATAR_TOO_LARGE` rather than fragmentin
 - Esc closes the overlay and re-focuses the search input.
 - `/` and `Cmd/Ctrl+K` from anywhere in `/app/*` focus the search input (handled in `AppShell.vue`).
 
-## 13. Dashboard
+## 15. Dashboard
 
 `views/BrowseView.vue` — the `/app` landing for signed-in users.
 
@@ -339,7 +383,7 @@ Reuses error codes `INVALID_IMAGE` and `AVATAR_TOO_LARGE` rather than fragmentin
 - **Past results** — finished-attempt cards linking to the result view. Hash anchor `#past-results` is supported via a one-shot `watchEffect` guarded by `hasScrolled` so it doesn't re-scroll on a refetch.
 - **Loading states** use inline shimmer skeleton blocks rather than "Loading…" text, so the layout doesn't reflow when data arrives.
 
-## 14. Navigation & app shell
+## 16. Navigation & app shell
 
 `components/AppShell.vue` wraps every authenticated route at `/app/*`.
 
@@ -348,7 +392,7 @@ Reuses error codes `INVALID_IMAGE` and `AVATAR_TOO_LARGE` rather than fragmentin
 - **Keyboard shortcuts**: `/` and `Cmd/Ctrl+K` focus the dashboard search input from anywhere in `/app/*` (skipped when typing in another input).
 - The `<ToastStack />` global toast surface is mounted at the App.vue level so unauthenticated routes (landing, login, register) can also surface toasts.
 
-## 15. Branding & shared UI primitives
+## 17. Branding & shared UI primitives
 
 **`BrandMark`** (`components/BrandMark.vue`):
 - Italic 67quiz wordmark with three sizes: `sm` (topbar, 22 px), `md` (auth cards, 32 px), `lg` (landing hero, `clamp(2.75rem, 8vw, 4.5rem)`).
@@ -363,7 +407,7 @@ Reuses error codes `INVALID_IMAGE` and `AVATAR_TOO_LARGE` rather than fragmentin
 - `ImageUploader.vue` — see §11.
 - `QuestionForm.vue`, `QuizCard.vue`, `UserCard.vue`, `ProfileComments.vue`, `NotificationBell.vue` — feature-specific.
 
-## 16. Error handling pipeline
+## 18. Error handling pipeline
 
 **Backend** (`shared/dto/`, `shared/component/GlobalExceptionHandler.java`):
 - Every error response is a `Failure(HttpStatus, List<ApiError>)`. Each `ApiError(code, details)` carries a SCREAMING_SNAKE code and an optional `Map<String, Object>` of context.
@@ -399,7 +443,7 @@ Reuses error codes `INVALID_IMAGE` and `AVATAR_TOO_LARGE` rather than fragmentin
 
 **Inline form errors** in `LoginView`, `RegisterView`, `QuizCreateView`, `ProfileView`'s edit modal, and the new `ProfileComments` composer, all driven by `validationFieldErrors` + the `Input.error` prop. Field errors render as sentence-case body text (not `label-sm` which would uppercase them).
 
-## 17. Infrastructure, build, deploy
+## 19. Infrastructure, build, deploy
 
 **Backend** (`backend/build.gradle.kts`):
 - Java 25 toolchain via Gradle's `JavaLanguageVersion.of(25)`.
@@ -445,21 +489,6 @@ Reuses error codes `INVALID_IMAGE` and `AVATAR_TOO_LARGE` rather than fragmentin
 - Builds + pushes a unified Docker image (`ghcr.io/suohcnamid/67-quiz`) for deploy.
 
 **Local dev DB** — `backend/local/67quiz/docker-compose.yaml` runs MariaDB; `podman compose -f ... up -d` brings it up on port 3306 with the credentials the default `application.yaml` expects.
-
-## 19. Browser APIs
-
-The frontend uses the following [Web APIs](https://developer.mozilla.org/en-US/docs/Web/API) directly — each counts as a distinct integration:
-
-| API | Where | Purpose |
-|---|---|---|
-| **WebGL API** (`HTMLCanvasElement.getContext('webgl')`) | `components/ShaderBackground.vue` | Full GLSL vertex + fragment shader pipeline for the animated lava-plasma background on the landing, login, and register pages. Compiles shader programs, manages a WebGL buffer and uniform locations, drives a 60 fps `TRIANGLE_STRIP` render loop. |
-| **Canvas API** (`HTMLCanvasElement`) | `components/ShaderBackground.vue` | The canvas DOM element that the WebGL context renders into. |
-| **ResizeObserver API** | `components/ShaderBackground.vue` | Syncs the WebGL drawing-buffer resolution to the CSS layout size whenever the element or viewport is resized, preventing blurry renders on window resize or mobile rotation. |
-| **requestAnimationFrame / cancelAnimationFrame** | `components/ShaderBackground.vue`, `components/FinishCelebration.vue` | Frame-accurate animation loops — the shader render loop and the confetti score-counter animation both use `rAF` and clean up via `cancelAnimationFrame` on unmount. |
-| **AbortSignal / AbortController** | All generated API clients (`src/api/**`) | Every HTTP request accepts a `signal?: AbortSignal` so TanStack Query can cancel in-flight requests on component unmount or cache invalidation without leaving dangling network calls. |
-| **FormData API** | `src/api/user-profile-controller/user-profile-controller.ts` | Constructs multipart `FormData` payloads for avatar uploads (`PUT /users/me/avatar`). The same pattern is reused for quiz-image uploads. |
-| **History API** (`createWebHistory`) | `src/router/index.ts` | Vue Router uses `window.history.pushState` / `replaceState` for SPA navigation with clean URLs (no hash). |
-| **matchMedia API** (`window.matchMedia`) | `src/lib/scrollAndFlash.ts` | Reads the `prefers-reduced-motion` media query before triggering scroll-flash animations so users with vestibular disorders get a reduced-motion experience. |
 
 ## 20. Testing
 

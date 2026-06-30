@@ -13,6 +13,13 @@ const props = defineProps<{
   emptyLabel?: string
   /** Disabled state. */
   disabled?: boolean
+  /**
+   * Optional fixed aspect ratio for the preview (e.g. "16 / 9" or "2 / 1").
+   * When set, the preview becomes a fixed-aspect box that crops the image
+   * to match — useful when the upload feeds into a display slot of known
+   * dimensions (e.g. quiz cover cards).
+   */
+  aspectRatio?: string
 }>()
 
 const emit = defineEmits<{
@@ -65,16 +72,44 @@ function onDelete() {
 
 <template>
   <div class="img-uploader">
-    <div v-if="display" class="img-uploader__preview">
+    <div
+      v-if="display"
+      class="img-uploader__preview"
+      :class="{ 'img-uploader__preview--fixed': aspectRatio }"
+      :style="aspectRatio ? { aspectRatio } : undefined"
+    >
       <img :src="display" alt="" loading="lazy" />
       <div class="img-uploader__overlay">
         <Button type="button" variant="ghost" :disabled="disabled" @click="pick">Replace</Button>
         <Button type="button" variant="danger" :disabled="disabled" @click="onDelete">Remove</Button>
       </div>
     </div>
-    <Button v-else type="button" variant="ghost" :disabled="disabled" @click="pick">
-      {{ emptyLabel ?? 'Add image' }}
-    </Button>
+    <button
+      v-else
+      type="button"
+      class="img-uploader__add"
+      :disabled="disabled"
+      :aria-label="emptyLabel ?? 'Add image'"
+      :title="emptyLabel ?? 'Add image'"
+      @click="pick"
+    >
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        width="20"
+        height="20"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <circle cx="8.5" cy="10.5" r="1.5" />
+        <path d="M21 16l-4.5-4.5L7 21" />
+      </svg>
+      <span class="visually-hidden">{{ emptyLabel ?? 'Add image' }}</span>
+    </button>
     <input
       ref="fileInput"
       type="file"
@@ -106,6 +141,20 @@ function onDelete() {
   max-height: 280px;
   height: auto;
 }
+/* Fixed-aspect variant: the preview matches its display slot exactly, so
+ * what the user sees here is what shows on the consumer (e.g. a quiz card
+ * cover). The image fills the box and crops via object-fit: cover. */
+.img-uploader__preview--fixed {
+  width: 100%;
+  max-width: 480px;
+}
+.img-uploader__preview--fixed img {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: cover;
+}
 .img-uploader__overlay {
   position: absolute;
   inset: auto 0 0 0;
@@ -114,7 +163,42 @@ function onDelete() {
   padding: var(--space-sm);
   background: linear-gradient(to top, rgba(0, 0, 0, 0.65), transparent);
 }
+.img-uploader__add {
+  appearance: none;
+  background: transparent;
+  border: 1px dashed var(--outline-variant);
+  color: var(--on-surface-variant);
+  border-radius: var(--radius);
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease;
+}
+.img-uploader__add:hover:not(:disabled) {
+  color: var(--on-surface);
+  border-color: var(--outline);
+  background: var(--surface-container-high);
+  border-style: solid;
+}
+.img-uploader__add:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
 .img-uploader__file {
   display: none;
+}
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 </style>

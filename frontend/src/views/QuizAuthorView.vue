@@ -282,12 +282,18 @@ function fmtRelative(iso?: string): string {
     <Button @click="router.push('/app')">Back to browse</Button>
   </Card>
   <template v-else>
-    <section class="cover-section">
-      <h2 class="visually-hidden">Quiz cover</h2>
+    <section class="cover-section" :class="{ 'cover-section--empty': !quiz.data.value.hasCover }">
+      <div class="cover-section__head">
+        <h2 class="cover-section__title body-md">Cover image</h2>
+        <p v-if="!quiz.data.value.hasCover" class="cover-section__hint body-md muted">
+          Shown on the quiz card. PNG, JPEG or WebP, up to 4 MB.
+        </p>
+      </div>
       <ImageUploader
         :has-image="!!quiz.data.value.hasCover"
         :image-url="coverPath"
         empty-label="Add cover image"
+        aspect-ratio="16 / 9"
         @upload="onCoverUpload"
         @delete="onCoverDelete"
       />
@@ -466,6 +472,35 @@ function fmtRelative(iso?: string): string {
 <style scoped>
 .cover-section {
   margin-bottom: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.cover-section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+.cover-section__title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--on-surface);
+}
+.cover-section__hint {
+  margin: 0;
+}
+/* Empty state gets a dashed-border dropzone so the call to action is
+   visible. Once a cover is uploaded the preview speaks for itself. */
+.cover-section--empty {
+  border: 1px dashed var(--outline-variant);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--surface-container-low);
+}
+.cover-section--empty .cover-section__head {
+  margin-bottom: var(--space-xs);
 }
 .visually-hidden {
   position: absolute !important;
