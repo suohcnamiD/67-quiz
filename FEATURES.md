@@ -66,6 +66,7 @@ The frontend uses the following [Web APIs](https://developer.mozilla.org/en-US/d
 | **FormData API** | `src/api/user-profile-controller/user-profile-controller.ts` | Constructs multipart `FormData` payloads for avatar uploads (`PUT /users/me/avatar`). The same pattern is reused for quiz-image uploads. |
 | **History API** (`createWebHistory`) | `src/router/index.ts` | Vue Router uses `window.history.pushState` / `replaceState` for SPA navigation with clean URLs (no hash). |
 | **matchMedia API** (`window.matchMedia`) | `src/lib/scrollAndFlash.ts` | Reads the `prefers-reduced-motion` media query before triggering scroll-flash animations so users with vestibular disorders get a reduced-motion experience. |
+| **Clipboard API** (`navigator.clipboard.writeText`) | `src/views/ProfileView.vue` | Copies the MCP install prompt to the clipboard when the user clicks "Copy prompt" in the Claude Integration modal. |
 
 ## 3. Claude MCP Integration
 
