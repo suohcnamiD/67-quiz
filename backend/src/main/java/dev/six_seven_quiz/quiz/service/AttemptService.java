@@ -184,7 +184,6 @@ public class AttemptService {
     public Page<AttemptInProgressDto> getAttemptsInProgressAsUser(UserDetails userDetails, int page) {
         ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
         refreshFinishedAttempts(user);
-        entityManager.flush();
         Page<Attempt> attempts = quizAttemptRepository.findByUserAndFinishedIsFalse(user, produceSanitizedPageable(page));
         return attempts.map(this::attemptToDto);
     }
@@ -193,24 +192,35 @@ public class AttemptService {
     public Page<FinishedAttemptSummaryDto> getFinishedAttemptsAsUser(UserDetails userDetails, int page) {
         ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
         refreshFinishedAttempts(user);
-        entityManager.flush();
         Page<Attempt> attempts = quizAttemptRepository.findByUserAndFinishedIsTrue(user, produceSanitizedPageable(page));
         return attempts.map(this::attemptToFinishedSummary);
     }
 
+    /**
+     * Mark any past-deadline in-progress attempts as finished via a single
+     * conditional UPDATE. Avoids the in-memory load + dirty-flush pattern
+     * that raced with concurrent finishers under MariaDB snapshot isolation
+     * (Error 1020 "Record has changed since last read"). After the bulk
+     * update we clear the persistence context so subsequent queries in the
+     * same transaction see fresh state.
+     */
     @Transactional
     protected void refreshFinishedAttempts(ApplicationUser user) {
-        List<Attempt> unfinishedAttemptsPastDeadline = quizAttemptRepository.findByUser_IdAndFinishedIsFalseAndFinishDeadlineBefore(user.getId(), Instant.now());
-        unfinishedAttemptsPastDeadline.forEach(Attempt::finish);
+        int updated = quizAttemptRepository.markPastDeadlineFinished(user.getId(), Instant.now());
+        if (updated > 0) {
+            entityManager.clear();
+        }
     }
 
     @Transactional
     public FinishedAttemptSummaryDto finishAttemptAsUser(UserDetails userDetails, FinishAttemptRequest request) {
-        Attempt attempt = quizAttemptRepository.findById(request.attemptId()).orElseThrow(() -> new AttemptNotFoundException(request.attemptId()));
         ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
-        validateUserAttemptOwnership(user, attempt);
+        // Run the deadline sweep first so its bulk UPDATE + entityManager.clear()
+        // can't strand a stale, managed copy of the attempt we're about to
+        // mutate. Load the attempt after the sweep has settled.
         refreshFinishedAttempts(user);
-        entityManager.flush();
+        Attempt attempt = quizAttemptRepository.findById(request.attemptId()).orElseThrow(() -> new AttemptNotFoundException(request.attemptId()));
+        validateUserAttemptOwnership(user, attempt);
         validateAttemptUnfinished(attempt);
 
         attempt.finish();
