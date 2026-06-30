@@ -52,6 +52,47 @@ Plus `GET /authentication/me` (`AuthenticationStateController`) for the FE's ano
 - Router guard waits for the first auth probe before resolving any route; routes marked `meta.anonymous` redirect authenticated users away, `meta.landing` does the same, the rest redirect to `/login?next=…` if anonymous.
 - Login/register forms surface field-level errors via the `Input.error` prop, populated from `validationFieldErrors(e)` in `lib/errors.ts`.
 
+## 2. Browser APIs
+
+The frontend uses the following [Web APIs](https://developer.mozilla.org/en-US/docs/Web/API) directly — each counts as a distinct integration:
+
+| API | Where | Purpose |
+|---|---|---|
+| **WebGL API** (`HTMLCanvasElement.getContext('webgl')`) | `components/ShaderBackground.vue` | Full GLSL vertex + fragment shader pipeline for the animated lava-plasma background on the landing, login, and register pages. Compiles shader programs, manages a WebGL buffer and uniform locations, drives a 60 fps `TRIANGLE_STRIP` render loop. |
+| **Canvas API** (`HTMLCanvasElement`) | `components/ShaderBackground.vue` | The canvas DOM element that the WebGL context renders into. |
+| **ResizeObserver API** | `components/ShaderBackground.vue` | Syncs the WebGL drawing-buffer resolution to the CSS layout size whenever the element or viewport is resized, preventing blurry renders on window resize or mobile rotation. |
+| **requestAnimationFrame / cancelAnimationFrame** | `components/ShaderBackground.vue`, `components/FinishCelebration.vue` | Frame-accurate animation loops — the shader render loop and the confetti score-counter animation both use `rAF` and clean up via `cancelAnimationFrame` on unmount. |
+| **AbortSignal / AbortController** | All generated API clients (`src/api/**`) | Every HTTP request accepts a `signal?: AbortSignal` so TanStack Query can cancel in-flight requests on component unmount or cache invalidation without leaving dangling network calls. |
+| **FormData API** | `src/api/user-profile-controller/user-profile-controller.ts` | Constructs multipart `FormData` payloads for avatar uploads (`PUT /users/me/avatar`). The same pattern is reused for quiz-image uploads. |
+| **History API** (`createWebHistory`) | `src/router/index.ts` | Vue Router uses `window.history.pushState` / `replaceState` for SPA navigation with clean URLs (no hash). |
+| **matchMedia API** (`window.matchMedia`) | `src/lib/scrollAndFlash.ts` | Reads the `prefers-reduced-motion` media query before triggering scroll-flash animations so users with vestibular disorders get a reduced-motion experience. |
+
+## 3. Claude MCP Integration
+
+A Model Context Protocol (MCP) server that allows Claude to create and manage quizzes on behalf of any logged-in user.
+
+**Install flow** (`views/ProfileView.vue`):
+- Every authenticated user sees a "Claude Integration" card on their profile page.
+- Clicking **Install MCP** opens a modal with a ready-made prompt.
+- Clicking **Copy prompt** copies it to the clipboard (Clipboard API).
+- The user pastes the prompt into Claude — Claude downloads the ZIP, installs dependencies, and registers the server automatically. No manual steps required.
+
+**MCP server** (`mcp/src/index.ts`, served as `frontend/public/mcp-bundle-v2.zip`):
+- Built with `@modelcontextprotocol/sdk`, communicates with Claude Desktop / Claude Code over stdio.
+- `QUIZ_BASE_URL` env var points at the backend (injected dynamically from `window.location` at prompt generation time).
+- Session cookie is stored in memory for the lifetime of the process.
+
+**Available tools:**
+
+| Tool | Description |
+|---|---|
+| `login` | Authenticate with username + password; stores the session cookie |
+| `list_quizzes` | List all quizzes (paginated) |
+| `create_quiz` | Create a new quiz with a name and duration |
+| `add_question` | Add a single/multi-choice question with options to a quiz |
+| `get_quiz` | Get full quiz details including all questions and options |
+| `delete_quiz` | Delete a quiz the caller authored |
+
 ## 4. Authorization
 
 - `Role` entity (`authorization/Role.java`) joined to users via `user_roles` (many-to-many, eager-fetched on `ApplicationUser`).
@@ -446,47 +487,6 @@ Reuses error codes `INVALID_IMAGE` and `AVATAR_TOO_LARGE` rather than fragmentin
 - Builds + pushes a unified Docker image (`ghcr.io/suohcnamid/67-quiz`) for deploy.
 
 **Local dev DB** — `backend/local/67quiz/docker-compose.yaml` runs MariaDB; `podman compose -f ... up -d` brings it up on port 3306 with the credentials the default `application.yaml` expects.
-
-## 2. Browser APIs
-
-The frontend uses the following [Web APIs](https://developer.mozilla.org/en-US/docs/Web/API) directly — each counts as a distinct integration:
-
-| API | Where | Purpose |
-|---|---|---|
-| **WebGL API** (`HTMLCanvasElement.getContext('webgl')`) | `components/ShaderBackground.vue` | Full GLSL vertex + fragment shader pipeline for the animated lava-plasma background on the landing, login, and register pages. Compiles shader programs, manages a WebGL buffer and uniform locations, drives a 60 fps `TRIANGLE_STRIP` render loop. |
-| **Canvas API** (`HTMLCanvasElement`) | `components/ShaderBackground.vue` | The canvas DOM element that the WebGL context renders into. |
-| **ResizeObserver API** | `components/ShaderBackground.vue` | Syncs the WebGL drawing-buffer resolution to the CSS layout size whenever the element or viewport is resized, preventing blurry renders on window resize or mobile rotation. |
-| **requestAnimationFrame / cancelAnimationFrame** | `components/ShaderBackground.vue`, `components/FinishCelebration.vue` | Frame-accurate animation loops — the shader render loop and the confetti score-counter animation both use `rAF` and clean up via `cancelAnimationFrame` on unmount. |
-| **AbortSignal / AbortController** | All generated API clients (`src/api/**`) | Every HTTP request accepts a `signal?: AbortSignal` so TanStack Query can cancel in-flight requests on component unmount or cache invalidation without leaving dangling network calls. |
-| **FormData API** | `src/api/user-profile-controller/user-profile-controller.ts` | Constructs multipart `FormData` payloads for avatar uploads (`PUT /users/me/avatar`). The same pattern is reused for quiz-image uploads. |
-| **History API** (`createWebHistory`) | `src/router/index.ts` | Vue Router uses `window.history.pushState` / `replaceState` for SPA navigation with clean URLs (no hash). |
-| **matchMedia API** (`window.matchMedia`) | `src/lib/scrollAndFlash.ts` | Reads the `prefers-reduced-motion` media query before triggering scroll-flash animations so users with vestibular disorders get a reduced-motion experience. |
-
-## 3. Claude MCP Integration
-
-A Model Context Protocol (MCP) server that allows Claude to create and manage quizzes on behalf of any logged-in user.
-
-**Install flow** (`views/ProfileView.vue`):
-- Every authenticated user sees a "Claude Integration" card on their profile page.
-- Clicking **Install MCP** opens a modal with a ready-made prompt.
-- Clicking **Copy prompt** copies it to the clipboard (Clipboard API).
-- The user pastes the prompt into Claude — Claude downloads the ZIP, installs dependencies, and registers the server automatically. No manual steps required.
-
-**MCP server** (`mcp/src/index.ts`, served as `frontend/public/mcp-bundle-v2.zip`):
-- Built with `@modelcontextprotocol/sdk`, communicates with Claude Desktop / Claude Code over stdio.
-- `QUIZ_BASE_URL` env var points at the backend (injected dynamically from `window.location` at prompt generation time).
-- Session cookie is stored in memory for the lifetime of the process.
-
-**Available tools:**
-
-| Tool | Description |
-|---|---|
-| `login` | Authenticate with username + password; stores the session cookie |
-| `list_quizzes` | List all quizzes (paginated) |
-| `create_quiz` | Create a new quiz with a name and duration |
-| `add_question` | Add a single/multi-choice question with options to a quiz |
-| `get_quiz` | Get full quiz details including all questions and options |
-| `delete_quiz` | Delete a quiz the caller authored |
 
 ## 20. Testing
 
