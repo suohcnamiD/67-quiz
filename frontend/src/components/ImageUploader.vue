@@ -13,6 +13,13 @@ const props = defineProps<{
   emptyLabel?: string
   /** Disabled state. */
   disabled?: boolean
+  /**
+   * Optional fixed aspect ratio for the preview (e.g. "16 / 9" or "2 / 1").
+   * When set, the preview becomes a fixed-aspect box that crops the image
+   * to match — useful when the upload feeds into a display slot of known
+   * dimensions (e.g. quiz cover cards).
+   */
+  aspectRatio?: string
 }>()
 
 const emit = defineEmits<{
@@ -65,7 +72,12 @@ function onDelete() {
 
 <template>
   <div class="img-uploader">
-    <div v-if="display" class="img-uploader__preview">
+    <div
+      v-if="display"
+      class="img-uploader__preview"
+      :class="{ 'img-uploader__preview--fixed': aspectRatio }"
+      :style="aspectRatio ? { aspectRatio } : undefined"
+    >
       <img :src="display" alt="" loading="lazy" />
       <div class="img-uploader__overlay">
         <Button type="button" variant="ghost" :disabled="disabled" @click="pick">Replace</Button>
@@ -128,6 +140,20 @@ function onDelete() {
   max-width: 100%;
   max-height: 280px;
   height: auto;
+}
+/* Fixed-aspect variant: the preview matches its display slot exactly, so
+ * what the user sees here is what shows on the consumer (e.g. a quiz card
+ * cover). The image fills the box and crops via object-fit: cover. */
+.img-uploader__preview--fixed {
+  width: 100%;
+  max-width: 480px;
+}
+.img-uploader__preview--fixed img {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: cover;
 }
 .img-uploader__overlay {
   position: absolute;

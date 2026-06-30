@@ -176,7 +176,8 @@ async function removeQuiz() {
 .cover {
   display: block;
   width: calc(100% + 2 * var(--space-lg) + 2px);
-  height: 180px;
+  aspect-ratio: 16 / 9;
+  height: auto;
   object-fit: cover;
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   margin: calc(-1 * var(--space-lg) - 1px) calc(-1 * var(--space-lg) - 1px) var(--space-md);

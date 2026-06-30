@@ -293,6 +293,7 @@ function fmtRelative(iso?: string): string {
         :has-image="!!quiz.data.value.hasCover"
         :image-url="coverPath"
         empty-label="Add cover image"
+        aspect-ratio="16 / 9"
         @upload="onCoverUpload"
         @delete="onCoverDelete"
       />
