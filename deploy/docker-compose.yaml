@@ -20,6 +20,9 @@ services:
       - DATABASE_URL=jdbc:mariadb://db:3306/main
       - DATABASE_USERNAME=user
       - DATABASE_PASSWORD=password
+      - APP_UPLOADS_DIR=/app/uploads
+    volumes:
+      - sixseven_uploads:/app/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -38,3 +41,4 @@ services:
 
 volumes:
   sixseven_data:
+  sixseven_uploads:

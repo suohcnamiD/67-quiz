@@ -219,16 +219,20 @@ public class AttemptService {
         entityManager.flush();
         entityManager.refresh(attempt);
 
-        // Notify the quiz author unless they took their own quiz.
-        ApplicationUser author = attempt.getQuiz().getAuthor();
-        if (!author.getId().equals(user.getId())) {
+        // Notify the quiz author unless they took their own quiz. The quiz can
+        // have been deleted between the attempt start and finish (quiz_attempts
+        // .quiz_id is ON DELETE SET NULL), so guard both the quiz and its
+        // author against null before emitting.
+        Quiz finishedQuiz = attempt.getQuiz();
+        ApplicationUser author = finishedQuiz != null ? finishedQuiz.getAuthor() : null;
+        if (author != null && !author.getId().equals(user.getId())) {
             int maxScore = attempt.getMaximumScore();
             int score = attempt.getEarnedScore();
             java.util.Map<String, Object> payload = new java.util.HashMap<>();
             payload.put("actorUsername", user.getUsername());
             payload.put("actorDisplayName", user.getDisplayName());
-            payload.put("quizId", attempt.getQuiz().getId().toString());
-            payload.put("quizName", attempt.getQuiz().getName());
+            payload.put("quizId", finishedQuiz.getId().toString());
+            payload.put("quizName", finishedQuiz.getName());
             payload.put("attemptId", attempt.getId().toString());
             payload.put("score", score);
             payload.put("maxScore", maxScore);
