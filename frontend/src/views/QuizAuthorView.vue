@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useGetQuiz, deleteQuiz, getGetQuizQueryKey } from '@/api/quiz-controller/quiz-controller'
+import { useGetQuiz, deleteQuiz, renameQuiz, reorderQuestions, getGetQuizQueryKey } from '@/api/quiz-controller/quiz-controller'
 import {
   addQuizQuestion,
   deleteQuizQuestion,
@@ -186,6 +186,93 @@ async function removeQuiz() {
   }
 }
 
+// ---------- Inline rename of the quiz title ----------
+const renamingTitle = ref(false)
+const titleDraft = ref('')
+const titleError = ref<string | null>(null)
+const savingTitle = ref(false)
+function startTitleEdit() {
+  titleDraft.value = quiz.data.value?.name ?? ''
+  titleError.value = null
+  renamingTitle.value = true
+}
+function cancelTitleEdit() {
+  renamingTitle.value = false
+  titleError.value = null
+}
+async function saveTitle() {
+  const trimmed = titleDraft.value.trim()
+  if (!trimmed) {
+    titleError.value = 'Name is required.'
+    return
+  }
+  if (trimmed === quiz.data.value?.name) {
+    renamingTitle.value = false
+    return
+  }
+  savingTitle.value = true
+  titleError.value = null
+  try {
+    await renameQuiz(quizId.value, { name: trimmed })
+    qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) })
+    renamingTitle.value = false
+  } catch (e) {
+    titleError.value = errorMessage(e)
+  } finally {
+    savingTitle.value = false
+  }
+}
+
+// ---------- Drag-to-reorder questions ----------
+// dragIndex = the row currently being dragged (from position); overIndex =
+// the row it's hovering over (to position). We only commit on drop so
+// abandoned drags leave the list untouched.
+const dragIndex = ref<number | null>(null)
+const overIndex = ref<number | null>(null)
+const reordering = ref(false)
+function onDragStart(i: number, event: DragEvent) {
+  dragIndex.value = i
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    // Firefox refuses to fire dragover unless dataTransfer has been set.
+    event.dataTransfer.setData('text/plain', String(i))
+  }
+}
+function onDragOver(i: number, event: DragEvent) {
+  if (dragIndex.value === null) return
+  event.preventDefault()
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+  overIndex.value = i
+}
+function onDragLeave(i: number) {
+  if (overIndex.value === i) overIndex.value = null
+}
+function onDragEnd() {
+  dragIndex.value = null
+  overIndex.value = null
+}
+async function onDrop(i: number) {
+  const from = dragIndex.value
+  dragIndex.value = null
+  overIndex.value = null
+  if (from === null || from === i) return
+  const questions = quiz.data.value?.questions ?? []
+  const ids = questions.map((q) => q.id).filter((id): id is string => !!id)
+  if (ids.length !== questions.length) return
+  const [moved] = ids.splice(from, 1)
+  ids.splice(i, 0, moved!)
+  reordering.value = true
+  errorText.value = null
+  try {
+    await reorderQuestions(quizId.value, { questionIds: ids })
+    qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) })
+  } catch (e) {
+    errorText.value = errorMessage(e)
+  } finally {
+    reordering.value = false
+  }
+}
+
 function typeLabel(t: QuestionType | undefined | null): string {
   return t === SINGLE ? 'Single choice' : 'Multi select'
 }
@@ -300,8 +387,33 @@ function fmtRelative(iso?: string): string {
       <p v-if="coverError" class="banner label-md" role="alert">{{ coverError }}</p>
     </section>
     <header class="head">
-      <div>
-        <h1 class="headline-lg">{{ quiz.data.value.name }}</h1>
+      <div class="head__title-wrap">
+        <template v-if="!renamingTitle">
+          <h1
+            class="headline-lg head__title"
+            tabindex="0"
+            role="button"
+            :title="'Click to rename'"
+            @click="startTitleEdit"
+            @keydown.enter.prevent="startTitleEdit"
+            @keydown.space.prevent="startTitleEdit"
+          >{{ quiz.data.value.name }}</h1>
+        </template>
+        <template v-else>
+          <form class="head__title-form" @submit.prevent="saveTitle">
+            <input
+              v-model="titleDraft"
+              class="head__title-input headline-lg"
+              maxlength="200"
+              autofocus
+              :aria-invalid="!!titleError"
+              :disabled="savingTitle"
+              @keydown.esc.prevent="cancelTitleEdit"
+              @blur="saveTitle"
+            />
+            <span v-if="titleError" class="head__title-error label-md" role="alert">{{ titleError }}</span>
+          </form>
+        </template>
         <p class="meta body-md">
           {{ quiz.data.value.questionCount ?? 0 }} questions · {{ quiz.data.value.duration }}
         </p>
@@ -325,10 +437,42 @@ function fmtRelative(iso?: string): string {
         No questions yet. Add one below.
       </div>
       <ol class="qlist">
-        <li v-for="(q, i) in quiz.data.value.questions ?? []" :key="q.id">
+        <li
+          v-for="(q, i) in quiz.data.value.questions ?? []"
+          :key="q.id"
+          :class="[
+            'qitem',
+            {
+              'qitem--dragging': dragIndex === i,
+              'qitem--drop-target': overIndex === i && dragIndex !== null && dragIndex !== i,
+            },
+          ]"
+          @dragover="onDragOver(i, $event)"
+          @dragleave="onDragLeave(i)"
+          @drop.prevent="onDrop(i)"
+        >
           <Card>
             <div class="qhead">
               <div class="qhead__title">
+                <button
+                  type="button"
+                  class="drag-handle"
+                  :aria-label="`Drag question ${i + 1} to reorder`"
+                  :draggable="editingId !== q.id"
+                  :disabled="reordering || editingId === q.id"
+                  :title="editingId === q.id ? 'Finish editing to reorder' : 'Drag to reorder'"
+                  @dragstart="onDragStart(i, $event)"
+                  @dragend="onDragEnd"
+                >
+                  <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true">
+                    <circle cx="5" cy="3" r="1.2" />
+                    <circle cx="11" cy="3" r="1.2" />
+                    <circle cx="5" cy="8" r="1.2" />
+                    <circle cx="11" cy="8" r="1.2" />
+                    <circle cx="5" cy="13" r="1.2" />
+                    <circle cx="11" cy="13" r="1.2" />
+                  </svg>
+                </button>
                 <span class="label-sm muted">Q{{ i + 1 }}</span>
                 <Chip>{{ typeLabel(q.type) }}</Chip>
               </div>
@@ -520,9 +664,54 @@ function fmtRelative(iso?: string): string {
   gap: var(--space-md);
   margin-bottom: var(--space-xl);
 }
+.head__title-wrap {
+  min-width: 0;
+  flex: 1;
+}
+.head__title {
+  margin: 0;
+  cursor: pointer;
+  border-radius: var(--radius);
+  padding: 2px 6px;
+  margin-left: -6px;
+  transition: background-color 120ms ease;
+}
+.head__title:hover,
+.head__title:focus-visible {
+  background: var(--surface-container-high);
+  outline: none;
+}
+.head__title-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.head__title-input {
+  width: 100%;
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius);
+  padding: 4px 8px;
+  color: var(--on-surface);
+  outline: none;
+  font: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  font-weight: inherit;
+}
+.head__title-input:focus {
+  border-color: var(--primary-container);
+}
+.head__title-input[aria-invalid="true"] {
+  border-color: var(--error-container);
+}
+.head__title-error {
+  color: var(--error);
+}
 .head__actions {
   display: flex;
   gap: var(--space-sm);
+  flex-shrink: 0;
 }
 .meta {
   color: var(--on-surface-variant);
@@ -551,6 +740,40 @@ function fmtRelative(iso?: string): string {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
+}
+.qitem {
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+.qitem--dragging {
+  opacity: 0.4;
+}
+.qitem--drop-target > :deep(.card) {
+  border-color: var(--primary-container);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-container) 40%, transparent);
+}
+.drag-handle {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 4px;
+  color: var(--on-surface-variant);
+  cursor: grab;
+  border-radius: var(--radius);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.drag-handle:hover:not(:disabled) {
+  background: var(--surface-container-high);
+  color: var(--on-surface);
+}
+.drag-handle:active {
+  cursor: grabbing;
+}
+.drag-handle:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
 }
 .qhead {
   display: flex;
