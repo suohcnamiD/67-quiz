@@ -9,7 +9,7 @@ cd 67-quiz/deploy
 docker compose up -d
 ```
 
-After the containers are up, you can access the app at http://localhost.
+After the containers are up, you can access the app at http://localhost:6767.
 
 ## Intro
 Good day well-respected sirs, this is a repo for 67 Quiz.
