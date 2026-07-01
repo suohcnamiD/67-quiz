@@ -199,7 +199,7 @@ function mcpPrompt(): string {
   const backendUrl = `${window.location.protocol}//${window.location.hostname}${window.location.port === '5173' ? ':8080' : ''}`
   return `Please install the 67-quiz MCP server for me. Follow these steps exactly:
 
-1. Download this ZIP file: ${frontendUrl}/mcp-bundle-v2.zip
+1. Download this ZIP file: ${frontendUrl}/mcp-bundle-v3.zip
 2. Unzip it to a folder on your computer: ~/67-quiz-mcp/
 3. Inside that folder, run: npm install
 4. Register the MCP server in Claude Code:
@@ -212,7 +212,7 @@ function mcpPrompt(): string {
 
    You should see: 67-quiz: node ~/67-quiz-mcp/index.js - ✓ Connected
 
-After that you will have these tools available: login, create_quiz, add_question, list_quizzes, get_quiz, delete_quiz.`
+After that you will have these tools available: login, create_quiz, add_question, list_quizzes, get_quiz, delete_quiz, set_quiz_cover.`
 }
 
 async function copyMcpPrompt() {
