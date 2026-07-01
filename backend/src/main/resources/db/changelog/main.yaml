@@ -29,3 +29,6 @@ databaseChangeLog:
   - include:
       file: 009-drop-sampler-fixture.yaml
       relativeToChangelogFile: true
+  - include:
+      file: 010-quiz-description.yaml
+      relativeToChangelogFile: true

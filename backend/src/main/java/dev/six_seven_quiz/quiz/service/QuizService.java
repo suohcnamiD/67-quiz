@@ -4,6 +4,7 @@ import dev.six_seven_quiz.quiz.component.mapper.QuizMapper;
 import dev.six_seven_quiz.quiz.dto.request.CreateQuizRequest;
 import dev.six_seven_quiz.quiz.dto.request.RenameQuizRequest;
 import dev.six_seven_quiz.quiz.dto.request.ReorderQuestionsRequest;
+import dev.six_seven_quiz.quiz.dto.request.UpdateQuizDescriptionRequest;
 import dev.six_seven_quiz.quiz.dto.response.QuizRatingSummaryDto;
 import dev.six_seven_quiz.quiz.dto.response.authoring.QuizDto;
 import dev.six_seven_quiz.quiz.dto.response.viewing.QuizSummaryDto;
@@ -136,6 +137,22 @@ public class QuizService {
         Quiz quiz = quizRepository.findById(quizId).orElseThrow(() -> new QuizNotFoundException(quizId));
         QuizValidator.requireOwner(quiz, user);
         quiz.setName(request.name().trim());
+        return this.quizToDto(quizRepository.save(quiz), user);
+    }
+
+    @Transactional
+    public QuizDto updateDescriptionAsUser(UUID quizId, UserDetails userDetails, UpdateQuizDescriptionRequest request) {
+        ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
+        Quiz quiz = quizRepository.findById(quizId).orElseThrow(() -> new QuizNotFoundException(quizId));
+        QuizValidator.requireOwner(quiz, user);
+        // Normalise: whitespace-only becomes null so the FE renders "no
+        // description" instead of an empty markdown block.
+        String next = request.description();
+        if (next != null) {
+            next = next.strip();
+            if (next.isEmpty()) next = null;
+        }
+        quiz.setDescription(next);
         return this.quizToDto(quizRepository.save(quiz), user);
     }
 

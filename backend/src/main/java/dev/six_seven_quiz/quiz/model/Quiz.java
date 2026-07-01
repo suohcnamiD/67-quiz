@@ -39,6 +39,9 @@ public class Quiz {
     @Column(name = "name")
     private String name;
 
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
     @Column(name = "duration")
     private Duration duration;
 
@@ -72,6 +75,14 @@ public class Quiz {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 
     public List<Question> getQuestions() {

@@ -120,6 +120,7 @@ public class AttemptService {
         if (quiz == null) {
             return new QuizSummaryDto(
                     "Deleted quiz",
+                    null,
                     0,
                     0,
                     java.time.Duration.ZERO,

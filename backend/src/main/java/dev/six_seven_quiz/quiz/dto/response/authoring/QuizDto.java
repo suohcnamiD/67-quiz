@@ -9,6 +9,7 @@ import java.util.UUID;
 @Relation(collectionRelation = "quizzes", itemRelation = "quiz")
 public record QuizDto(
     String name,
+    String description,
     int questionCount,
     Duration duration,
     UUID id,

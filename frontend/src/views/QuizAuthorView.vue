@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useGetQuiz, deleteQuiz, renameQuiz, reorderQuestions, getGetQuizQueryKey } from '@/api/quiz-controller/quiz-controller'
+import { useGetQuiz, deleteQuiz, renameQuiz, reorderQuestions, updateQuizDescription, getGetQuizQueryKey } from '@/api/quiz-controller/quiz-controller'
 import {
   addQuizQuestion,
   deleteQuizQuestion,
@@ -26,6 +26,7 @@ import ImageUploader from '@/components/ImageUploader.vue'
 import Chip from '@/components/Chip.vue'
 import Avatar from '@/components/Avatar.vue'
 import QuestionForm from '@/components/QuestionForm.vue'
+import MarkdownView from '@/components/MarkdownView.vue'
 import type { OptionData, AddQuestionRequest, QuestionDto } from '@/api/openAPIDefinition.schemas'
 
 type QuestionType = AddQuestionRequest['type']
@@ -220,6 +221,39 @@ async function saveTitle() {
     titleError.value = errorMessage(e)
   } finally {
     savingTitle.value = false
+  }
+}
+
+// ---------- Inline edit of the quiz description ----------
+const editingDescription = ref(false)
+const descriptionDraft = ref('')
+const descriptionError = ref<string | null>(null)
+const savingDescription = ref(false)
+function startDescriptionEdit() {
+  descriptionDraft.value = quiz.data.value?.description ?? ''
+  descriptionError.value = null
+  editingDescription.value = true
+}
+function cancelDescriptionEdit() {
+  editingDescription.value = false
+  descriptionError.value = null
+}
+async function saveDescription() {
+  const trimmed = descriptionDraft.value.trim()
+  if (trimmed === (quiz.data.value?.description ?? '')) {
+    editingDescription.value = false
+    return
+  }
+  savingDescription.value = true
+  descriptionError.value = null
+  try {
+    await updateQuizDescription(quizId.value, { description: trimmed || undefined })
+    qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) })
+    editingDescription.value = false
+  } catch (e) {
+    descriptionError.value = errorMessage(e)
+  } finally {
+    savingDescription.value = false
   }
 }
 
@@ -423,6 +457,40 @@ function fmtRelative(iso?: string): string {
         <Button variant="danger" @click="removeQuiz">Delete quiz</Button>
       </div>
     </header>
+
+    <section class="description-section" aria-label="Quiz description">
+      <template v-if="!editingDescription">
+        <div v-if="quiz.data.value.description" class="description-preview">
+          <MarkdownView :source="quiz.data.value.description" />
+          <Button variant="ghost" class="description-edit-btn" @click="startDescriptionEdit">Edit description</Button>
+        </div>
+        <button
+          v-else
+          type="button"
+          class="description-empty"
+          @click="startDescriptionEdit"
+        >+ Add a description</button>
+      </template>
+      <template v-else>
+        <form class="description-form" @submit.prevent="saveDescription">
+          <textarea
+            v-model="descriptionDraft"
+            class="description-textarea"
+            rows="6"
+            placeholder="Describe the quiz. Markdown supported — headings, lists, links, code, tables."
+            maxlength="10000"
+            :disabled="savingDescription"
+            :aria-invalid="!!descriptionError"
+          />
+          <p v-if="descriptionError" class="banner label-md" role="alert">{{ descriptionError }}</p>
+          <div class="description-form__actions">
+            <Button variant="ghost" type="button" :disabled="savingDescription" @click="cancelDescriptionEdit">Cancel</Button>
+            <Button type="submit" :loading="savingDescription">Save</Button>
+          </div>
+          <p class="description-hint label-sm muted">Markdown: **bold**, *italic*, `code`, [link](url), lists, tables. HTML tags will be stripped.</p>
+        </form>
+      </template>
+    </section>
 
     <section class="section">
       <div class="section__head">
@@ -774,6 +842,83 @@ function fmtRelative(iso?: string): string {
 .drag-handle:disabled {
   cursor: not-allowed;
   opacity: 0.4;
+}
+
+/* Description block sits between the header and the questions list. Empty
+ * state is a subtle dashed placeholder; filled state shows the rendered
+ * markdown with an Edit button anchored top-right. */
+.description-section {
+  margin: calc(-1 * var(--space-lg)) 0 var(--space-xl);
+}
+.description-preview {
+  position: relative;
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md) var(--space-lg);
+}
+.description-edit-btn {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+}
+.description-empty {
+  appearance: none;
+  background: transparent;
+  border: 1px dashed var(--outline-variant);
+  border-radius: var(--radius-lg);
+  color: var(--on-surface-variant);
+  font: inherit;
+  padding: var(--space-md);
+  width: 100%;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease;
+}
+.description-empty:hover {
+  color: var(--on-surface);
+  border-color: var(--outline);
+  background: var(--surface-container-high);
+  border-style: solid;
+}
+.description-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.description-textarea {
+  width: 100%;
+  min-height: 8rem;
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius);
+  padding: var(--space-sm) var(--space-md);
+  color: var(--on-surface);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  outline: none;
+  resize: vertical;
+}
+.description-textarea:focus {
+  border-color: var(--primary-container);
+}
+.description-textarea[aria-invalid="true"] {
+  border-color: var(--error-container);
+}
+.description-form__actions {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+}
+.description-hint {
+  margin: 0;
+}
+.banner {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--error-container);
+  color: var(--on-error-container);
+  border-radius: var(--radius);
 }
 .qhead {
   display: flex;

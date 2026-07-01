@@ -3,6 +3,7 @@ package dev.six_seven_quiz.quiz.controller;
 import dev.six_seven_quiz.quiz.dto.request.CreateQuizRequest;
 import dev.six_seven_quiz.quiz.dto.request.RenameQuizRequest;
 import dev.six_seven_quiz.quiz.dto.request.ReorderQuestionsRequest;
+import dev.six_seven_quiz.quiz.dto.request.UpdateQuizDescriptionRequest;
 import dev.six_seven_quiz.quiz.dto.response.authoring.QuizDto;
 import dev.six_seven_quiz.quiz.dto.response.viewing.QuizSummaryDto;
 import dev.six_seven_quiz.quiz.service.QuizService;
@@ -69,6 +70,15 @@ public class QuizController {
             @RequestBody @Valid RenameQuizRequest request
     ) {
         return quizService.renameAsUser(quizId, userDetails, request);
+    }
+
+    @PatchMapping("/{quizId}/description")
+    public QuizDto updateQuizDescription(
+            @PathVariable @NotNull UUID quizId,
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody @Valid UpdateQuizDescriptionRequest request
+    ) {
+        return quizService.updateDescriptionAsUser(quizId, userDetails, request);
     }
 
     @PatchMapping("/{quizId}/reorder")

@@ -10,6 +10,7 @@ import java.util.UUID;
 @Relation(collectionRelation = "quizzes", itemRelation = "quiz")
 public record QuizSummaryDto(
     String name,
+    String description,
     int questionCount,
     int maximumScore,
     Duration duration,
