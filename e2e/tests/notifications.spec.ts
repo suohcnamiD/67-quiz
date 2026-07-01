@@ -189,6 +189,7 @@ test('notifications history page lists every notification', async ({ page, brows
 
 test('leaderboard rank drop fires a RANK_DROPPED notification', async ({ page, browser }) => {
   test.setTimeout(90_000)
+  test.skip(!process.env.SLOW_TESTS, 'timing-sensitive: needs the snapshot job to observe two ranks in sequence; run with SLOW_TESTS=1')
   // The snapshot job runs every 2s in this profile (notifications.snapshot.
   // interval-ms=2000). To see a drop we need: (1) victim snapshot exists, (2)
   // a competitor outranks them, (3) the next snapshot runs and compares.

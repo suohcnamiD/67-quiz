@@ -23,7 +23,7 @@ test('full happy path: create quiz → add question → start attempt → finish
   await page.getByLabel(/duration/i).fill('5')
   await page.getByRole('button', { name: 'Create' }).click()
   await page.waitForURL(/\/app\/quiz\/[0-9a-f]{8}-/i, { timeout: 10_000 })
-  const quizId = page.url().split('/').pop()!
+  const quizId = page.url().match(/\/app\/quiz\/([0-9a-f-]{36})/i)![1]
 
   // Add a question (UI)
   await page.getByLabel('Question text').fill('What is 2+2?')

@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -42,9 +43,20 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     };
 
     private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
+    private final boolean disabled;
+
+    public RateLimitInterceptor(Environment environment) {
+        // Buckets survive the whole process, so the e2e suite (which registers
+        // many users per run) trips the register/login caps well before it
+        // exercises the features under test. Disable the interceptor for the
+        // local + test profiles; prod behaviour is unchanged.
+        this.disabled = environment.matchesProfiles("local", "test");
+        if (disabled) log.info("rate-limit interceptor disabled for local/test profile");
+    }
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+        if (disabled) return true;
         Rule rule = matchRule(request);
         if (rule == null) return true;
 

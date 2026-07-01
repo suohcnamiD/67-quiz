@@ -162,7 +162,7 @@ test('authoring rejects single-choice with two correct options', async ({ page }
 test('authoring UI: switching to single-choice keeps only one correct option', async ({ page }) => {
   await registerAndLogin(page)
   const quizId = await createQuiz(page, `UI ${Date.now()}`)
-  await page.goto(`/app/quiz/${quizId}`)
+  await page.goto(`/app/quiz/${quizId}/edit`)
   await page.waitForLoadState('networkidle')
 
   // Question text + two options with both correct (multi-select default).
