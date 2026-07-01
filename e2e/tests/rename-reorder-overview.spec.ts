@@ -88,7 +88,7 @@ test.describe('Rename + reorder', () => {
 
     await page.reload()
     await page.waitForLoadState('networkidle')
-    const texts = await page.locator('.qitem .body-lg').allTextContents()
+    const texts = (await page.locator('.qitem .body-lg').allTextContents()).map((t) => t.trim())
     expect(texts).toEqual(['third', 'second', 'first'])
   })
 

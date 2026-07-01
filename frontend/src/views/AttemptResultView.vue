@@ -16,6 +16,8 @@ import { dhbwGrade, formatGrade } from '@/lib/dhbwGrade'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import FinishCelebration from '@/components/FinishCelebration.vue'
+import MarkdownView from '@/components/MarkdownView.vue'
+import MarkdownInline from '@/components/MarkdownInline.vue'
 import type { FinishedQuestionDto, FinishedOptionDto } from '@/api/openAPIDefinition.schemas'
 
 const route = useRoute()
@@ -312,7 +314,7 @@ function dismissRating() {
         <header class="qhead">
           <div class="qhead__title">
             <span class="label-sm muted">Question {{ i + 1 }} of {{ attempt.questions?.length ?? 0 }}</span>
-            <p class="q-text">{{ q.text }}</p>
+            <div class="q-text"><MarkdownView :source="q.text" /></div>
           </div>
           <div
             :class="[
@@ -347,7 +349,7 @@ function dismissRating() {
                 <span v-if="o.selected" class="opt__pick-tick">✓</span>
               </span>
             </span>
-            <span class="opt__text">{{ o.text }}</span>
+            <MarkdownInline class="opt__text" :source="o.text" />
             <img
               v-if="o.hasImage && o.id"
               :src="optionImageUrl(o.id)"

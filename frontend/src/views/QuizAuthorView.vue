@@ -27,6 +27,7 @@ import Chip from '@/components/Chip.vue'
 import Avatar from '@/components/Avatar.vue'
 import QuestionForm from '@/components/QuestionForm.vue'
 import MarkdownView from '@/components/MarkdownView.vue'
+import MarkdownInline from '@/components/MarkdownInline.vue'
 import type { OptionData, AddQuestionRequest, QuestionDto } from '@/api/openAPIDefinition.schemas'
 
 type QuestionType = AddQuestionRequest['type']
@@ -557,7 +558,7 @@ function fmtRelative(iso?: string): string {
             </div>
 
             <template v-if="editingId !== q.id">
-              <p class="body-lg">{{ q.text }}</p>
+              <div class="body-lg"><MarkdownView :source="q.text" /></div>
               <div class="q-image">
                 <ImageUploader
                   :has-image="!!q.hasImage"
@@ -574,7 +575,7 @@ function fmtRelative(iso?: string): string {
                   :class="['opt', { 'opt--correct': o.correct }]"
                 >
                   <div class="opt__row">
-                    <span class="opt__text">{{ o.text }}</span>
+                    <MarkdownInline class="opt__text" :source="o.text" />
                     <Chip v-if="o.correct" tone="success">Correct</Chip>
                   </div>
                   <div class="opt__image">
