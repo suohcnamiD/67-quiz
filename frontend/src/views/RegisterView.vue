@@ -84,7 +84,7 @@ async function submit() {
           />
           <ul class="rules" aria-label="Username requirements">
             <li v-for="(rule, i) in usernameRules" :key="`u${i}`" :class="['rule', { 'rule--ok': rule.ok }]">
-              <span aria-hidden="true" class="rule__mark">{{ rule.ok ? '✓' : '○' }}</span>
+              <span aria-hidden="true" class="rule__mark">{{ rule.ok ? '✓' : '✕' }}</span>
               <span class="rule__label body-md">{{ rule.label }}</span>
             </li>
           </ul>
@@ -99,7 +99,7 @@ async function submit() {
           />
           <ul class="rules" aria-label="Password requirements">
             <li v-for="(rule, i) in passwordRules" :key="`p${i}`" :class="['rule', { 'rule--ok': rule.ok }]">
-              <span aria-hidden="true" class="rule__mark">{{ rule.ok ? '✓' : '○' }}</span>
+              <span aria-hidden="true" class="rule__mark">{{ rule.ok ? '✓' : '✕' }}</span>
               <span class="rule__label body-md">{{ rule.label }}</span>
             </li>
           </ul>
@@ -156,7 +156,7 @@ async function submit() {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--on-surface-variant);
+  color: var(--on-error-container);
   font-size: 0.875rem;
   transition: color 120ms ease;
 }
@@ -169,10 +169,10 @@ async function submit() {
   border-radius: 50%;
   font-weight: 700;
   font-size: 0.75rem;
-  background: transparent;
-  color: var(--on-surface-variant);
-  border: 1px solid currentColor;
-  transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease;
+  background: var(--on-error-container);
+  color: #000;
+  border: 0;
+  transition: color 120ms ease, background-color 120ms ease;
 }
 .rule--ok {
   color: var(--on-secondary-container);
@@ -180,7 +180,6 @@ async function submit() {
 .rule--ok .rule__mark {
   background: var(--on-secondary-container);
   color: #000;
-  border-color: transparent;
 }
 .form__error {
   color: var(--error);
