@@ -2,10 +2,17 @@ package dev.six_seven_quiz.quiz.service;
 
 import dev.six_seven_quiz.quiz.component.mapper.QuizMapper;
 import dev.six_seven_quiz.quiz.dto.request.CreateQuizRequest;
+import dev.six_seven_quiz.quiz.dto.request.PinQuizRequest;
+import dev.six_seven_quiz.quiz.dto.request.QuizSort;
+import dev.six_seven_quiz.quiz.dto.request.RenameQuizRequest;
+import dev.six_seven_quiz.quiz.dto.request.ReorderQuestionsRequest;
+import dev.six_seven_quiz.quiz.dto.request.UpdateQuizDescriptionRequest;
 import dev.six_seven_quiz.quiz.dto.response.QuizRatingSummaryDto;
 import dev.six_seven_quiz.quiz.dto.response.authoring.QuizDto;
 import dev.six_seven_quiz.quiz.dto.response.viewing.QuizSummaryDto;
+import dev.six_seven_quiz.quiz.exception.InvalidReorderException;
 import dev.six_seven_quiz.quiz.exception.QuizNotFoundException;
+import dev.six_seven_quiz.quiz.model.Question;
 import dev.six_seven_quiz.quiz.model.Quiz;
 import dev.six_seven_quiz.quiz.repository.QuestionRepository;
 import dev.six_seven_quiz.quiz.repository.QuizAttemptRepository;
@@ -19,10 +26,15 @@ import jakarta.transaction.Transactional;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -60,8 +72,20 @@ public class QuizService {
     }
 
     public Page<QuizSummaryDto> getQuizzes(int page, UserDetails userDetails) {
+        return getQuizzes(page, QuizSort.NAME, userDetails);
+    }
+
+    public Page<QuizSummaryDto> getQuizzes(int page, QuizSort sort, UserDetails userDetails) {
         ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
-        return quizRepository.findAll(produceSanitizedPageable(page)).map(quiz -> quizToSummary(quiz, user));
+        QuizSort effectiveSort = sort == null ? QuizSort.NAME : sort;
+        Page<Quiz> quizzes = switch (effectiveSort) {
+            case NAME -> quizRepository.findAll(pageable(page, effectiveSort));
+            case NEWEST -> quizRepository.findAll(pageable(page, effectiveSort));
+            // Rating uses a custom aggregate query; the Pageable still supplies
+            // pagination but its Sort is ignored (the JPQL ORDER BY wins).
+            case RATING -> quizRepository.findAllOrderByRating(PageRequest.of(page, QUIZZES_PER_PAGE));
+        };
+        return quizzes.map(quiz -> quizToSummary(quiz, user));
     }
 
     /**
@@ -103,7 +127,29 @@ public class QuizService {
     }
 
     private Pageable produceSanitizedPageable(int page) {
-        return PageRequest.of(page, QUIZZES_PER_PAGE);
+        return pageable(page, QuizSort.NAME);
+    }
+
+    /**
+     * Pinned quizzes always float to the top. Within the unpinned bucket
+     * the secondary sort is driven by the enum:
+     *   - NAME   → alphabetical (case-sensitive at the DB level, matches
+     *              existing UX), tie-broken by id so ordering is stable
+     *   - NEWEST → createdAt DESC, tie-broken by id DESC — the earlier
+     *              tie-breaker was name ASC, which collapsed NEWEST to
+     *              NAME when the whole set shared a second-precision
+     *              created_at (e.g. after a backfill).
+     *   - RATING → handled via a separate JPQL query in the repository
+     *              (Pageable.sort is ignored for that case)
+     */
+    private Pageable pageable(int page, QuizSort sort) {
+        Sort.Order pinnedFirst = Sort.Order.desc("pinned");
+        Sort tail = switch (sort) {
+            case NEWEST -> Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"));
+            case RATING -> Sort.by(Sort.Order.asc("name"), Sort.Order.asc("id")); // ignored by repo query
+            case NAME -> Sort.by(Sort.Order.asc("name"), Sort.Order.asc("id"));
+        };
+        return PageRequest.of(page, QUIZZES_PER_PAGE, Sort.by(pinnedFirst).and(tail));
     }
 
     @Transactional
@@ -120,5 +166,95 @@ public class QuizService {
         Quiz quiz = quizRepository.findById(quizId).orElseThrow(() -> new QuizNotFoundException(quizId));
         QuizValidator.requireOwner(quiz, user);
         return this.quizToDto(quiz, user);
+    }
+
+    /**
+     * Public quiz summary for the overview page — anyone signed-in can view.
+     * Contains name, description, cover flag, question count, rating summary,
+     * and author info. Does NOT include the question texts / options — those
+     * only surface once an attempt is started.
+     */
+    public QuizSummaryDto getSummaryAsViewer(@NotNull UUID quizId, UserDetails userDetails) {
+        ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
+        Quiz quiz = quizRepository.findById(quizId).orElseThrow(() -> new QuizNotFoundException(quizId));
+        return this.quizToSummary(quiz, user);
+    }
+
+    /**
+     * Admin-only pin/unpin. Owners of a quiz can NOT pin their own quiz —
+     * this is a curation lever for platform admins to surface a small
+     * number of quizzes to everyone.
+     */
+    @Transactional
+    public QuizDto pinAsUser(UUID quizId, UserDetails userDetails, PinQuizRequest request) {
+        ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
+        if (!QuizValidator.isAdmin(user)) {
+            throw new dev.six_seven_quiz.quiz.exception.NoAccessToQuizException(quizId);
+        }
+        Quiz quiz = quizRepository.findById(quizId).orElseThrow(() -> new QuizNotFoundException(quizId));
+        quiz.setPinned(Boolean.TRUE.equals(request.pinned()));
+        return this.quizToDto(quizRepository.save(quiz), user);
+    }
+
+    @Transactional
+    public QuizDto renameAsUser(UUID quizId, UserDetails userDetails, RenameQuizRequest request) {
+        ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
+        Quiz quiz = quizRepository.findById(quizId).orElseThrow(() -> new QuizNotFoundException(quizId));
+        QuizValidator.requireOwner(quiz, user);
+        quiz.setName(request.name().trim());
+        return this.quizToDto(quizRepository.save(quiz), user);
+    }
+
+    @Transactional
+    public QuizDto updateDescriptionAsUser(UUID quizId, UserDetails userDetails, UpdateQuizDescriptionRequest request) {
+        ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
+        Quiz quiz = quizRepository.findById(quizId).orElseThrow(() -> new QuizNotFoundException(quizId));
+        QuizValidator.requireOwner(quiz, user);
+        // Normalise: whitespace-only becomes null so the FE renders "no
+        // description" instead of an empty markdown block.
+        String next = request.description();
+        if (next != null) {
+            next = next.strip();
+            if (next.isEmpty()) next = null;
+        }
+        quiz.setDescription(next);
+        return this.quizToDto(quizRepository.save(quiz), user);
+    }
+
+    /**
+     * Reorder the quiz's questions to match the given id list. The list must
+     * be a permutation of the quiz's current question ids — same size, same
+     * set — otherwise we bail out with INVALID_REORDER instead of silently
+     * dropping or duplicating questions.
+     */
+    @Transactional
+    public QuizDto reorderAsUser(UUID quizId, UserDetails userDetails, ReorderQuestionsRequest request) {
+        ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
+        Quiz quiz = quizRepository.findById(quizId).orElseThrow(() -> new QuizNotFoundException(quizId));
+        QuizValidator.requireOwner(quiz, user);
+
+        List<Question> current = quiz.getQuestions();
+        List<UUID> requested = request.questionIds();
+        if (requested.size() != current.size()) {
+            throw new InvalidReorderException("question list size does not match the quiz's current questions");
+        }
+        Set<UUID> currentIds = new HashSet<>();
+        for (Question q : current) currentIds.add(q.getId());
+        Set<UUID> requestedIds = new HashSet<>(requested);
+        if (!currentIds.equals(requestedIds)) {
+            throw new InvalidReorderException("question ids do not match the quiz's current questions");
+        }
+
+        List<Question> reordered = new ArrayList<>(current.size());
+        for (UUID id : requested) {
+            for (Question q : current) {
+                if (q.getId().equals(id)) {
+                    reordered.add(q);
+                    break;
+                }
+            }
+        }
+        quiz.setQuestions(reordered);
+        return this.quizToDto(quizRepository.save(quiz), user);
     }
 }

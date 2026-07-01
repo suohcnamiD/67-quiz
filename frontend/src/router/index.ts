@@ -28,7 +28,8 @@ const router = createRouter({
       children: [
         { path: '', name: 'browse', component: () => import('@/views/BrowseView.vue') },
         { path: 'quiz/new', name: 'quiz-new', component: () => import('@/views/QuizCreateView.vue') },
-        { path: 'quiz/:quizId', name: 'quiz-author', component: () => import('@/views/QuizAuthorView.vue') },
+        { path: 'quiz/:quizId', name: 'quiz-overview', component: () => import('@/views/QuizOverviewView.vue') },
+        { path: 'quiz/:quizId/edit', name: 'quiz-author', component: () => import('@/views/QuizAuthorView.vue') },
         { path: 'attempt/:attemptId', name: 'attempt', component: () => import('@/views/AttemptView.vue') },
         { path: 'attempt/:attemptId/result', name: 'attempt-result', component: () => import('@/views/AttemptResultView.vue') },
         { path: 'leaderboards', name: 'leaderboards', component: () => import('@/views/LeaderboardsView.vue') },

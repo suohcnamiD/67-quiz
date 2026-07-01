@@ -16,6 +16,7 @@ public record ApiError(
                         "ATTEMPT_ALREADY_FINISHED",
                         "BLANK_OPTION_TEXT",
                         "INVALID_QUESTION_SHAPE",
+                        "INVALID_REORDER",
                         "RATING_NOT_ELIGIBLE",
                         "INVALID_RATING",
                         "COMMENT_NOT_FOUND",
@@ -39,6 +40,7 @@ public record ApiError(
                         "NOT_FOUND",
                         "METHOD_NOT_ALLOWED",
                         "UNSUPPORTED_MEDIA_TYPE",
+                        "RATE_LIMITED",
                         "INTERNAL_SERVER_ERROR"
                 })
         String code,

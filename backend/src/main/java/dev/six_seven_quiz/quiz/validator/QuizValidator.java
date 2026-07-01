@@ -1,12 +1,22 @@
 package dev.six_seven_quiz.quiz.validator;
 
+import dev.six_seven_quiz.authorization.AdminChecker;
 import dev.six_seven_quiz.quiz.exception.NoAccessToQuizException;
 import dev.six_seven_quiz.quiz.model.Quiz;
 import dev.six_seven_quiz.user.ApplicationUser;
 
 public class QuizValidator {
     public static void requireOwner(Quiz quiz, ApplicationUser currentUser) {
-        if (quiz.getAuthor().equals(currentUser)) return;
+        if (isOwnerOrAdmin(quiz, currentUser)) return;
         throw new NoAccessToQuizException(quiz.getId());
+    }
+
+    public static boolean isOwnerOrAdmin(Quiz quiz, ApplicationUser currentUser) {
+        if (quiz.getAuthor().equals(currentUser)) return true;
+        return AdminChecker.isAdmin(currentUser);
+    }
+
+    public static boolean isAdmin(ApplicationUser user) {
+        return AdminChecker.isAdmin(user);
     }
 }

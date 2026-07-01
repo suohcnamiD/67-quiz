@@ -1,6 +1,11 @@
 package dev.six_seven_quiz.quiz.controller;
 
 import dev.six_seven_quiz.quiz.dto.request.CreateQuizRequest;
+import dev.six_seven_quiz.quiz.dto.request.PinQuizRequest;
+import dev.six_seven_quiz.quiz.dto.request.QuizSort;
+import dev.six_seven_quiz.quiz.dto.request.RenameQuizRequest;
+import dev.six_seven_quiz.quiz.dto.request.ReorderQuestionsRequest;
+import dev.six_seven_quiz.quiz.dto.request.UpdateQuizDescriptionRequest;
 import dev.six_seven_quiz.quiz.dto.response.authoring.QuizDto;
 import dev.six_seven_quiz.quiz.dto.response.viewing.QuizSummaryDto;
 import dev.six_seven_quiz.quiz.service.QuizService;
@@ -43,13 +48,22 @@ public class QuizController {
         return quizService.getAsAuthor(quizId, userDetails);
     }
 
+    @GetMapping("/{quizId}")
+    public QuizSummaryDto getQuizOverview(
+            @PathVariable @NotNull UUID quizId,
+            @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        return quizService.getSummaryAsViewer(quizId, userDetails);
+    }
+
     @GetMapping
     public PagedModel<EntityModel<QuizSummaryDto>> getQuizzes(
             @RequestParam (defaultValue = "0") int page,
+            @RequestParam (required = false) QuizSort sort,
             @AuthenticationPrincipal UserDetails userDetails,
             @Parameter(hidden = true) PagedResourcesAssembler<QuizSummaryDto> pagedResourcesAssembler
     ) {
-        return pagedResourcesAssembler.toModel(quizService.getQuizzes(page, userDetails));
+        return pagedResourcesAssembler.toModel(quizService.getQuizzes(page, sort, userDetails));
     }
 
     @PostMapping
@@ -58,5 +72,41 @@ public class QuizController {
             @RequestBody @Valid CreateQuizRequest request
     ) {
         return quizService.createQuiz(userDetails, request);
+    }
+
+    @PatchMapping("/{quizId}")
+    public QuizDto renameQuiz(
+            @PathVariable @NotNull UUID quizId,
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody @Valid RenameQuizRequest request
+    ) {
+        return quizService.renameAsUser(quizId, userDetails, request);
+    }
+
+    @PatchMapping("/{quizId}/description")
+    public QuizDto updateQuizDescription(
+            @PathVariable @NotNull UUID quizId,
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody @Valid UpdateQuizDescriptionRequest request
+    ) {
+        return quizService.updateDescriptionAsUser(quizId, userDetails, request);
+    }
+
+    @PatchMapping("/{quizId}/reorder")
+    public QuizDto reorderQuestions(
+            @PathVariable @NotNull UUID quizId,
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody @Valid ReorderQuestionsRequest request
+    ) {
+        return quizService.reorderAsUser(quizId, userDetails, request);
+    }
+
+    @PatchMapping("/{quizId}/pin")
+    public QuizDto pinQuiz(
+            @PathVariable @NotNull UUID quizId,
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody @Valid PinQuizRequest request
+    ) {
+        return quizService.pinAsUser(quizId, userDetails, request);
     }
 }

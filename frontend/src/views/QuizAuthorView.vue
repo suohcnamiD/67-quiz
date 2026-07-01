@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useGetQuiz, deleteQuiz, getGetQuizQueryKey } from '@/api/quiz-controller/quiz-controller'
+import { useGetQuiz, deleteQuiz, renameQuiz, reorderQuestions, updateQuizDescription, getGetQuizQueryKey } from '@/api/quiz-controller/quiz-controller'
 import {
   addQuizQuestion,
   deleteQuizQuestion,
@@ -26,6 +26,8 @@ import ImageUploader from '@/components/ImageUploader.vue'
 import Chip from '@/components/Chip.vue'
 import Avatar from '@/components/Avatar.vue'
 import QuestionForm from '@/components/QuestionForm.vue'
+import MarkdownView from '@/components/MarkdownView.vue'
+import MarkdownInline from '@/components/MarkdownInline.vue'
 import type { OptionData, AddQuestionRequest, QuestionDto } from '@/api/openAPIDefinition.schemas'
 
 type QuestionType = AddQuestionRequest['type']
@@ -103,9 +105,42 @@ const editOptions = ref<OptionData[]>([])
 const savingEdit = ref(false)
 const editError = ref<string | null>(null)
 
+// ---------- Collapse state ----------
+// Questions start collapsed so long quizzes are easy to reorder — one row
+// per question. Clicking the header expands the row. Editing auto-expands.
+const expandedIds = ref<Set<string>>(new Set())
+function isExpanded(id?: string | null): boolean {
+  return !!id && expandedIds.value.has(id)
+}
+function toggleExpanded(id?: string | null) {
+  if (!id) return
+  const next = new Set(expandedIds.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  expandedIds.value = next
+}
+function expandAll() {
+  const ids = (quiz.data.value?.questions ?? []).map((q) => q.id).filter((x): x is string => !!x)
+  expandedIds.value = new Set(ids)
+}
+function collapseAll() {
+  expandedIds.value = new Set()
+}
+function questionPreview(text: string | undefined | null): string {
+  if (!text) return ''
+  // Strip trailing whitespace + newlines so the preview is a single tight line.
+  return text.replace(/\s+/g, ' ').trim()
+}
+
 function startEdit(q: QuestionDto) {
   if (!q.id) return
   editingId.value = q.id
+  // Editing forces the row open so the form is visible.
+  if (!expandedIds.value.has(q.id)) {
+    const next = new Set(expandedIds.value)
+    next.add(q.id)
+    expandedIds.value = next
+  }
   editText.value = q.text ?? ''
   editType.value = (q.type as QuestionType) ?? MULTI
   editOptions.value = (q.options ?? []).map((o) => ({
@@ -183,6 +218,153 @@ async function removeQuiz() {
     router.push('/app')
   } catch (e) {
     errorText.value = errorMessage(e)
+  }
+}
+
+// ---------- Inline rename of the quiz title ----------
+const renamingTitle = ref(false)
+const titleDraft = ref('')
+const titleError = ref<string | null>(null)
+const savingTitle = ref(false)
+function startTitleEdit() {
+  titleDraft.value = quiz.data.value?.name ?? ''
+  titleError.value = null
+  renamingTitle.value = true
+}
+function cancelTitleEdit() {
+  renamingTitle.value = false
+  titleError.value = null
+}
+async function saveTitle() {
+  const trimmed = titleDraft.value.trim()
+  if (!trimmed) {
+    titleError.value = 'Name is required.'
+    return
+  }
+  if (trimmed === quiz.data.value?.name) {
+    renamingTitle.value = false
+    return
+  }
+  savingTitle.value = true
+  titleError.value = null
+  try {
+    await renameQuiz(quizId.value, { name: trimmed })
+    qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) })
+    renamingTitle.value = false
+  } catch (e) {
+    titleError.value = errorMessage(e)
+  } finally {
+    savingTitle.value = false
+  }
+}
+
+// ---------- Inline edit of the quiz description ----------
+const editingDescription = ref(false)
+const descriptionDraft = ref('')
+const descriptionError = ref<string | null>(null)
+const savingDescription = ref(false)
+function startDescriptionEdit() {
+  descriptionDraft.value = quiz.data.value?.description ?? ''
+  descriptionError.value = null
+  editingDescription.value = true
+}
+function cancelDescriptionEdit() {
+  editingDescription.value = false
+  descriptionError.value = null
+}
+async function saveDescription() {
+  const trimmed = descriptionDraft.value.trim()
+  if (trimmed === (quiz.data.value?.description ?? '')) {
+    editingDescription.value = false
+    return
+  }
+  savingDescription.value = true
+  descriptionError.value = null
+  try {
+    await updateQuizDescription(quizId.value, { description: trimmed || undefined })
+    qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) })
+    editingDescription.value = false
+  } catch (e) {
+    descriptionError.value = errorMessage(e)
+  } finally {
+    savingDescription.value = false
+  }
+}
+
+// ---------- Drag-to-reorder questions ----------
+// dragIndex = the row currently being dragged (from position). dropSlot =
+// the *gap* between rows where the moved question will land: 0 = before
+// the first row, N = after the last row. We render a horizontal bar in
+// that gap so the drop target is unambiguous. We only commit on drop so
+// abandoned drags leave the list untouched.
+const dragIndex = ref<number | null>(null)
+const dropSlot = ref<number | null>(null)
+const reordering = ref(false)
+function onDragStart(i: number, event: DragEvent) {
+  dragIndex.value = i
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    // Firefox refuses to fire dragover unless dataTransfer has been set.
+    event.dataTransfer.setData('text/plain', String(i))
+  }
+}
+function onDragOver(i: number, event: DragEvent) {
+  if (dragIndex.value === null) return
+  event.preventDefault()
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+  // Split each row into a top half (drop before it) and a bottom half
+  // (drop after it). currentTarget is the <li> so the bounding rect
+  // covers the whole question card.
+  const el = event.currentTarget as HTMLElement | null
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+  const midpoint = rect.top + rect.height / 2
+  const slot = event.clientY < midpoint ? i : i + 1
+  // Suppress the two slots that would be no-ops (drop right where the
+  // dragged card already sits) so the indicator doesn't flicker in.
+  if (slot === dragIndex.value || slot === dragIndex.value + 1) {
+    dropSlot.value = null
+    return
+  }
+  dropSlot.value = slot
+}
+function onDragLeave(event: DragEvent) {
+  // Only clear when the pointer leaves the <li> entirely — dragleave
+  // fires for every child boundary otherwise and the bar would flicker.
+  const el = event.currentTarget as HTMLElement | null
+  const related = event.relatedTarget as Node | null
+  if (el && related && el.contains(related)) return
+  dropSlot.value = null
+}
+function onDragEnd() {
+  dragIndex.value = null
+  dropSlot.value = null
+}
+async function onDrop() {
+  const from = dragIndex.value
+  const slot = dropSlot.value
+  dragIndex.value = null
+  dropSlot.value = null
+  if (from === null || slot === null) return
+  // Translate slot (gap index) into a target list position after removal.
+  // Removing `from` shifts everything after it down by one, so if the
+  // slot was past `from` we subtract one.
+  const to = slot > from ? slot - 1 : slot
+  if (to === from) return
+  const questions = quiz.data.value?.questions ?? []
+  const ids = questions.map((q) => q.id).filter((id): id is string => !!id)
+  if (ids.length !== questions.length) return
+  const [moved] = ids.splice(from, 1)
+  ids.splice(to, 0, moved!)
+  reordering.value = true
+  errorText.value = null
+  try {
+    await reorderQuestions(quizId.value, { questionIds: ids })
+    qc.invalidateQueries({ queryKey: getGetQuizQueryKey(quizId.value) })
+  } catch (e) {
+    errorText.value = errorMessage(e)
+  } finally {
+    reordering.value = false
   }
 }
 
@@ -300,8 +482,33 @@ function fmtRelative(iso?: string): string {
       <p v-if="coverError" class="banner label-md" role="alert">{{ coverError }}</p>
     </section>
     <header class="head">
-      <div>
-        <h1 class="headline-lg">{{ quiz.data.value.name }}</h1>
+      <div class="head__title-wrap">
+        <template v-if="!renamingTitle">
+          <h1
+            class="headline-lg head__title"
+            tabindex="0"
+            role="button"
+            :title="'Click to rename'"
+            @click="startTitleEdit"
+            @keydown.enter.prevent="startTitleEdit"
+            @keydown.space.prevent="startTitleEdit"
+          >{{ quiz.data.value.name }}</h1>
+        </template>
+        <template v-else>
+          <form class="head__title-form" @submit.prevent="saveTitle">
+            <input
+              v-model="titleDraft"
+              class="head__title-input headline-lg"
+              maxlength="200"
+              autofocus
+              :aria-invalid="!!titleError"
+              :disabled="savingTitle"
+              @keydown.esc.prevent="cancelTitleEdit"
+              @blur="saveTitle"
+            />
+            <span v-if="titleError" class="head__title-error label-md" role="alert">{{ titleError }}</span>
+          </form>
+        </template>
         <p class="meta body-md">
           {{ quiz.data.value.questionCount ?? 0 }} questions · {{ quiz.data.value.duration }}
         </p>
@@ -312,25 +519,129 @@ function fmtRelative(iso?: string): string {
       </div>
     </header>
 
+    <section class="description-section" aria-label="Quiz description">
+      <template v-if="!editingDescription">
+        <div v-if="quiz.data.value.description" class="description-preview">
+          <MarkdownView :source="quiz.data.value.description" />
+          <Button variant="ghost" class="description-edit-btn" @click="startDescriptionEdit">Edit description</Button>
+        </div>
+        <button
+          v-else
+          type="button"
+          class="description-empty"
+          @click="startDescriptionEdit"
+        >+ Add a description</button>
+      </template>
+      <template v-else>
+        <form class="description-form" @submit.prevent="saveDescription">
+          <textarea
+            v-model="descriptionDraft"
+            class="description-textarea"
+            rows="6"
+            placeholder="Describe the quiz. Markdown supported — headings, lists, links, code, tables."
+            maxlength="10000"
+            :disabled="savingDescription"
+            :aria-invalid="!!descriptionError"
+          />
+          <p v-if="descriptionError" class="banner label-md" role="alert">{{ descriptionError }}</p>
+          <div class="description-form__actions">
+            <Button variant="ghost" type="button" :disabled="savingDescription" @click="cancelDescriptionEdit">Cancel</Button>
+            <Button type="submit" :loading="savingDescription">Save</Button>
+          </div>
+          <p class="description-hint label-sm muted">Markdown: **bold**, *italic*, `code`, [link](url), lists, tables. HTML tags will be stripped.</p>
+        </form>
+      </template>
+    </section>
+
     <section class="section">
       <div class="section__head">
         <h2 class="headline-md">Questions</h2>
-        <Button
-          v-if="(quiz.data.value.questions?.length ?? 0) >= 3"
-          variant="ghost"
-          @click="scrollToAddForm"
-        >+ Add another</Button>
+        <div class="section__head-actions">
+          <Button
+            v-if="(quiz.data.value.questions?.length ?? 0) >= 2"
+            variant="ghost"
+            @click="expandedIds.size ? collapseAll() : expandAll()"
+          >{{ expandedIds.size ? 'Collapse all' : 'Expand all' }}</Button>
+          <Button
+            v-if="(quiz.data.value.questions?.length ?? 0) >= 3"
+            variant="ghost"
+            @click="scrollToAddForm"
+          >+ Add another</Button>
+        </div>
       </div>
       <div v-if="!(quiz.data.value.questions?.length)" class="empty body-md">
         No questions yet. Add one below.
       </div>
       <ol class="qlist">
-        <li v-for="(q, i) in quiz.data.value.questions ?? []" :key="q.id">
+        <li
+          v-for="(q, i) in quiz.data.value.questions ?? []"
+          :key="q.id"
+          :class="[
+            'qitem',
+            {
+              'qitem--dragging': dragIndex === i,
+              'qitem--slot-before': dropSlot === i,
+              'qitem--slot-after': dropSlot === i + 1,
+            },
+          ]"
+          @dragover="onDragOver(i, $event)"
+          @dragleave="onDragLeave($event)"
+          @drop.prevent="onDrop()"
+        >
           <Card>
             <div class="qhead">
               <div class="qhead__title">
-                <span class="label-sm muted">Q{{ i + 1 }}</span>
+                <button
+                  type="button"
+                  class="drag-handle"
+                  :aria-label="`Drag question ${i + 1} to reorder`"
+                  :draggable="editingId !== q.id"
+                  :disabled="reordering || editingId === q.id"
+                  :title="editingId === q.id ? 'Finish editing to reorder' : 'Drag to reorder'"
+                  @dragstart="onDragStart(i, $event)"
+                  @dragend="onDragEnd"
+                >
+                  <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true">
+                    <circle cx="5" cy="3" r="1.2" />
+                    <circle cx="11" cy="3" r="1.2" />
+                    <circle cx="5" cy="8" r="1.2" />
+                    <circle cx="11" cy="8" r="1.2" />
+                    <circle cx="5" cy="13" r="1.2" />
+                    <circle cx="11" cy="13" r="1.2" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="qhead__toggle"
+                  :aria-expanded="isExpanded(q.id)"
+                  :aria-label="isExpanded(q.id) ? 'Collapse question' : 'Expand question'"
+                  :disabled="editingId === q.id"
+                  @click="toggleExpanded(q.id)"
+                >
+                  <svg
+                    class="qhead__chevron"
+                    :class="{ 'qhead__chevron--open': isExpanded(q.id) }"
+                    viewBox="0 0 24 24"
+                    width="14"
+                    height="14"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <polyline points="9 6 15 12 9 18" />
+                  </svg>
+                </button>
+                <span class="label-sm muted qhead__index">Q{{ i + 1 }}</span>
                 <Chip>{{ typeLabel(q.type) }}</Chip>
+                <span
+                  v-if="!isExpanded(q.id) && editingId !== q.id"
+                  class="qhead__preview"
+                  :title="questionPreview(q.text)"
+                  @click="toggleExpanded(q.id)"
+                >{{ questionPreview(q.text) || '(no text)' }}</span>
               </div>
               <div class="qhead__actions">
                 <template v-if="editingId !== q.id">
@@ -344,8 +655,8 @@ function fmtRelative(iso?: string): string {
               </div>
             </div>
 
-            <template v-if="editingId !== q.id">
-              <p class="body-lg">{{ q.text }}</p>
+            <template v-if="editingId !== q.id && isExpanded(q.id)">
+              <div class="qbody body-lg"><MarkdownView :source="q.text" /></div>
               <div class="q-image">
                 <ImageUploader
                   :has-image="!!q.hasImage"
@@ -362,7 +673,7 @@ function fmtRelative(iso?: string): string {
                   :class="['opt', { 'opt--correct': o.correct }]"
                 >
                   <div class="opt__row">
-                    <span class="opt__text">{{ o.text }}</span>
+                    <MarkdownInline class="opt__text" :source="o.text" />
                     <Chip v-if="o.correct" tone="success">Correct</Chip>
                   </div>
                   <div class="opt__image">
@@ -377,7 +688,7 @@ function fmtRelative(iso?: string): string {
                 </li>
               </ul>
             </template>
-            <template v-else>
+            <template v-if="editingId === q.id">
               <form class="form" @submit.prevent="saveEdit">
                 <QuestionForm
                   v-model:text="editText"
@@ -520,9 +831,54 @@ function fmtRelative(iso?: string): string {
   gap: var(--space-md);
   margin-bottom: var(--space-xl);
 }
+.head__title-wrap {
+  min-width: 0;
+  flex: 1;
+}
+.head__title {
+  margin: 0;
+  cursor: pointer;
+  border-radius: var(--radius);
+  padding: 2px 6px;
+  margin-left: -6px;
+  transition: background-color 120ms ease;
+}
+.head__title:hover,
+.head__title:focus-visible {
+  background: var(--surface-container-high);
+  outline: none;
+}
+.head__title-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.head__title-input {
+  width: 100%;
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius);
+  padding: 4px 8px;
+  color: var(--on-surface);
+  outline: none;
+  font: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  font-weight: inherit;
+}
+.head__title-input:focus {
+  border-color: var(--primary-container);
+}
+.head__title-input[aria-invalid="true"] {
+  border-color: var(--error-container);
+}
+.head__title-error {
+  color: var(--error);
+}
 .head__actions {
   display: flex;
   gap: var(--space-sm);
+  flex-shrink: 0;
 }
 .meta {
   color: var(--on-surface-variant);
@@ -550,24 +906,223 @@ function fmtRelative(iso?: string): string {
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  /* No flex gap — each <li> pads its own vertical breathing room so the
+   * whole strip is a contiguous dragover surface. Without this the gap
+   * between rows is dead space and the pointer sees no dragover events. */
+  gap: 0;
+}
+.qitem {
+  position: relative;
+  /* Each row owns half the gap on either side, so hovering the space
+   * between two cards still fires dragover on one of them. */
+  padding: calc(var(--space-md) / 2) 0;
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+.qitem--dragging {
+  opacity: 0.4;
+}
+/* Drop indicator: a crisp horizontal line + a "pin" dot at the left,
+ * rendered in the gap between two question cards. ::before covers the
+ * "insert above this row" slot; ::after covers "insert below this row".
+ * Solid accent color, no color-mix, so it stays sharp on any surface. */
+.qitem--slot-before::before,
+.qitem--slot-after::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  height: 2px;
+  background: var(--primary-container);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 2;
+}
+.qitem--slot-before::before {
+  top: 0;
+}
+.qitem--slot-after::after {
+  bottom: 0;
+}
+.drag-handle {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 4px;
+  color: var(--on-surface-variant);
+  cursor: grab;
+  border-radius: var(--radius);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.drag-handle:hover:not(:disabled) {
+  background: var(--surface-container-high);
+  color: var(--on-surface);
+}
+.drag-handle:active {
+  cursor: grabbing;
+}
+.drag-handle:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* Description block sits between the header and the questions list. Empty
+ * state is a subtle dashed placeholder; filled state shows the rendered
+ * markdown with an Edit button anchored top-right. */
+.description-section {
+  margin: calc(-1 * var(--space-lg)) 0 var(--space-xl);
+}
+.description-preview {
+  position: relative;
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md) var(--space-lg);
+}
+.description-edit-btn {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+}
+.description-empty {
+  appearance: none;
+  background: transparent;
+  border: 1px dashed var(--outline-variant);
+  border-radius: var(--radius-lg);
+  color: var(--on-surface-variant);
+  font: inherit;
+  padding: var(--space-md);
+  width: 100%;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease;
+}
+.description-empty:hover {
+  color: var(--on-surface);
+  border-color: var(--outline);
+  background: var(--surface-container-high);
+  border-style: solid;
+}
+.description-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.description-textarea {
+  width: 100%;
+  min-height: 8rem;
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius);
+  padding: var(--space-sm) var(--space-md);
+  color: var(--on-surface);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  outline: none;
+  resize: vertical;
+}
+.description-textarea:focus {
+  border-color: var(--primary-container);
+}
+.description-textarea[aria-invalid="true"] {
+  border-color: var(--error-container);
+}
+.description-form__actions {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+}
+.description-hint {
+  margin: 0;
+}
+.banner {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--error-container);
+  color: var(--on-error-container);
+  border-radius: var(--radius);
 }
 .qhead {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: var(--space-sm);
-  margin-bottom: var(--space-sm);
-  flex-wrap: wrap;
+  margin-bottom: 0;
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 .qhead__title {
   display: inline-flex;
   align-items: center;
   gap: var(--space-sm);
+  flex: 1;
+  min-width: 0;
 }
 .qhead__actions {
   display: inline-flex;
   gap: var(--space-sm);
+  flex-shrink: 0;
+}
+.qhead__index {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.qhead__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--on-surface-variant);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+.qhead__toggle:hover:not(:disabled) {
+  background: var(--surface-container-high);
+  color: var(--on-surface);
+}
+.qhead__toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.qhead__chevron {
+  transition: transform 150ms ease;
+}
+.qhead__chevron--open {
+  transform: rotate(90deg);
+}
+.qhead__preview {
+  color: var(--on-surface-variant);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+.qhead__preview:hover {
+  color: var(--on-surface);
+}
+/* Give collapsed rows more headroom so the drag handle + chevron + text
+ * line up on one row without cramping. Expanded rows get a bottom margin
+ * so the body doesn't kiss the header. */
+.qitem :deep(.card) {
+  transition: background-color 120ms ease;
+}
+.section__head-actions {
+  display: inline-flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+.qbody {
+  margin-top: var(--space-md);
 }
 .q-image {
   margin: var(--space-sm) 0 0;
@@ -607,6 +1162,9 @@ function fmtRelative(iso?: string): string {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
+}
+.qitem .form {
+  margin-top: var(--space-md);
 }
 .form__error {
   color: var(--error);

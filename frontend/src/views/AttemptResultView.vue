@@ -12,9 +12,12 @@ import {
 import { getGetQuizzesQueryKey } from '@/api/quiz-controller/quiz-controller'
 import { errorMessage, firstErrorCode } from '@/lib/errors'
 import { questionImageUrl, optionImageUrl } from '@/lib/quizImages'
+import { dhbwGrade, formatGrade } from '@/lib/dhbwGrade'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import FinishCelebration from '@/components/FinishCelebration.vue'
+import MarkdownView from '@/components/MarkdownView.vue'
+import MarkdownInline from '@/components/MarkdownInline.vue'
 import type { FinishedQuestionDto, FinishedOptionDto } from '@/api/openAPIDefinition.schemas'
 
 const route = useRoute()
@@ -52,6 +55,11 @@ const percent = computed(() => {
   return (attempt.value!.score ?? 0) / max
 })
 const percentLabel = computed(() => `${Math.round(percent.value * 100)}%`)
+// German DHBW-Wirtschaft note (1.0 great … 5.0 fail). Displayed alongside
+// the raw percent so students used to the German grading scale get an
+// immediate read on the result.
+const grade = computed(() => dhbwGrade(percent.value * 100))
+const gradeLabel = computed(() => formatGrade(grade.value))
 const tone = computed<'great' | 'good' | 'tried'>(() => {
   const p = percent.value
   if (p >= 0.85) return 'great'
@@ -133,13 +141,12 @@ const myRatingQuery = useGetMine(
 // resolves data to undefined/null. Treat null/undefined as "no rating yet".
 const myRating = computed(() => myRatingQuery.data.value ?? null)
 
-const dismissKey = computed(() => quizId.value ? `quiz-rating-dismissed:${quizId.value}` : null)
-function isDismissed(): boolean {
-  if (!dismissKey.value) return false
-  try { return localStorage.getItem(dismissKey.value) === '1' } catch { return false }
-}
-const dismissed = ref(isDismissed())
-watch(quizId, () => { dismissed.value = isDismissed() })
+// Dismiss is session-only: closing the widget once should NOT hide it
+// forever on future visits. Users kept coming back to a result page for a
+// quiz they'd dismissed and thought the rating feature was broken. Keep
+// the flag in-memory (dismissed ref); no localStorage.
+const dismissed = ref(false)
+watch(quizId, () => { dismissed.value = false })
 
 const ratingScore = ref<number | null>(null)
 const ratingHover = ref<number | null>(null)
@@ -176,10 +183,8 @@ async function saveRating() {
     qc.invalidateQueries({ queryKey: getGetMineQueryKey(quizId.value) })
     qc.invalidateQueries({ queryKey: getRatingSummaryQueryKey(quizId.value) })
     qc.invalidateQueries({ queryKey: getGetQuizzesQueryKey() })
-    // Persist dismissal so the prompt doesn't keep insisting after a save.
-    if (dismissKey.value) {
-      try { localStorage.setItem(dismissKey.value, '1') } catch { /* ignore */ }
-    }
+    // No dismissal on save: the widget flips to "Your rating" mode and
+    // becomes an update form, which is more useful than hiding it.
   } catch (e) {
     if (firstErrorCode(e) !== 'RATING_NOT_ELIGIBLE') console.error(e)
     ratingError.value = errorMessage(e)
@@ -189,10 +194,9 @@ async function saveRating() {
 }
 
 function dismissRating() {
+  // Session-only dismiss. Refreshing the page brings the widget back so
+  // the user can still rate later without hunting for a hidden action.
   dismissed.value = true
-  if (dismissKey.value) {
-    try { localStorage.setItem(dismissKey.value, '1') } catch { /* ignore */ }
-  }
 }
 </script>
 
@@ -210,6 +214,10 @@ function dismissRating() {
         <h1 class="hero__title">{{ attempt.quiz?.name ?? 'Untitled quiz' }}</h1>
         <p class="hero__points label-md">
           {{ attempt.score ?? 0 }} of {{ attempt.maximumScore ?? 0 }} points
+        </p>
+        <p class="hero__grade" :title="'DHBW-Wirtschaft grade for this percentage'">
+          <span class="hero__grade-value">{{ gradeLabel }}</span>
+          <span class="hero__grade-label label-sm">DHBW-Note</span>
         </p>
       </div>
       <div class="hero__score">
@@ -306,7 +314,7 @@ function dismissRating() {
         <header class="qhead">
           <div class="qhead__title">
             <span class="label-sm muted">Question {{ i + 1 }} of {{ attempt.questions?.length ?? 0 }}</span>
-            <p class="q-text">{{ q.text }}</p>
+            <div class="q-text"><MarkdownView :source="q.text" /></div>
           </div>
           <div
             :class="[
@@ -341,7 +349,7 @@ function dismissRating() {
                 <span v-if="o.selected" class="opt__pick-tick">✓</span>
               </span>
             </span>
-            <span class="opt__text">{{ o.text }}</span>
+            <MarkdownInline class="opt__text" :source="o.text" />
             <img
               v-if="o.hasImage && o.id"
               :src="optionImageUrl(o.id)"
@@ -419,6 +427,26 @@ function dismissRating() {
   color: var(--on-surface-variant);
   font-variant-numeric: tabular-nums;
   font-size: 1rem;
+}
+.hero__grade {
+  margin: var(--space-sm) 0 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--on-surface-variant);
+  font-variant-numeric: tabular-nums;
+}
+.hero__grade-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--on-surface);
+  line-height: 1;
+}
+.hero__grade-label {
+  font-size: 0.75rem;
+  color: var(--on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .hero__score {

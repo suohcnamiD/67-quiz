@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, useTemplateRef, watchEffect } from 'vue'
+import { ref, computed, useTemplateRef, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGetQuizzes } from '@/api/quiz-controller/quiz-controller'
+import { GetQuizzesSort } from '@/api/openAPIDefinition.schemas'
 import {
   useGetAttemptsInProgress,
   useGetFinishedAttempts,
@@ -24,11 +25,28 @@ const auth = useAuthStore()
 const errorText = ref<string | null>(null)
 
 const page = ref(0)
-const quizzes = useGetQuizzes(computed(() => ({ page: page.value })))
+const sort = ref<GetQuizzesSort>(GetQuizzesSort.NAME)
+// Reset to page 0 when the sort changes so users don't land on a page
+// index that no longer makes sense against a different ordering.
+watch(sort, () => { page.value = 0 })
+const quizzes = useGetQuizzes(computed(() => ({ page: page.value, sort: sort.value })), {
+  query: { placeholderData: (prev: unknown) => prev },
+} as never)
 const inProgressPage = ref(0)
 const finishedPage = ref(0)
-const inProgress = useGetAttemptsInProgress(computed(() => ({ page: inProgressPage.value })))
-const finished = useGetFinishedAttempts(computed(() => ({ page: finishedPage.value })))
+// Keep the previous page rendered while the next page fetches so the list
+// doesn't collapse to empty (which would jump the scroll position and
+// flash "no items"). TanStack v5 exposes this via placeholderData
+// = (prev) => prev — reuse-in-place semantics.
+const keepPrev = { query: { placeholderData: (prev: unknown) => prev } } as never
+const inProgress = useGetAttemptsInProgress(
+  computed(() => ({ page: inProgressPage.value })),
+  keepPrev,
+)
+const finished = useGetFinishedAttempts(
+  computed(() => ({ page: finishedPage.value })),
+  keepPrev,
+)
 const profile = useGetOwnProfile()
 
 const me = computed(() => profile.data.value)
@@ -178,6 +196,25 @@ function scoreTone(pct: number): 'great' | 'good' | 'tried' {
   if (pct >= 0.5) return 'good'
   return 'tried'
 }
+
+// Pager click handlers. Anchor the scroll to the section's top BEFORE
+// swapping page state so the user always lands with the pager header
+// visible, and the vertical shift when the last page has fewer items
+// happens below the fold rather than yanking the viewport around.
+const inProgressSection = useTemplateRef<HTMLElement>('inProgressSection')
+const finishedSection = useTemplateRef<HTMLElement>('finishedSection')
+function setInProgressPage(next: number) {
+  const bounded = Math.max(0, Math.min(inProgressTotalPages.value - 1, next))
+  if (bounded === inProgressPage.value) return
+  inProgressSection.value?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+  inProgressPage.value = bounded
+}
+function setFinishedPage(next: number) {
+  const bounded = Math.max(0, Math.min(finishedTotalPages.value - 1, next))
+  if (bounded === finishedPage.value) return
+  finishedSection.value?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+  finishedPage.value = bounded
+}
 </script>
 
 <template>
@@ -223,12 +260,12 @@ function scoreTone(pct: number): 'great' | 'good' | 'tried' {
       </li>
     </ul>
     <div v-if="playerRank || authorRank" class="rank-row" aria-label="Your leaderboard standings">
-      <RouterLink v-if="playerRank" to="/app/leaderboards" class="rank-pill">
+      <RouterLink v-if="playerRank" :to="{ path: '/app/leaderboards', query: { tab: 'players' } }" class="rank-pill">
         <span class="rank-pill__hash">#{{ playerRank.rank }}</span>
         <span class="rank-pill__label body-md">Top players</span>
         <span class="rank-pill__chevron" aria-hidden="true">›</span>
       </RouterLink>
-      <RouterLink v-if="authorRank" to="/app/leaderboards" class="rank-pill">
+      <RouterLink v-if="authorRank" :to="{ path: '/app/leaderboards', query: { tab: 'authors' } }" class="rank-pill">
         <span class="rank-pill__hash">#{{ authorRank.rank }}</span>
         <span class="rank-pill__label body-md">Top authors</span>
         <span class="rank-pill__chevron" aria-hidden="true">›</span>
@@ -319,13 +356,14 @@ function scoreTone(pct: number): 'great' | 'good' | 'tried' {
 
   <section
     v-if="inProgressItems.length"
+    ref="inProgressSection"
     class="section section--accent"
     aria-labelledby="continue-heading"
   >
     <header class="section__head">
       <h2 id="continue-heading" class="headline-md">Continue</h2>
     </header>
-    <div class="grid">
+    <div class="grid" :class="{ 'grid--stable': inProgressTotalPages > 1 }">
       <Card
         v-for="a in inProgressItems"
         :key="a.id"
@@ -347,9 +385,9 @@ function scoreTone(pct: number): 'great' | 'good' | 'tried' {
       </Card>
     </div>
     <nav v-if="inProgressTotalPages > 1" class="mini-pager" aria-label="In-progress attempts pagination">
-      <Button variant="ghost" :disabled="inProgressPage === 0" @click="inProgressPage = Math.max(0, inProgressPage - 1)">Previous</Button>
+      <Button variant="ghost" :disabled="inProgressPage === 0" @click="setInProgressPage(inProgressPage - 1)">Previous</Button>
       <span class="label-sm muted">Page {{ inProgressPage + 1 }} / {{ inProgressTotalPages }}</span>
-      <Button variant="ghost" :disabled="inProgressPage + 1 >= inProgressTotalPages" @click="inProgressPage = inProgressPage + 1">Next</Button>
+      <Button variant="ghost" :disabled="inProgressPage + 1 >= inProgressTotalPages" @click="setInProgressPage(inProgressPage + 1)">Next</Button>
     </nav>
   </section>
 
@@ -359,6 +397,14 @@ function scoreTone(pct: number): 'great' | 'good' | 'tried' {
         Browse quizzes
         <span v-if="totalQuizzes" class="muted label-md">({{ totalQuizzes }})</span>
       </h2>
+      <label class="sort-select">
+        <span class="label-sm muted">Sort</span>
+        <select v-model="sort" class="sort-select__control">
+          <option :value="'NAME'">Name (A–Z)</option>
+          <option :value="'NEWEST'">Newest</option>
+          <option :value="'RATING'">Top rated</option>
+        </select>
+      </label>
     </header>
     <div v-if="quizzes.isLoading.value" class="grid" aria-hidden="true">
       <div v-for="i in 3" :key="i" class="skeleton skeleton--card" />
@@ -402,14 +448,14 @@ function scoreTone(pct: number): 'great' | 'good' | 'tried' {
     </nav>
   </section>
 
-  <section v-if="finishedItems.length" id="past-results" class="section" aria-labelledby="past-heading">
+  <section v-if="finishedItems.length" ref="finishedSection" id="past-results" class="section" aria-labelledby="past-heading">
     <header class="section__head">
       <h2 id="past-heading" class="headline-md">
         Past results
         <span v-if="finishedTotal > finishedItems.length" class="section__count label-sm muted">({{ finishedTotal }})</span>
       </h2>
     </header>
-    <div class="grid">
+    <div class="grid" :class="{ 'grid--stable': finishedTotalPages > 1 }">
       <Card v-for="a in finishedItems" :key="a.id" interactive @click="router.push(`/app/attempt/${a.id}/result`)">
         <div class="past">
           <CircleProgress
@@ -427,9 +473,9 @@ function scoreTone(pct: number): 'great' | 'good' | 'tried' {
       </Card>
     </div>
     <nav v-if="finishedTotalPages > 1" class="mini-pager" aria-label="Past results pagination">
-      <Button variant="ghost" :disabled="finishedPage === 0" @click="finishedPage = Math.max(0, finishedPage - 1)">Previous</Button>
+      <Button variant="ghost" :disabled="finishedPage === 0" @click="setFinishedPage(finishedPage - 1)">Previous</Button>
       <span class="label-sm muted">Page {{ finishedPage + 1 }} / {{ finishedTotalPages }}</span>
-      <Button variant="ghost" :disabled="finishedPage + 1 >= finishedTotalPages" @click="finishedPage = finishedPage + 1">Next</Button>
+      <Button variant="ghost" :disabled="finishedPage + 1 >= finishedTotalPages" @click="setFinishedPage(finishedPage + 1)">Next</Button>
     </nav>
   </section>
 </template>
@@ -644,12 +690,52 @@ function scoreTone(pct: number): 'great' | 'good' | 'tried' {
   margin-bottom: var(--space-xl);
 }
 .section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
   margin-bottom: var(--space-md);
+  flex-wrap: wrap;
+}
+.sort-select {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+.sort-select__control {
+  appearance: none;
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius);
+  color: var(--on-surface);
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 6px 28px 6px 10px;
+  cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 15px) 50%, calc(100% - 10px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+.sort-select__control:hover {
+  border-color: var(--outline);
+}
+.sort-select__control:focus {
+  outline: 2px solid var(--primary-container);
+  outline-offset: 2px;
 }
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: var(--space-md);
+}
+/* When the section is paginated we reserve a minimum height so switching
+ * to a last page with fewer items doesn't collapse the grid and yank
+ * the pager up the viewport. Roughly three card-rows worth. */
+.grid--stable {
+  min-height: 24rem;
+  align-content: start;
 }
 .row {
   display: flex;

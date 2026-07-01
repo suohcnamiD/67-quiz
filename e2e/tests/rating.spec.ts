@@ -109,9 +109,9 @@ test('quiz card shows the rating average and count after submission', async ({ p
   // Wait for debounced search results to render.
   const card = page.locator('article, [class*="card"]').filter({ hasText: quizName }).first()
   await expect(card).toBeVisible({ timeout: 10_000 })
-  await expect(card).toContainText('★')
-  await expect(card).toContainText('8')
-  await expect(card).toContainText('(1)')
+  // The rating badge on the cover shows just "★ 8" (no /10 or count text).
+  await expect(card.locator('.rating-badge')).toBeVisible()
+  await expect(card.locator('.rating-badge')).toContainText('8')
 })
 
 test('non-eligible user cannot submit a rating without finishing', async ({ page }) => {

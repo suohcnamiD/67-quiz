@@ -32,8 +32,10 @@ async function logout() {
     danger: true,
   })
   if (!ok) return
-  // No backend logout endpoint exposed; clear locally and bounce to /login.
-  auth.clear()
+  // auth.logout invalidates the server session first so a refresh can't
+  // silently re-authenticate via the still-valid cookie, then clears local
+  // state.
+  await auth.logout()
   router.push('/login')
 }
 

@@ -1,5 +1,6 @@
 package dev.six_seven_quiz.user.profile.service;
 
+import dev.six_seven_quiz.authorization.AdminChecker;
 import dev.six_seven_quiz.notification.model.NotificationType;
 import dev.six_seven_quiz.notification.service.NotificationService;
 import dev.six_seven_quiz.user.ApplicationUser;
@@ -95,7 +96,7 @@ public class ProfileCommentService {
                 .orElseThrow(() -> new CommentNotFoundException(commentId));
         boolean isAuthor = comment.getAuthor().getId().equals(caller.getId());
         boolean isOwner = comment.getTarget().getId().equals(caller.getId());
-        if (!isAuthor && !isOwner) {
+        if (!isAuthor && !isOwner && !AdminChecker.isAdmin(caller)) {
             throw new NoAccessToCommentException(commentId);
         }
         commentRepository.delete(comment);
@@ -103,7 +104,8 @@ public class ProfileCommentService {
 
     private ProfileCommentDto toDto(ProfileComment comment, ApplicationUser viewer) {
         boolean canDelete = comment.getAuthor().getId().equals(viewer.getId())
-                || comment.getTarget().getId().equals(viewer.getId());
+                || comment.getTarget().getId().equals(viewer.getId())
+                || AdminChecker.isAdmin(viewer);
         return new ProfileCommentDto(
                 comment.getId(),
                 comment.getBody(),

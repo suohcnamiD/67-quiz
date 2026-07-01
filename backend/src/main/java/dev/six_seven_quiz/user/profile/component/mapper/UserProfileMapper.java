@@ -1,5 +1,6 @@
 package dev.six_seven_quiz.user.profile.component.mapper;
 
+import dev.six_seven_quiz.authorization.AdminChecker;
 import dev.six_seven_quiz.user.ApplicationUser;
 import dev.six_seven_quiz.user.profile.dto.AuthorSummaryDto;
 import dev.six_seven_quiz.user.profile.dto.UserProfileDto;
@@ -15,6 +16,10 @@ public class UserProfileMapper {
             Integer averageScorePercent,
             boolean isYou
     ) {
+        // isAdmin only leaks on the caller's own profile — it's a bit of
+        // identity meant for the FE to decide whether to render admin
+        // affordances, not something to broadcast about other users.
+        boolean isAdmin = isYou && AdminChecker.isAdmin(user);
         return new UserProfileDto(
                 user.getUsername(),
                 user.getDisplayName(),
@@ -23,7 +28,8 @@ public class UserProfileMapper {
                 quizzesAuthored,
                 attemptsTaken,
                 averageScorePercent,
-                isYou
+                isYou,
+                isAdmin
         );
     }
 

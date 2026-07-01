@@ -38,7 +38,7 @@ async function submit() {
       quizName: name.value.trim(),
       quizDuration: `PT${mins}M`,
     })
-    if (quiz.id) router.push(`/app/quiz/${quiz.id}`)
+    if (quiz.id) router.push(`/app/quiz/${quiz.id}/edit`)
   } catch (e) {
     const fieldErrors = validationFieldErrors(e)
     if (fieldErrors.quizName) nameError.value = fieldErrors.quizName

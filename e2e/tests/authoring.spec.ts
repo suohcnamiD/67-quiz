@@ -46,7 +46,7 @@ test('Remove button deletes the question from the list', async ({ page }) => {
   await addQuestion(page, quizId, 'What is 2 + 2?')
   await addQuestion(page, quizId, 'Capital of France?')
 
-  await page.goto(`/app/quiz/${quizId}`)
+  await page.goto(`/app/quiz/${quizId}/edit`)
   await page.waitForLoadState('networkidle')
   await expect(page.getByText('What is 2 + 2?')).toBeVisible()
   await expect(page.getByText('Capital of France?')).toBeVisible()
@@ -74,7 +74,7 @@ test('Edit updates the question text inline', async ({ page }) => {
   const quizId = await createQuiz(page, `Edit ${Date.now()}`)
   await addQuestion(page, quizId, 'Original text')
 
-  await page.goto(`/app/quiz/${quizId}`)
+  await page.goto(`/app/quiz/${quizId}/edit`)
   await page.waitForLoadState('networkidle')
   await page
     .locator('li', { hasText: 'Original text' })

@@ -118,6 +118,7 @@ const STATIC: Record<string, string> = {
   NOT_FOUND: 'That resource could not be found.',
   METHOD_NOT_ALLOWED: 'That action isn’t supported here.',
   UNSUPPORTED_MEDIA_TYPE: 'Unsupported content type.',
+  RATE_LIMITED: 'You’re doing that too often. Try again in a minute.',
   INTERNAL_SERVER_ERROR: 'The server hit an unexpected error.',
 }
 

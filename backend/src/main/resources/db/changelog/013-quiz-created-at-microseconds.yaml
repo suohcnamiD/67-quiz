@@ -1,0 +1,16 @@
+databaseChangeLog:
+  - changeSet:
+      id: quiz-created-at-microseconds
+      author: hubenko
+      changes:
+        # MariaDB defaults TIMESTAMP to second precision, which meant every
+        # row inserted in the same second (in particular the backfill from
+        # changelog 012) tied on createdAt — the tie-breaker collapsed
+        # NEWEST sort back onto NAME. Widen to microsecond precision so
+        # future inserts get distinguishable timestamps. Existing rows are
+        # untouched (their .000000 suffix keeps them equal, and the id
+        # tie-breaker in QuizService now handles that).
+        - modifyDataType:
+            tableName: quizzes
+            columnName: created_at
+            newDataType: TIMESTAMP(6)

@@ -1,0 +1,12 @@
+databaseChangeLog:
+  - changeSet:
+      id: add-quiz-description
+      author: hubenko
+      changes:
+        - addColumn:
+            tableName: quizzes
+            columns:
+              - column:
+                  name: description
+                  type: TEXT
+                  remarks: Optional markdown description shown on the quiz overview. Null = no description.

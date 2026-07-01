@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getOwnProfile } from '@/api/user-profile-controller/user-profile-controller'
 import { firstErrorCode } from '@/lib/axios'
+import { AXIOS_INSTANCE } from '@/lib/axios'
 
 type AuthStatus = 'unknown' | 'authenticated' | 'anonymous'
 
@@ -11,6 +12,7 @@ export const useAuthStore = defineStore('auth', () => {
   const username = ref<string | null>(null)
   const displayName = ref<string | null>(null)
   const hasAvatar = ref<boolean>(false)
+  const isAdmin = ref<boolean>(false)
   // Bumped every time the user uploads/deletes an avatar so the AppShell <img>
   // refetches instead of showing the cached version.
   const avatarVersion = ref<number>(0)
@@ -29,6 +31,7 @@ export const useAuthStore = defineStore('auth', () => {
       username.value = me.username ?? null
       displayName.value = me.displayName ?? me.username ?? null
       hasAvatar.value = !!me.hasAvatar
+      isAdmin.value = !!me.isAdmin
       status.value = 'authenticated'
     } catch (e) {
       const code = firstErrorCode(e)
@@ -47,6 +50,25 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function clear() {
+    clearLocal()
+  }
+
+  /**
+   * End the session on the server AND locally. Spring Security's built-in
+   * logout filter at /api/authentication/logout invalidates the JDBC-stored
+   * session and clears the cookie — without hitting it, refreshing the page
+   * would re-authenticate via the still-valid cookie and the user would
+   * appear logged in again.
+   */
+  async function logout() {
+    try {
+      await AXIOS_INSTANCE.post('/api/authentication/logout')
+    } catch (e) {
+      // Even if the network call fails we still want to drop local state so
+      // the user isn't stranded. The server cookie will simply expire on its
+      // own timer if the request truly didn't land.
+      console.warn('logout request failed:', firstErrorCode(e) ?? e)
+    }
     clearLocal()
   }
 
@@ -70,6 +92,7 @@ export const useAuthStore = defineStore('auth', () => {
     username.value = null
     displayName.value = null
     hasAvatar.value = false
+    isAdmin.value = false
     status.value = 'anonymous'
   }
 
@@ -79,12 +102,14 @@ export const useAuthStore = defineStore('auth', () => {
     username,
     displayName,
     hasAvatar,
+    isAdmin,
     avatarVersion,
     avatarUrl,
     isAuthenticated,
     refresh,
     markAuthenticated,
     clear,
+    logout,
     applyProfileSnapshot,
     bumpAvatarVersion,
   }

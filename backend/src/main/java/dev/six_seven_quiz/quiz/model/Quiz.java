@@ -25,6 +25,7 @@ public class Quiz {
         this.name = name;
         this.author = author;
         this.duration = duration;
+        this.createdAt = Instant.now();
     }
 
     @Id
@@ -39,11 +40,20 @@ public class Quiz {
     @Column(name = "name")
     private String name;
 
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
     @Column(name = "duration")
     private Duration duration;
 
     @Column(name = "cover_image_path")
     private String coverImagePath;
+
+    @Column(name = "pinned", nullable = false)
+    private boolean pinned = false;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
 
     @OneToMany(fetch = FetchType.EAGER, cascade = {CascadeType.DETACH, CascadeType.MERGE, CascadeType.PERSIST, CascadeType.REFRESH, CascadeType.REMOVE})
     @JoinTable(
@@ -70,8 +80,36 @@ public class Quiz {
         return name;
     }
 
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public boolean isPinned() {
+        return pinned;
+    }
+
+    public void setPinned(boolean pinned) {
+        this.pinned = pinned;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
     public List<Question> getQuestions() {
         return questions;
+    }
+
+    public void setQuestions(List<Question> questions) {
+        this.questions = questions;
     }
 
     public Attempt start(ApplicationUser user) {

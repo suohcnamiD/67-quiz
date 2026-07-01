@@ -20,7 +20,8 @@ async function createQuizWithOneQuestion(page: Page, quizName: string): Promise<
   await page.getByLabel(/duration/i).fill('5')
   await page.getByRole('button', { name: 'Create' }).click()
   await page.waitForURL(/\/app\/quiz\/[0-9a-f]{8}-/i, { timeout: 10_000 })
-  const quizId = page.url().split('/').pop()!
+  const match = page.url().match(/\/app\/quiz\/([0-9a-f-]{36})/i)
+  const quizId = match![1]
   await page.getByLabel('Question text').fill('q?')
   const opts = page.locator('input[placeholder="Option text"]')
   await opts.nth(0).fill('a')
@@ -200,11 +201,9 @@ test('finished attempt shows clear correct/wrong cues', async ({ page }) => {
   })
 
   await page.goto(`/app/attempt/${attemptId}/result`)
-  // Each row reads a +1 or 0 chip and a filled/hollow checkbox.
-  // The user picked "right" → that row earns +1 with the box ticked.
-  // They skipped the distractor "wrong" → that row also earns +1 (skipped correctly)
-  // but should be muted (.opt--skipped, outline-only chip).
-  const pickedRight = page.locator('.opt--picked.opt--win').first()
+  // The user picked "right" → that row earns +1 (opt--correct + opt--picked).
+  // They skipped the distractor "wrong" → that row is muted (opt--skipped).
+  const pickedRight = page.locator('.opt--picked.opt--correct').first()
   await expect(pickedRight).toBeVisible()
   await expect(pickedRight.locator('.opt__chip')).toHaveText('+1')
   await expect(page.locator('.opt--skipped').first()).toBeVisible()

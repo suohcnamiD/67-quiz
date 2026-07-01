@@ -9,6 +9,8 @@ import { questionImageUrl, optionImageUrl } from '@/lib/quizImages'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
+import MarkdownView from '@/components/MarkdownView.vue'
+import MarkdownInline from '@/components/MarkdownInline.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -230,7 +232,7 @@ watch(remainingMs, (ms) => {
               {{ q.type === 'SINGLE_CHOICE' ? 'Single answer' : 'Select all that apply' }}
             </span>
           </div>
-          <p class="body-lg q-text">{{ q.text }}</p>
+          <div class="body-lg q-text"><MarkdownView :source="q.text" /></div>
           <img
             v-if="q.hasImage && q.questionId"
             :src="questionImageUrl(q.questionId)"
@@ -254,7 +256,7 @@ watch(remainingMs, (ms) => {
                 <span class="opt__marker">
                   <span v-if="o.selected" class="opt__dot" />
                 </span>
-                <span class="opt__text">{{ o.text }}</span>
+                <MarkdownInline class="opt__text" :source="o.text" />
                 <img
                   v-if="o.hasImage && o.id"
                   :src="optionImageUrl(o.id)"
