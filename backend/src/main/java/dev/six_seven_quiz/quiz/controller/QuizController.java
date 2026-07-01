@@ -1,6 +1,7 @@
 package dev.six_seven_quiz.quiz.controller;
 
 import dev.six_seven_quiz.quiz.dto.request.CreateQuizRequest;
+import dev.six_seven_quiz.quiz.dto.request.PinQuizRequest;
 import dev.six_seven_quiz.quiz.dto.request.RenameQuizRequest;
 import dev.six_seven_quiz.quiz.dto.request.ReorderQuestionsRequest;
 import dev.six_seven_quiz.quiz.dto.request.UpdateQuizDescriptionRequest;
@@ -96,5 +97,14 @@ public class QuizController {
             @RequestBody @Valid ReorderQuestionsRequest request
     ) {
         return quizService.reorderAsUser(quizId, userDetails, request);
+    }
+
+    @PatchMapping("/{quizId}/pin")
+    public QuizDto pinQuiz(
+            @PathVariable @NotNull UUID quizId,
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody @Valid PinQuizRequest request
+    ) {
+        return quizService.pinAsUser(quizId, userDetails, request);
     }
 }

@@ -48,6 +48,9 @@ public class Quiz {
     @Column(name = "cover_image_path")
     private String coverImagePath;
 
+    @Column(name = "pinned", nullable = false)
+    private boolean pinned = false;
+
     @OneToMany(fetch = FetchType.EAGER, cascade = {CascadeType.DETACH, CascadeType.MERGE, CascadeType.PERSIST, CascadeType.REFRESH, CascadeType.REMOVE})
     @JoinTable(
             name = "quiz_questions",
@@ -83,6 +86,14 @@ public class Quiz {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public boolean isPinned() {
+        return pinned;
+    }
+
+    public void setPinned(boolean pinned) {
+        this.pinned = pinned;
     }
 
     public List<Question> getQuestions() {

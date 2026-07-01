@@ -32,3 +32,6 @@ databaseChangeLog:
   - include:
       file: 010-quiz-description.yaml
       relativeToChangelogFile: true
+  - include:
+      file: 011-admin-and-pinning.yaml
+      relativeToChangelogFile: true

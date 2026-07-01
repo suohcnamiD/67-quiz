@@ -13,6 +13,8 @@ public record UserProfileDto(
         @Schema(description = "Mean score across finished attempts as a percentage (0–100). Null if the user has no finished attempts yet.")
         Integer averageScorePercent,
         @Schema(description = "True when this profile belongs to the currently authenticated caller. Lets the frontend show edit affordances without a second request.")
-        boolean isYou
+        boolean isYou,
+        @Schema(description = "True only on the caller's own profile response when the caller has the ADMIN role. Never surfaced for other users' profiles.")
+        boolean isAdmin
 ) {
 }

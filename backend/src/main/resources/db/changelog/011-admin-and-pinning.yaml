@@ -1,0 +1,35 @@
+databaseChangeLog:
+  - changeSet:
+      id: seed-admin-role
+      author: hubenko
+      changes:
+        - insert:
+            tableName: roles
+            columns:
+              - column:
+                  name: id
+                  valueComputed: "UUID()"
+              - column:
+                  name: name
+                  value: ADMIN
+
+  - changeSet:
+      id: add-quiz-pinned-flag
+      author: hubenko
+      changes:
+        - addColumn:
+            tableName: quizzes
+            columns:
+              - column:
+                  name: pinned
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+                  remarks: When true, admins have pinned this quiz to the top of browse listings.
+        - createIndex:
+            indexName: quizzes_pinned_ix
+            tableName: quizzes
+            columns:
+              - column:
+                  name: pinned

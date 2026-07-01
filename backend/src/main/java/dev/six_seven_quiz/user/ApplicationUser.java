@@ -55,6 +55,10 @@ public class ApplicationUser {
         return roles;
     }
 
+    public void setRoles(Set<Role> roles) {
+        this.roles = roles;
+    }
+
     public String getPassword() {
         return password;
     }

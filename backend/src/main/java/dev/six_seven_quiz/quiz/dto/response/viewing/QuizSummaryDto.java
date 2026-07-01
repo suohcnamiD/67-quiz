@@ -17,6 +17,7 @@ public record QuizSummaryDto(
     UUID id,
     boolean youAreAuthor,
     boolean hasCover,
+    boolean pinned,
     AuthorSummaryDto author,
     QuizRatingSummaryDto ratingSummary
 ) {

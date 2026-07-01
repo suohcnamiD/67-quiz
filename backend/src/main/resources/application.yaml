@@ -37,6 +37,12 @@ spring:
 app:
   uploads:
     dir: ${APP_UPLOADS_DIR:./uploads}
+  admin:
+    # Comma-separated list of usernames to promote to ADMIN on startup.
+    # Set APP_ADMIN_USERNAMES=alice,bob in the prod compose file. Users
+    # not yet registered are skipped and will be promoted on the next
+    # startup after they sign up.
+    usernames: ${APP_ADMIN_USERNAMES:}
 
 server:
   servlet:

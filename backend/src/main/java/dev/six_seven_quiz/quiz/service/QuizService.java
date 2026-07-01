@@ -2,6 +2,7 @@ package dev.six_seven_quiz.quiz.service;
 
 import dev.six_seven_quiz.quiz.component.mapper.QuizMapper;
 import dev.six_seven_quiz.quiz.dto.request.CreateQuizRequest;
+import dev.six_seven_quiz.quiz.dto.request.PinQuizRequest;
 import dev.six_seven_quiz.quiz.dto.request.RenameQuizRequest;
 import dev.six_seven_quiz.quiz.dto.request.ReorderQuestionsRequest;
 import dev.six_seven_quiz.quiz.dto.request.UpdateQuizDescriptionRequest;
@@ -24,6 +25,7 @@ import jakarta.transaction.Transactional;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
@@ -112,7 +114,10 @@ public class QuizService {
     }
 
     private Pageable produceSanitizedPageable(int page) {
-        return PageRequest.of(page, QUIZZES_PER_PAGE);
+        // Pinned quizzes float to the top of every browse listing; within
+        // each bucket, alphabetise by name so the order is stable across
+        // reloads. Sort.Direction.DESC on a boolean puts true first (1 > 0).
+        return PageRequest.of(page, QUIZZES_PER_PAGE, Sort.by(Sort.Order.desc("pinned"), Sort.Order.asc("name")));
     }
 
     @Transactional
@@ -141,6 +146,22 @@ public class QuizService {
         ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
         Quiz quiz = quizRepository.findById(quizId).orElseThrow(() -> new QuizNotFoundException(quizId));
         return this.quizToSummary(quiz, user);
+    }
+
+    /**
+     * Admin-only pin/unpin. Owners of a quiz can NOT pin their own quiz —
+     * this is a curation lever for platform admins to surface a small
+     * number of quizzes to everyone.
+     */
+    @Transactional
+    public QuizDto pinAsUser(UUID quizId, UserDetails userDetails, PinQuizRequest request) {
+        ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
+        if (!QuizValidator.isAdmin(user)) {
+            throw new dev.six_seven_quiz.quiz.exception.NoAccessToQuizException(quizId);
+        }
+        Quiz quiz = quizRepository.findById(quizId).orElseThrow(() -> new QuizNotFoundException(quizId));
+        quiz.setPinned(Boolean.TRUE.equals(request.pinned()));
+        return this.quizToDto(quizRepository.save(quiz), user);
     }
 
     @Transactional

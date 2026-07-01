@@ -2,9 +2,10 @@
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQueryClient } from '@tanstack/vue-query'
-import { useGetQuizOverview, deleteQuiz, getGetQuizzesQueryKey } from '@/api/quiz-controller/quiz-controller'
+import { useGetQuizOverview, deleteQuiz, pinQuiz, getGetQuizzesQueryKey, getGetQuizOverviewQueryKey } from '@/api/quiz-controller/quiz-controller'
 import { attemptQuiz, getGetAttemptsInProgressQueryKey } from '@/api/attempt-controller/attempt-controller'
 import { useListRatings } from '@/api/quiz-rating-controller/quiz-rating-controller'
+import { useAuthStore } from '@/stores/auth'
 import { errorMessage } from '@/lib/errors'
 import { confirmDialog } from '@/lib/confirmDialog'
 import { coverUrl } from '@/lib/quizImages'
@@ -31,6 +32,8 @@ const totalRatings = computed(() => ratingsQuery.data.value?.page?.totalElements
 const errorText = ref<string | null>(null)
 const starting = ref(false)
 const deleting = ref(false)
+const pinning = ref(false)
+const auth = useAuthStore()
 
 const canStart = computed(() => (quiz.value?.questionCount ?? 0) > 0)
 
@@ -46,6 +49,21 @@ async function startAttempt() {
     errorText.value = errorMessage(e)
   } finally {
     starting.value = false
+  }
+}
+
+async function togglePin() {
+  if (!quizId.value || !quiz.value) return
+  pinning.value = true
+  errorText.value = null
+  try {
+    await pinQuiz(quizId.value, { pinned: !quiz.value.pinned })
+    qc.invalidateQueries({ queryKey: getGetQuizOverviewQueryKey(quizId.value) })
+    qc.invalidateQueries({ queryKey: getGetQuizzesQueryKey() })
+  } catch (e) {
+    errorText.value = errorMessage(e)
+  } finally {
+    pinning.value = false
   }
 }
 
@@ -121,6 +139,13 @@ function fmtRelative(iso?: string): string {
       <div class="head__main">
         <div class="head__title-row">
           <h1 class="head__title">{{ quiz.name }}</h1>
+          <Chip v-if="quiz.pinned" tone="warning" class="head__chip">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="12" y1="17" x2="12" y2="22"/>
+              <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24z"/>
+            </svg>
+            Pinned
+          </Chip>
           <Chip v-if="quiz.youAreAuthor" class="head__chip">Your quiz</Chip>
         </div>
         <RouterLink
@@ -161,6 +186,14 @@ function fmtRelative(iso?: string): string {
           :title="!canStart ? 'Add at least one question to start' : undefined"
           @click="startAttempt"
         >Start attempt</Button>
+        <Button
+          v-if="auth.isAdmin"
+          type="button"
+          variant="ghost"
+          :loading="pinning"
+          :title="quiz.pinned ? 'Unpin from browse' : 'Pin to the top of browse'"
+          @click="togglePin"
+        >{{ quiz.pinned ? 'Unpin' : 'Pin' }}</Button>
         <Button
           v-if="quiz.youAreAuthor"
           type="button"

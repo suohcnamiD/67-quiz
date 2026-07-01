@@ -107,7 +107,16 @@ async function removeQuiz() {
     </div>
     <div class="row">
       <h3 class="headline-md quiz-card__title">{{ quiz.name }}</h3>
-      <Chip v-if="quiz.youAreAuthor" class="quiz-card__author-chip">Your quiz</Chip>
+      <div class="quiz-card__chips">
+        <Chip v-if="quiz.pinned" tone="warning" class="quiz-card__author-chip">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="12" y1="17" x2="12" y2="22"/>
+            <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24z"/>
+          </svg>
+          Pinned
+        </Chip>
+        <Chip v-if="quiz.youAreAuthor" class="quiz-card__author-chip">Your quiz</Chip>
+      </div>
     </div>
     <RouterLink
       v-if="showAuthor && quiz.author?.username"
@@ -197,6 +206,15 @@ async function removeQuiz() {
 .quiz-card__author-chip {
   flex-shrink: 0;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.quiz-card__chips {
+  display: inline-flex;
+  gap: 6px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
 }
 .quiz-card__empty {
   margin: var(--space-sm) 0 0;

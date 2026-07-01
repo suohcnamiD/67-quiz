@@ -12,6 +12,7 @@ export const useAuthStore = defineStore('auth', () => {
   const username = ref<string | null>(null)
   const displayName = ref<string | null>(null)
   const hasAvatar = ref<boolean>(false)
+  const isAdmin = ref<boolean>(false)
   // Bumped every time the user uploads/deletes an avatar so the AppShell <img>
   // refetches instead of showing the cached version.
   const avatarVersion = ref<number>(0)
@@ -30,6 +31,7 @@ export const useAuthStore = defineStore('auth', () => {
       username.value = me.username ?? null
       displayName.value = me.displayName ?? me.username ?? null
       hasAvatar.value = !!me.hasAvatar
+      isAdmin.value = !!me.isAdmin
       status.value = 'authenticated'
     } catch (e) {
       const code = firstErrorCode(e)
@@ -90,6 +92,7 @@ export const useAuthStore = defineStore('auth', () => {
     username.value = null
     displayName.value = null
     hasAvatar.value = false
+    isAdmin.value = false
     status.value = 'anonymous'
   }
 
@@ -99,6 +102,7 @@ export const useAuthStore = defineStore('auth', () => {
     username,
     displayName,
     hasAvatar,
+    isAdmin,
     avatarVersion,
     avatarUrl,
     isAuthenticated,

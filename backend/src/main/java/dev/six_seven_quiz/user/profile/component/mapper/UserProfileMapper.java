@@ -15,6 +15,11 @@ public class UserProfileMapper {
             Integer averageScorePercent,
             boolean isYou
     ) {
+        // isAdmin only leaks on the caller's own profile — it's a bit of
+        // identity meant for the FE to decide whether to render admin
+        // affordances, not something to broadcast about other users.
+        boolean isAdmin = isYou && user.getRoles() != null
+                && user.getRoles().stream().anyMatch(r -> "ADMIN".equalsIgnoreCase(r.getName()));
         return new UserProfileDto(
                 user.getUsername(),
                 user.getDisplayName(),
@@ -23,7 +28,8 @@ public class UserProfileMapper {
                 quizzesAuthored,
                 attemptsTaken,
                 averageScorePercent,
-                isYou
+                isYou,
+                isAdmin
         );
     }
 

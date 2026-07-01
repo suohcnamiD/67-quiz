@@ -127,6 +127,7 @@ public class AttemptService {
                     null,
                     false,
                     false,
+                    false,
                     null,
                     new QuizRatingSummaryDto(null, 0L)
             );
