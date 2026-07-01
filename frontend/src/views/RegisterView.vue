@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { register } from '@/api/authentication-controller/authentication-controller'
 import { useAuthStore } from '@/stores/auth'
 import { errorMessage, firstError, validationFieldErrors } from '@/lib/errors'
@@ -18,6 +18,17 @@ const passwordError = ref<string | null>(null)
 const submitting = ref(false)
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
+
+// Same-origin next-URL guard as LoginView; keeps the "start a quiz while
+// logged out" flow intact when the user registers a new account instead
+// of signing in.
+function safeNext(): string {
+  const raw = route.query.next
+  if (typeof raw !== 'string') return '/app'
+  if (!raw.startsWith('/') || raw.startsWith('//')) return '/app'
+  return raw
+}
 
 // Mirrors the server-side rules in RegistrationService — the FE shows green
 // checks live so the user sees the requirements fulfilled as they type.
@@ -45,7 +56,7 @@ async function submit() {
   try {
     const res = await register({ username: username.value, password: password.value })
     auth.markAuthenticated(res.roles ?? [])
-    router.push('/app')
+    router.push(safeNext())
   } catch (e) {
     const first = firstError(e)
     const code = first?.code
@@ -108,7 +119,7 @@ async function submit() {
         <Button type="submit" :loading="submitting" full-width>Create account</Button>
       </form>
       <p class="footnote body-md">
-        Already have one? <RouterLink to="/login">Sign in</RouterLink>
+        Already have one? <RouterLink :to="{ path: '/login', query: route.query.next ? { next: route.query.next } : {} }">Sign in</RouterLink>
       </p>
     </Card>
   </div>

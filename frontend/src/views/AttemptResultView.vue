@@ -139,13 +139,12 @@ const myRatingQuery = useGetMine(
 // resolves data to undefined/null. Treat null/undefined as "no rating yet".
 const myRating = computed(() => myRatingQuery.data.value ?? null)
 
-const dismissKey = computed(() => quizId.value ? `quiz-rating-dismissed:${quizId.value}` : null)
-function isDismissed(): boolean {
-  if (!dismissKey.value) return false
-  try { return localStorage.getItem(dismissKey.value) === '1' } catch { return false }
-}
-const dismissed = ref(isDismissed())
-watch(quizId, () => { dismissed.value = isDismissed() })
+// Dismiss is session-only: closing the widget once should NOT hide it
+// forever on future visits. Users kept coming back to a result page for a
+// quiz they'd dismissed and thought the rating feature was broken. Keep
+// the flag in-memory (dismissed ref); no localStorage.
+const dismissed = ref(false)
+watch(quizId, () => { dismissed.value = false })
 
 const ratingScore = ref<number | null>(null)
 const ratingHover = ref<number | null>(null)
@@ -182,10 +181,8 @@ async function saveRating() {
     qc.invalidateQueries({ queryKey: getGetMineQueryKey(quizId.value) })
     qc.invalidateQueries({ queryKey: getRatingSummaryQueryKey(quizId.value) })
     qc.invalidateQueries({ queryKey: getGetQuizzesQueryKey() })
-    // Persist dismissal so the prompt doesn't keep insisting after a save.
-    if (dismissKey.value) {
-      try { localStorage.setItem(dismissKey.value, '1') } catch { /* ignore */ }
-    }
+    // No dismissal on save: the widget flips to "Your rating" mode and
+    // becomes an update form, which is more useful than hiding it.
   } catch (e) {
     if (firstErrorCode(e) !== 'RATING_NOT_ELIGIBLE') console.error(e)
     ratingError.value = errorMessage(e)
@@ -195,10 +192,9 @@ async function saveRating() {
 }
 
 function dismissRating() {
+  // Session-only dismiss. Refreshing the page brings the widget back so
+  // the user can still rate later without hunting for a hidden action.
   dismissed.value = true
-  if (dismissKey.value) {
-    try { localStorage.setItem(dismissKey.value, '1') } catch { /* ignore */ }
-  }
 }
 </script>
 

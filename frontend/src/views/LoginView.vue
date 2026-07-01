@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { login } from '@/api/authentication-controller/authentication-controller'
 import { useAuthStore } from '@/stores/auth'
 import { errorMessage, firstErrorCode, validationFieldErrors } from '@/lib/errors'
@@ -18,11 +18,26 @@ const passwordError = ref<string | null>(null)
 const submitting = ref(false)
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 
 function clearErrors() {
   errorText.value = null
   usernameError.value = null
   passwordError.value = null
+}
+
+/**
+ * Where to land after a successful sign-in. Honours `?next=<path>` when the
+ * router guard sent an anon user here (so someone opening a quiz link while
+ * logged out ends up on that quiz after signing in), and falls back to
+ * /app. Only accepts same-origin, in-app paths — no `//evil.com` open
+ * redirects.
+ */
+function safeNext(): string {
+  const raw = route.query.next
+  if (typeof raw !== 'string') return '/app'
+  if (!raw.startsWith('/') || raw.startsWith('//')) return '/app'
+  return raw
 }
 
 async function submit() {
@@ -31,7 +46,7 @@ async function submit() {
   try {
     const res = await login({ username: username.value, password: password.value })
     auth.markAuthenticated(res.roles ?? [])
-    router.push('/app')
+    router.push(safeNext())
   } catch (e) {
     const code = firstErrorCode(e)
     if (code === 'UNAUTHORIZED') {
@@ -74,7 +89,7 @@ async function submit() {
         <Button type="submit" :loading="submitting" full-width>Sign in</Button>
       </form>
       <p class="footnote body-md">
-        No account? <RouterLink to="/register">Create one</RouterLink>
+        No account? <RouterLink :to="{ path: '/register', query: route.query.next ? { next: route.query.next } : {} }">Create one</RouterLink>
       </p>
     </Card>
   </div>

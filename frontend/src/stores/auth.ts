@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getOwnProfile } from '@/api/user-profile-controller/user-profile-controller'
 import { firstErrorCode } from '@/lib/axios'
+import { AXIOS_INSTANCE } from '@/lib/axios'
 
 type AuthStatus = 'unknown' | 'authenticated' | 'anonymous'
 
@@ -50,6 +51,25 @@ export const useAuthStore = defineStore('auth', () => {
     clearLocal()
   }
 
+  /**
+   * End the session on the server AND locally. Spring Security's built-in
+   * logout filter at /api/authentication/logout invalidates the JDBC-stored
+   * session and clears the cookie — without hitting it, refreshing the page
+   * would re-authenticate via the still-valid cookie and the user would
+   * appear logged in again.
+   */
+  async function logout() {
+    try {
+      await AXIOS_INSTANCE.post('/api/authentication/logout')
+    } catch (e) {
+      // Even if the network call fails we still want to drop local state so
+      // the user isn't stranded. The server cookie will simply expire on its
+      // own timer if the request truly didn't land.
+      console.warn('logout request failed:', firstErrorCode(e) ?? e)
+    }
+    clearLocal()
+  }
+
   function applyProfileSnapshot(snapshot: {
     username?: string | null
     displayName?: string | null
@@ -85,6 +105,7 @@ export const useAuthStore = defineStore('auth', () => {
     refresh,
     markAuthenticated,
     clear,
+    logout,
     applyProfileSnapshot,
     bumpAvatarVersion,
   }
