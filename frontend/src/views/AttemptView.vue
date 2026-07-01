@@ -147,14 +147,18 @@ async function finishCore(viaAuto = false) {
     }
   }
   if (viaAuto) autoFinishState.value = 'succeeded'
-  // Navigate first, then invalidate. If we invalidated before navigating,
-  // the in-progress query would drop this attempt and the AttemptView
-  // would briefly render "Attempt not found" between frames.
-  router.push({ path: `/app/attempt/${attemptId.value}/result`, query: { just: '1' } })
+  // Refetch the finished list BEFORE we navigate, so the ResultView finds
+  // the just-finished attempt in cache and doesn't briefly render
+  // "Result not found". If we only invalidated after router.push, Firefox
+  // would sometimes abort the in-flight list refetch (NS_BINDING_ABORTED)
+  // when the ResultView mounted a fresh query, leaving stale data on screen.
+  // The AttemptView itself tolerates the intermediate state — the finishing
+  // flag keeps it from rendering "Attempt not found" while we wait.
   await Promise.all([
+    qc.refetchQueries({ queryKey: getGetFinishedAttemptsQueryKey() }),
     qc.invalidateQueries({ queryKey: getGetAttemptsInProgressQueryKey() }),
-    qc.invalidateQueries({ queryKey: getGetFinishedAttemptsQueryKey() }),
   ])
+  router.push({ path: `/app/attempt/${attemptId.value}/result`, query: { just: '1' } })
   finishing.value = false
 }
 async function finish() {

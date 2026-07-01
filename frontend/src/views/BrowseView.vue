@@ -16,6 +16,7 @@ import Chip from '@/components/Chip.vue'
 import Button from '@/components/Button.vue'
 import QuizCard from '@/components/QuizCard.vue'
 import UserCard from '@/components/UserCard.vue'
+import CircleProgress from '@/components/CircleProgress.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -159,6 +160,18 @@ function scrollToPastResults() {
     // the hash; the existing watchEffect handles the scroll once it mounts.
     router.replace({ path: '/app', hash: '#past-results' })
   }
+}
+
+function scorePct(earned: number | undefined | null, max: number | undefined | null): number {
+  const e = earned ?? 0
+  const m = max ?? 0
+  if (!m) return 0
+  return e / m
+}
+function scoreTone(pct: number): 'great' | 'good' | 'tried' {
+  if (pct >= 0.85) return 'great'
+  if (pct >= 0.5) return 'good'
+  return 'tried'
 }
 </script>
 
@@ -385,18 +398,19 @@ function scrollToPastResults() {
     </header>
     <div class="grid">
       <Card v-for="a in finishedItems" :key="a.id" interactive @click="router.push(`/app/attempt/${a.id}/result`)">
-        <div class="row">
-          <h3 class="headline-md">{{ a.quiz?.name ?? 'Untitled quiz' }}</h3>
-          <Chip tone="success">Finished</Chip>
-        </div>
-        <div class="row">
-          <div class="score-stack">
-            <span class="label-sm muted">Score</span>
-            <span class="headline-md">{{ a.score ?? 0 }} <span class="muted">/ {{ a.maximumScore ?? 0 }}</span></span>
+        <div class="past">
+          <CircleProgress
+            :value="scorePct(a.score, a.maximumScore)"
+            :tone="scoreTone(scorePct(a.score, a.maximumScore))"
+            :size="64"
+            :thickness="7"
+            :label="`Scored ${a.score ?? 0} out of ${a.maximumScore ?? 0}`"
+          />
+          <div class="past__body">
+            <h3 class="past__title">{{ a.quiz?.name ?? 'Untitled quiz' }}</h3>
+            <p v-if="a.startedAt" class="past__meta label-sm muted">{{ fmtRelative(a.startedAt) }}</p>
           </div>
-          <span class="label-sm muted">{{ a.questions?.length ?? 0 }} questions</span>
         </div>
-        <p v-if="a.startedAt" class="meta body-md">Attempted {{ fmtRelative(a.startedAt) }}</p>
       </Card>
     </div>
   </section>
@@ -640,6 +654,36 @@ function scrollToPastResults() {
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+}
+/* Past-attempt card: circle progress on the left, title + relative time
+ * on the right. Dropped the redundant "Score", "N questions", and Finished
+ * chip — the circle is the score, and the section header already tells
+ * the reader these are past attempts. */
+.past {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+.past__body {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.past__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--on-surface);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.past__meta {
+  margin: 0;
 }
 .people-list {
   list-style: none;

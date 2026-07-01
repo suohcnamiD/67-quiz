@@ -34,6 +34,7 @@ import jakarta.transaction.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
@@ -58,7 +59,9 @@ public class AttemptService {
     private final NotificationService notificationService;
 
     private Pageable produceSanitizedPageable(int page) {
-        return PageRequest.of(page, ATTEMPTS_PER_PAGE);
+        // Newest attempts first — matches how users think about "my past
+        // attempts" (last one taken should be at the top).
+        return PageRequest.of(page, ATTEMPTS_PER_PAGE, Sort.by(Sort.Direction.DESC, "startedAt"));
     }
 
     @PersistenceContext
