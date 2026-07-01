@@ -253,12 +253,12 @@ function setFinishedPage(next: number) {
       </li>
     </ul>
     <div v-if="playerRank || authorRank" class="rank-row" aria-label="Your leaderboard standings">
-      <RouterLink v-if="playerRank" to="/app/leaderboards" class="rank-pill">
+      <RouterLink v-if="playerRank" :to="{ path: '/app/leaderboards', query: { tab: 'players' } }" class="rank-pill">
         <span class="rank-pill__hash">#{{ playerRank.rank }}</span>
         <span class="rank-pill__label body-md">Top players</span>
         <span class="rank-pill__chevron" aria-hidden="true">›</span>
       </RouterLink>
-      <RouterLink v-if="authorRank" to="/app/leaderboards" class="rank-pill">
+      <RouterLink v-if="authorRank" :to="{ path: '/app/leaderboards', query: { tab: 'authors' } }" class="rank-pill">
         <span class="rank-pill__hash">#{{ authorRank.rank }}</span>
         <span class="rank-pill__label body-md">Top authors</span>
         <span class="rank-pill__chevron" aria-hidden="true">›</span>

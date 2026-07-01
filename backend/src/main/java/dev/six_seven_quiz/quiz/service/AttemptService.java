@@ -187,33 +187,34 @@ public class AttemptService {
     @Transactional
     public Page<AttemptInProgressDto> getAttemptsInProgressAsUser(UserDetails userDetails, int page) {
         ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
-        refreshFinishedAttempts(user);
-        Page<Attempt> attempts = quizAttemptRepository.findByUserAndFinishedIsFalse(user, produceSanitizedPageable(page));
+        // Filter past-deadline rows at read time rather than sweeping them
+        // to finished=true. The sweep used to fire a bulk UPDATE on every
+        // list call, which raced under MariaDB REPEATABLE_READ any time two
+        // requests hit the same user's rows (poll + explicit finish, two
+        // tabs, auto-finish + poll) and tripped Error 1020. The finish
+        // endpoint still flips the flag idempotently under a pessimistic
+        // lock — this read path just doesn't need to write.
+        Page<Attempt> attempts = quizAttemptRepository.findActiveByUser(user, Instant.now(), produceSanitizedPageable(page));
         return attempts.map(this::attemptToDto);
     }
 
     @Transactional
     public Page<FinishedAttemptSummaryDto> getFinishedAttemptsAsUser(UserDetails userDetails, int page) {
         ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
-        refreshFinishedAttempts(user);
-        Page<Attempt> attempts = quizAttemptRepository.findByUserAndFinishedIsTrue(user, produceSanitizedPageable(page));
+        Page<Attempt> attempts = quizAttemptRepository.findFinishedOrExpiredByUser(user, Instant.now(), produceSanitizedPageable(page));
         return attempts.map(this::attemptToFinishedSummary);
     }
 
     /**
-     * Mark any past-deadline in-progress attempts as finished via a single
-     * conditional UPDATE. Avoids the in-memory load + dirty-flush pattern
-     * that raced with concurrent finishers under MariaDB snapshot isolation
-     * (Error 1020 "Record has changed since last read"). After the bulk
-     * update we clear the persistence context so subsequent queries in the
-     * same transaction see fresh state.
+     * Kept for the explicit finish path: promotes a single past-deadline
+     * attempt to finished under a pessimistic write lock so no two callers
+     * race. The list endpoints deliberately do NOT call this — see the
+     * comment above them.
      */
     @Transactional
     protected void refreshFinishedAttempts(ApplicationUser user) {
-        int updated = quizAttemptRepository.markPastDeadlineFinished(user.getId(), Instant.now());
-        if (updated > 0) {
-            entityManager.clear();
-        }
+        // No-op on read paths; kept as an anchor for the finish path which
+        // handles the transition inline with a row-level lock.
     }
 
     @Transactional

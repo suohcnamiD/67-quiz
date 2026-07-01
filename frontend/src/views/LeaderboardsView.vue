@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   useTopPlayers,
   useTopAuthors,
@@ -14,8 +14,18 @@ defineOptions({ name: 'LeaderboardsView' })
 
 type Tab = 'players' | 'authors'
 
+const route = useRoute()
 const router = useRouter()
-const tab = ref<Tab>('players')
+// Initial tab reads from ?tab=authors so dashboard links open the right
+// board directly instead of always defaulting to players.
+const initialTab: Tab = route.query.tab === 'authors' ? 'authors' : 'players'
+const tab = ref<Tab>(initialTab)
+// Keep the URL in sync when the user flips tabs so refreshes/back-nav land
+// on the same view.
+watch(tab, (next) => {
+  if (route.query.tab === next) return
+  router.replace({ path: route.path, query: { ...route.query, tab: next } })
+})
 const playersPage = ref(0)
 const authorsPage = ref(0)
 

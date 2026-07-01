@@ -7,7 +7,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -19,6 +18,23 @@ import java.util.UUID;
 public interface QuizAttemptRepository extends JpaRepository<Attempt, UUID> {
     Page<Attempt> findByUserAndFinishedIsTrue(ApplicationUser user, Pageable pageable);
     Page<Attempt> findByUserAndFinishedIsFalse(ApplicationUser user, Pageable pageable);
+
+    /**
+     * In-progress attempts filtered to those still within their deadline —
+     * past-deadline rows with {@code finished=false} are excluded from the
+     * "active" list so the caller doesn't need to sweep them first. Prevents
+     * the concurrent-UPDATE race on the sweep path.
+     */
+    @Query("SELECT a FROM Attempt a WHERE a.user = :user AND a.finished = false AND a.finishDeadline >= :now")
+    Page<Attempt> findActiveByUser(@Param("user") ApplicationUser user, @Param("now") Instant now, Pageable pageable);
+
+    /**
+     * Finished OR effectively-finished (past-deadline) attempts. Mirrors the
+     * above — no write needed to include stale unfinished rows in the
+     * "past results" list.
+     */
+    @Query("SELECT a FROM Attempt a WHERE a.user = :user AND (a.finished = true OR a.finishDeadline < :now)")
+    Page<Attempt> findFinishedOrExpiredByUser(@Param("user") ApplicationUser user, @Param("now") Instant now, Pageable pageable);
 
     int countByUserAndFinishedIsTrue(ApplicationUser user);
 
@@ -36,17 +52,4 @@ public interface QuizAttemptRepository extends JpaRepository<Attempt, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM Attempt a WHERE a.id = :id")
     Optional<Attempt> findByIdForUpdate(@Param("id") UUID id);
-
-    /**
-     * Bulk-flip past-deadline unfinished attempts for a user to finished.
-     * Conditional on {@code finished = false} so concurrent finishers (the
-     * explicit finish endpoint, polling list calls) don't race each other —
-     * MariaDB's snapshot isolation kicks back a "record has changed" error
-     * when two transactions both load + update the same row, which is what
-     * we used to do via in-memory mutation.
-     */
-    @Modifying
-    @Query("UPDATE Attempt a SET a.finished = true " +
-            "WHERE a.user.id = :userId AND a.finished = false AND a.finishDeadline < :now")
-    int markPastDeadlineFinished(@Param("userId") UUID userId, @Param("now") Instant now);
 }

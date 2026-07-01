@@ -431,26 +431,24 @@ function dismissRating() {
   font-size: 1rem;
 }
 .hero__grade {
-  margin: var(--space-md) 0 0;
+  margin: var(--space-sm) 0 0;
   display: inline-flex;
   align-items: baseline;
-  gap: var(--space-sm);
-  padding: 6px 14px;
-  background: var(--surface-container-high);
-  border: 1px solid var(--outline-variant);
-  border-radius: 999px;
+  gap: 6px;
+  color: var(--on-surface-variant);
+  font-variant-numeric: tabular-nums;
 }
 .hero__grade-value {
-  font-size: 1.75rem;
-  font-weight: 800;
+  font-size: 1rem;
+  font-weight: 700;
   color: var(--on-surface);
-  font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 .hero__grade-label {
+  font-size: 0.75rem;
   color: var(--on-surface-variant);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
 }
 
 .hero__score {
