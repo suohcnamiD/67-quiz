@@ -51,7 +51,7 @@ public class AttemptService {
     private final AttemptMapper attemptMapper;
     private final OptionMapper optionMapper;
     private final AttemptQuestionMapper attemptQuestionMapper;
-    private static final int ATTEMPTS_PER_PAGE = 10;
+    private static final int ATTEMPTS_PER_PAGE = 12;
     private final QuestionRepository questionRepository;
     private final QuizMapper quizMapper;
     private final UserProfileMapper userProfileMapper;
