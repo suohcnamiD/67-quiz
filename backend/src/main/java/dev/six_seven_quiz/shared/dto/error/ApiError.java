@@ -40,6 +40,7 @@ public record ApiError(
                         "NOT_FOUND",
                         "METHOD_NOT_ALLOWED",
                         "UNSUPPORTED_MEDIA_TYPE",
+                        "RATE_LIMITED",
                         "INTERNAL_SERVER_ERROR"
                 })
         String code,
