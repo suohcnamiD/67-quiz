@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, useTemplateRef, watchEffect } from 'vue'
+import { ref, computed, useTemplateRef, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGetQuizzes } from '@/api/quiz-controller/quiz-controller'
+import { GetQuizzesSort } from '@/api/openAPIDefinition.schemas'
 import {
   useGetAttemptsInProgress,
   useGetFinishedAttempts,
@@ -24,7 +25,13 @@ const auth = useAuthStore()
 const errorText = ref<string | null>(null)
 
 const page = ref(0)
-const quizzes = useGetQuizzes(computed(() => ({ page: page.value })))
+const sort = ref<GetQuizzesSort>(GetQuizzesSort.NAME)
+// Reset to page 0 when the sort changes so users don't land on a page
+// index that no longer makes sense against a different ordering.
+watch(sort, () => { page.value = 0 })
+const quizzes = useGetQuizzes(computed(() => ({ page: page.value, sort: sort.value })), {
+  query: { placeholderData: (prev: unknown) => prev },
+} as never)
 const inProgressPage = ref(0)
 const finishedPage = ref(0)
 // Keep the previous page rendered while the next page fetches so the list
@@ -390,6 +397,14 @@ function setFinishedPage(next: number) {
         Browse quizzes
         <span v-if="totalQuizzes" class="muted label-md">({{ totalQuizzes }})</span>
       </h2>
+      <label class="sort-select">
+        <span class="label-sm muted">Sort</span>
+        <select v-model="sort" class="sort-select__control">
+          <option :value="'NAME'">Name (A–Z)</option>
+          <option :value="'NEWEST'">Newest</option>
+          <option :value="'RATING'">Top rated</option>
+        </select>
+      </label>
     </header>
     <div v-if="quizzes.isLoading.value" class="grid" aria-hidden="true">
       <div v-for="i in 3" :key="i" class="skeleton skeleton--card" />
@@ -675,7 +690,40 @@ function setFinishedPage(next: number) {
   margin-bottom: var(--space-xl);
 }
 .section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
   margin-bottom: var(--space-md);
+  flex-wrap: wrap;
+}
+.sort-select {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+.sort-select__control {
+  appearance: none;
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius);
+  color: var(--on-surface);
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 6px 28px 6px 10px;
+  cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 15px) 50%, calc(100% - 10px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+.sort-select__control:hover {
+  border-color: var(--outline);
+}
+.sort-select__control:focus {
+  outline: 2px solid var(--primary-container);
+  outline-offset: 2px;
 }
 .grid {
   display: grid;

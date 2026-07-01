@@ -165,17 +165,18 @@ function fmtRelative(iso?: string): string {
           <span>{{ quiz.questionCount ?? 0 }} {{ quiz.questionCount === 1 ? 'question' : 'questions' }}</span>
           <span>·</span>
           <span>{{ fmtDuration(quiz.duration) }}</span>
-          <template v-if="(quiz.ratingSummary?.count ?? 0) > 0">
-            <span>·</span>
-            <span
-              class="rating"
-              :title="`Average rating: ${fmtRating(quiz.ratingSummary?.average)} / 10 from ${quiz.ratingSummary?.count} rating${quiz.ratingSummary?.count === 1 ? '' : 's'}`"
-            >
-              <span aria-hidden="true">★</span>
-              <strong>{{ fmtRating(quiz.ratingSummary?.average) }}</strong>
-              <span class="muted">({{ quiz.ratingSummary?.count }})</span>
-            </span>
-          </template>
+        </div>
+        <div
+          v-if="(quiz.ratingSummary?.count ?? 0) > 0"
+          class="rating-kpi"
+          :title="`Average rating: ${fmtRating(quiz.ratingSummary?.average)} / 10 from ${quiz.ratingSummary?.count} rating${quiz.ratingSummary?.count === 1 ? '' : 's'}`"
+        >
+          <svg class="rating-kpi__star" viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          </svg>
+          <span class="rating-kpi__avg">{{ fmtRating(quiz.ratingSummary?.average) }}</span>
+          <span class="rating-kpi__scale muted">/ 10</span>
+          <span class="rating-kpi__count muted">· {{ quiz.ratingSummary?.count }} {{ quiz.ratingSummary?.count === 1 ? 'rating' : 'ratings' }}</span>
         </div>
       </div>
       <div class="head__actions">
@@ -339,6 +340,38 @@ function fmtRelative(iso?: string): string {
   align-items: baseline;
   gap: 3px;
   color: var(--on-surface);
+}
+/* Prominent rating KPI — larger than the meta row so it reads as a
+ * headline stat, not a bullet in a list. Amber matches the "great"
+ * tone from the result page for consistency. */
+.rating-kpi {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 6px 14px;
+  background: color-mix(in srgb, #d9a24a 12%, var(--surface-container-low));
+  border: 1px solid color-mix(in srgb, #d9a24a 45%, transparent);
+  border-radius: 999px;
+  width: fit-content;
+  font-variant-numeric: tabular-nums;
+}
+.rating-kpi__star {
+  color: #d9a24a;
+  align-self: center;
+  margin-right: 4px;
+}
+.rating-kpi__avg {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--on-surface);
+  line-height: 1;
+}
+.rating-kpi__scale {
+  font-size: 0.95rem;
+}
+.rating-kpi__count {
+  font-size: 0.85rem;
+  margin-left: 4px;
 }
 .head__actions {
   display: flex;

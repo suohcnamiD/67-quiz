@@ -2,6 +2,7 @@ package dev.six_seven_quiz.quiz.controller;
 
 import dev.six_seven_quiz.quiz.dto.request.CreateQuizRequest;
 import dev.six_seven_quiz.quiz.dto.request.PinQuizRequest;
+import dev.six_seven_quiz.quiz.dto.request.QuizSort;
 import dev.six_seven_quiz.quiz.dto.request.RenameQuizRequest;
 import dev.six_seven_quiz.quiz.dto.request.ReorderQuestionsRequest;
 import dev.six_seven_quiz.quiz.dto.request.UpdateQuizDescriptionRequest;
@@ -58,10 +59,11 @@ public class QuizController {
     @GetMapping
     public PagedModel<EntityModel<QuizSummaryDto>> getQuizzes(
             @RequestParam (defaultValue = "0") int page,
+            @RequestParam (required = false) QuizSort sort,
             @AuthenticationPrincipal UserDetails userDetails,
             @Parameter(hidden = true) PagedResourcesAssembler<QuizSummaryDto> pagedResourcesAssembler
     ) {
-        return pagedResourcesAssembler.toModel(quizService.getQuizzes(page, userDetails));
+        return pagedResourcesAssembler.toModel(quizService.getQuizzes(page, sort, userDetails));
     }
 
     @PostMapping

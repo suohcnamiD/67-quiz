@@ -3,6 +3,7 @@ package dev.six_seven_quiz.quiz.service;
 import dev.six_seven_quiz.quiz.component.mapper.QuizMapper;
 import dev.six_seven_quiz.quiz.dto.request.CreateQuizRequest;
 import dev.six_seven_quiz.quiz.dto.request.PinQuizRequest;
+import dev.six_seven_quiz.quiz.dto.request.QuizSort;
 import dev.six_seven_quiz.quiz.dto.request.RenameQuizRequest;
 import dev.six_seven_quiz.quiz.dto.request.ReorderQuestionsRequest;
 import dev.six_seven_quiz.quiz.dto.request.UpdateQuizDescriptionRequest;
@@ -71,8 +72,20 @@ public class QuizService {
     }
 
     public Page<QuizSummaryDto> getQuizzes(int page, UserDetails userDetails) {
+        return getQuizzes(page, QuizSort.NAME, userDetails);
+    }
+
+    public Page<QuizSummaryDto> getQuizzes(int page, QuizSort sort, UserDetails userDetails) {
         ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
-        return quizRepository.findAll(produceSanitizedPageable(page)).map(quiz -> quizToSummary(quiz, user));
+        QuizSort effectiveSort = sort == null ? QuizSort.NAME : sort;
+        Page<Quiz> quizzes = switch (effectiveSort) {
+            case NAME -> quizRepository.findAll(pageable(page, effectiveSort));
+            case NEWEST -> quizRepository.findAll(pageable(page, effectiveSort));
+            // Rating uses a custom aggregate query; the Pageable still supplies
+            // pagination but its Sort is ignored (the JPQL ORDER BY wins).
+            case RATING -> quizRepository.findAllOrderByRating(PageRequest.of(page, QUIZZES_PER_PAGE));
+        };
+        return quizzes.map(quiz -> quizToSummary(quiz, user));
     }
 
     /**
@@ -114,10 +127,27 @@ public class QuizService {
     }
 
     private Pageable produceSanitizedPageable(int page) {
-        // Pinned quizzes float to the top of every browse listing; within
-        // each bucket, alphabetise by name so the order is stable across
-        // reloads. Sort.Direction.DESC on a boolean puts true first (1 > 0).
-        return PageRequest.of(page, QUIZZES_PER_PAGE, Sort.by(Sort.Order.desc("pinned"), Sort.Order.asc("name")));
+        return pageable(page, QuizSort.NAME);
+    }
+
+    /**
+     * Pinned quizzes always float to the top. Within the unpinned bucket
+     * the secondary sort is driven by the enum:
+     *   - NAME   → alphabetical (case-sensitive at the DB level, matches
+     *              existing UX)
+     *   - NEWEST → createdAt DESC
+     *   - RATING → handled via a separate JPQL query in the repository
+     *              (Pageable.sort is ignored for that case)
+     * Name is always the final tie-breaker so orderings are stable.
+     */
+    private Pageable pageable(int page, QuizSort sort) {
+        Sort.Order pinnedFirst = Sort.Order.desc("pinned");
+        Sort.Order secondary = switch (sort) {
+            case NEWEST -> Sort.Order.desc("createdAt");
+            case RATING -> Sort.Order.asc("name"); // ignored by repo query
+            case NAME -> Sort.Order.asc("name");
+        };
+        return PageRequest.of(page, QUIZZES_PER_PAGE, Sort.by(pinnedFirst, secondary, Sort.Order.asc("name")));
     }
 
     @Transactional

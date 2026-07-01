@@ -134,20 +134,22 @@ async function removeQuiz() {
       />
       <span class="author__name label-sm">{{ quiz.author.displayName ?? quiz.author.username }}</span>
     </RouterLink>
+    <div
+      v-if="(quiz.ratingSummary?.count ?? 0) > 0"
+      class="rating-kpi"
+      :title="`Average rating: ${fmtRating(quiz.ratingSummary?.average ?? undefined)} / 10 from ${quiz.ratingSummary?.count} rating${quiz.ratingSummary?.count === 1 ? '' : 's'}`"
+    >
+      <svg class="rating-kpi__star" viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+      </svg>
+      <span class="rating-kpi__avg">{{ fmtRating(quiz.ratingSummary?.average ?? undefined) }}</span>
+      <span class="rating-kpi__scale muted">/ 10</span>
+      <span class="rating-kpi__count muted">· {{ quiz.ratingSummary?.count }} {{ quiz.ratingSummary?.count === 1 ? 'rating' : 'ratings' }}</span>
+    </div>
     <div class="meta-row label-sm">
       <span>{{ quiz.questionCount ?? 0 }} questions</span>
       <span>·</span>
       <span>{{ fmtDuration(quiz.duration) }}</span>
-      <span v-if="(quiz.ratingSummary?.count ?? 0) > 0">·</span>
-      <span
-        v-if="(quiz.ratingSummary?.count ?? 0) > 0"
-        class="rating"
-        :title="`Average rating: ${fmtRating(quiz.ratingSummary?.average ?? undefined)} / 10 from ${quiz.ratingSummary?.count} rating${quiz.ratingSummary?.count === 1 ? '' : 's'}`"
-      >
-        <span aria-hidden="true">★</span>
-        <span class="rating__avg">{{ fmtRating(quiz.ratingSummary?.average ?? undefined) }}</span>
-        <span class="rating__count muted">({{ quiz.ratingSummary?.count }})</span>
-      </span>
     </div>
     <div v-if="showAuthorActions && quiz.youAreAuthor" class="actions" @click.stop>
       <Button
@@ -266,6 +268,40 @@ async function removeQuiz() {
 }
 .rating__count {
   color: var(--on-surface-variant);
+}
+/* Prominent rating KPI — the number is the headline of the card,
+ * separated from the meta row so it reads as a rating stat rather than
+ * a duration bullet. Amber star matches the "great score" tone used on
+ * the result page. */
+.rating-kpi {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  margin: 0 0 var(--space-sm);
+  padding: 4px 10px;
+  background: color-mix(in srgb, #d9a24a 12%, var(--surface-container-low));
+  border: 1px solid color-mix(in srgb, #d9a24a 40%, transparent);
+  border-radius: 999px;
+  width: fit-content;
+  font-variant-numeric: tabular-nums;
+}
+.rating-kpi__star {
+  color: #d9a24a;
+  align-self: center;
+  margin-right: 2px;
+}
+.rating-kpi__avg {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--on-surface);
+  line-height: 1;
+}
+.rating-kpi__scale {
+  font-size: 0.85rem;
+}
+.rating-kpi__count {
+  font-size: 0.8rem;
+  margin-left: 4px;
 }
 .muted {
   color: var(--on-surface-variant);
