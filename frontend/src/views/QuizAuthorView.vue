@@ -105,9 +105,42 @@ const editOptions = ref<OptionData[]>([])
 const savingEdit = ref(false)
 const editError = ref<string | null>(null)
 
+// ---------- Collapse state ----------
+// Questions start collapsed so long quizzes are easy to reorder — one row
+// per question. Clicking the header expands the row. Editing auto-expands.
+const expandedIds = ref<Set<string>>(new Set())
+function isExpanded(id?: string | null): boolean {
+  return !!id && expandedIds.value.has(id)
+}
+function toggleExpanded(id?: string | null) {
+  if (!id) return
+  const next = new Set(expandedIds.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  expandedIds.value = next
+}
+function expandAll() {
+  const ids = (quiz.data.value?.questions ?? []).map((q) => q.id).filter((x): x is string => !!x)
+  expandedIds.value = new Set(ids)
+}
+function collapseAll() {
+  expandedIds.value = new Set()
+}
+function questionPreview(text: string | undefined | null): string {
+  if (!text) return ''
+  // Strip trailing whitespace + newlines so the preview is a single tight line.
+  return text.replace(/\s+/g, ' ').trim()
+}
+
 function startEdit(q: QuestionDto) {
   if (!q.id) return
   editingId.value = q.id
+  // Editing forces the row open so the form is visible.
+  if (!expandedIds.value.has(q.id)) {
+    const next = new Set(expandedIds.value)
+    next.add(q.id)
+    expandedIds.value = next
+  }
   editText.value = q.text ?? ''
   editType.value = (q.type as QuestionType) ?? MULTI
   editOptions.value = (q.options ?? []).map((o) => ({
@@ -496,11 +529,18 @@ function fmtRelative(iso?: string): string {
     <section class="section">
       <div class="section__head">
         <h2 class="headline-md">Questions</h2>
-        <Button
-          v-if="(quiz.data.value.questions?.length ?? 0) >= 3"
-          variant="ghost"
-          @click="scrollToAddForm"
-        >+ Add another</Button>
+        <div class="section__head-actions">
+          <Button
+            v-if="(quiz.data.value.questions?.length ?? 0) >= 2"
+            variant="ghost"
+            @click="expandedIds.size ? collapseAll() : expandAll()"
+          >{{ expandedIds.size ? 'Collapse all' : 'Expand all' }}</Button>
+          <Button
+            v-if="(quiz.data.value.questions?.length ?? 0) >= 3"
+            variant="ghost"
+            @click="scrollToAddForm"
+          >+ Add another</Button>
+        </div>
       </div>
       <div v-if="!(quiz.data.value.questions?.length)" class="empty body-md">
         No questions yet. Add one below.
@@ -542,8 +582,38 @@ function fmtRelative(iso?: string): string {
                     <circle cx="11" cy="13" r="1.2" />
                   </svg>
                 </button>
-                <span class="label-sm muted">Q{{ i + 1 }}</span>
+                <button
+                  type="button"
+                  class="qhead__toggle"
+                  :aria-expanded="isExpanded(q.id)"
+                  :aria-label="isExpanded(q.id) ? 'Collapse question' : 'Expand question'"
+                  :disabled="editingId === q.id"
+                  @click="toggleExpanded(q.id)"
+                >
+                  <svg
+                    class="qhead__chevron"
+                    :class="{ 'qhead__chevron--open': isExpanded(q.id) }"
+                    viewBox="0 0 24 24"
+                    width="14"
+                    height="14"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <polyline points="9 6 15 12 9 18" />
+                  </svg>
+                </button>
+                <span class="label-sm muted qhead__index">Q{{ i + 1 }}</span>
                 <Chip>{{ typeLabel(q.type) }}</Chip>
+                <span
+                  v-if="!isExpanded(q.id) && editingId !== q.id"
+                  class="qhead__preview"
+                  :title="questionPreview(q.text)"
+                  @click="toggleExpanded(q.id)"
+                >{{ questionPreview(q.text) || '(no text)' }}</span>
               </div>
               <div class="qhead__actions">
                 <template v-if="editingId !== q.id">
@@ -557,8 +627,8 @@ function fmtRelative(iso?: string): string {
               </div>
             </div>
 
-            <template v-if="editingId !== q.id">
-              <div class="body-lg"><MarkdownView :source="q.text" /></div>
+            <template v-if="editingId !== q.id && isExpanded(q.id)">
+              <div class="qbody body-lg"><MarkdownView :source="q.text" /></div>
               <div class="q-image">
                 <ImageUploader
                   :has-image="!!q.hasImage"
@@ -590,7 +660,7 @@ function fmtRelative(iso?: string): string {
                 </li>
               </ul>
             </template>
-            <template v-else>
+            <template v-if="editingId === q.id">
               <form class="form" @submit.prevent="saveEdit">
                 <QuestionForm
                   v-model:text="editText"
@@ -926,17 +996,80 @@ function fmtRelative(iso?: string): string {
   justify-content: space-between;
   align-items: center;
   gap: var(--space-sm);
-  margin-bottom: var(--space-sm);
-  flex-wrap: wrap;
+  margin-bottom: 0;
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 .qhead__title {
   display: inline-flex;
   align-items: center;
   gap: var(--space-sm);
+  flex: 1;
+  min-width: 0;
 }
 .qhead__actions {
   display: inline-flex;
   gap: var(--space-sm);
+  flex-shrink: 0;
+}
+.qhead__index {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.qhead__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--on-surface-variant);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+.qhead__toggle:hover:not(:disabled) {
+  background: var(--surface-container-high);
+  color: var(--on-surface);
+}
+.qhead__toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.qhead__chevron {
+  transition: transform 150ms ease;
+}
+.qhead__chevron--open {
+  transform: rotate(90deg);
+}
+.qhead__preview {
+  color: var(--on-surface-variant);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+.qhead__preview:hover {
+  color: var(--on-surface);
+}
+/* Give collapsed rows more headroom so the drag handle + chevron + text
+ * line up on one row without cramping. Expanded rows get a bottom margin
+ * so the body doesn't kiss the header. */
+.qitem :deep(.card) {
+  transition: background-color 120ms ease;
+}
+.section__head-actions {
+  display: inline-flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+.qbody {
+  margin-top: var(--space-md);
 }
 .q-image {
   margin: var(--space-sm) 0 0;
@@ -976,6 +1109,9 @@ function fmtRelative(iso?: string): string {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
+}
+.qitem .form {
+  margin-top: var(--space-md);
 }
 .form__error {
   color: var(--error);

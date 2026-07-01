@@ -202,12 +202,12 @@ function fmtRelative(iso?: string): string {
           @click="router.push(`/app/quiz/${quiz.id}/edit`)"
         >Edit</Button>
         <Button
-          v-if="quiz.youAreAuthor"
+          v-if="quiz.youAreAuthor || auth.isAdmin"
           type="button"
           variant="danger"
           :loading="deleting"
           @click="removeQuiz"
-        >Delete</Button>
+        >{{ !quiz.youAreAuthor && auth.isAdmin ? 'Delete (admin)' : 'Delete' }}</Button>
       </div>
     </header>
 

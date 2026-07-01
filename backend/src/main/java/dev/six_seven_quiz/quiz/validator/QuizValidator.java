@@ -1,5 +1,6 @@
 package dev.six_seven_quiz.quiz.validator;
 
+import dev.six_seven_quiz.authorization.AdminChecker;
 import dev.six_seven_quiz.quiz.exception.NoAccessToQuizException;
 import dev.six_seven_quiz.quiz.model.Quiz;
 import dev.six_seven_quiz.user.ApplicationUser;
@@ -12,11 +13,10 @@ public class QuizValidator {
 
     public static boolean isOwnerOrAdmin(Quiz quiz, ApplicationUser currentUser) {
         if (quiz.getAuthor().equals(currentUser)) return true;
-        return isAdmin(currentUser);
+        return AdminChecker.isAdmin(currentUser);
     }
 
     public static boolean isAdmin(ApplicationUser user) {
-        if (user == null || user.getRoles() == null) return false;
-        return user.getRoles().stream().anyMatch(r -> "ADMIN".equalsIgnoreCase(r.getName()));
+        return AdminChecker.isAdmin(user);
     }
 }
