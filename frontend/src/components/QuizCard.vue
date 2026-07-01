@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQueryClient } from '@tanstack/vue-query'
 import {
@@ -37,6 +37,7 @@ const qc = useQueryClient()
 
 const starting = ref(false)
 const deleting = ref(false)
+const canStart = computed(() => !!props.quiz.questionCount && props.quiz.questionCount >= 1 && !starting.value && !deleting.value)
 
 function fmtDuration(iso?: string): string {
   if (!iso) return '—'
@@ -97,7 +98,16 @@ async function removeQuiz() {
 </script>
 
 <template>
-  <Card>
+  <Card
+    :interactive="canStart"
+    :class="{ 'quiz-card--disabled': !canStart }"
+    :aria-label="canStart ? `Start attempt: ${quiz.name}` : undefined"
+    :role="canStart ? 'button' : undefined"
+    :tabindex="canStart ? 0 : undefined"
+    @click="canStart && startAttempt()"
+    @keydown.enter.prevent="canStart && startAttempt()"
+    @keydown.space.prevent="canStart && startAttempt()"
+  >
     <img
       v-if="quiz.hasCover && quiz.id"
       :src="coverUrl(quiz.id)"
@@ -113,14 +123,16 @@ async function removeQuiz() {
       </svg>
     </div>
     <div class="row">
-      <h3 class="headline-md">{{ quiz.name }}</h3>
-      <Chip v-if="quiz.youAreAuthor">Your quiz</Chip>
+      <h3 class="headline-md quiz-card__title">{{ quiz.name }}</h3>
+      <Chip v-if="quiz.youAreAuthor" class="quiz-card__author-chip">Your quiz</Chip>
     </div>
     <RouterLink
       v-if="showAuthor && quiz.author?.username"
       :to="{ name: 'user-profile', params: { username: quiz.author.username } }"
       class="author"
       @click.stop
+      @keydown.enter.stop
+      @keydown.space.stop
     >
       <Avatar
         :username="quiz.author.username"
@@ -134,8 +146,6 @@ async function removeQuiz() {
       <span>{{ quiz.questionCount ?? 0 }} questions</span>
       <span>·</span>
       <span>{{ fmtDuration(quiz.duration) }}</span>
-      <span v-if="quiz.maximumScore != null">·</span>
-      <span v-if="quiz.maximumScore != null">Max {{ quiz.maximumScore }} pts</span>
       <span v-if="(quiz.ratingSummary?.count ?? 0) > 0">·</span>
       <span
         v-if="(quiz.ratingSummary?.count ?? 0) > 0"
@@ -147,28 +157,21 @@ async function removeQuiz() {
         <span class="rating__count muted">({{ quiz.ratingSummary?.count }})</span>
       </span>
     </div>
-    <div class="actions">
+    <div v-if="showAuthorActions && quiz.youAreAuthor" class="actions" @click.stop>
       <Button
-        type="button"
-        :loading="starting"
-        :disabled="!quiz.questionCount || quiz.questionCount < 1"
-        :title="!quiz.questionCount || quiz.questionCount < 1 ? 'Add at least one question to start' : undefined"
-        @click="startAttempt"
-      >Start attempt</Button>
-      <Button
-        v-if="showAuthorActions && quiz.youAreAuthor"
         type="button"
         variant="ghost"
-        @click="router.push(`/app/quiz/${quiz.id}`)"
+        @click.stop="router.push(`/app/quiz/${quiz.id}`)"
       >Edit</Button>
       <Button
-        v-if="showAuthorActions && quiz.youAreAuthor"
         type="button"
         variant="danger"
         :loading="deleting"
-        @click="removeQuiz"
+        @click.stop="removeQuiz"
       >Delete</Button>
     </div>
+    <p v-if="!canStart" class="quiz-card__empty label-sm muted">Add at least one question to start.</p>
+    <p v-if="starting" class="quiz-card__starting label-sm muted" aria-live="polite">Starting…</p>
   </Card>
 </template>
 
@@ -196,6 +199,29 @@ async function removeQuiz() {
   justify-content: space-between;
   gap: var(--space-md);
   margin-bottom: var(--space-sm);
+}
+.quiz-card__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-break: break-word;
+}
+/* Keep the chip on one line even when the title is long — flex-shrink: 0
+ * prevents it from wrapping into a second row, white-space: nowrap keeps
+ * the label itself intact. */
+.quiz-card__author-chip {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.quiz-card--disabled {
+  cursor: not-allowed;
+}
+.quiz-card__empty,
+.quiz-card__starting {
+  margin: var(--space-sm) 0 0;
 }
 .meta-row {
   display: flex;
