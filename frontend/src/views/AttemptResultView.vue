@@ -12,6 +12,7 @@ import {
 import { getGetQuizzesQueryKey } from '@/api/quiz-controller/quiz-controller'
 import { errorMessage, firstErrorCode } from '@/lib/errors'
 import { questionImageUrl, optionImageUrl } from '@/lib/quizImages'
+import { dhbwGrade, formatGrade } from '@/lib/dhbwGrade'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import FinishCelebration from '@/components/FinishCelebration.vue'
@@ -52,6 +53,11 @@ const percent = computed(() => {
   return (attempt.value!.score ?? 0) / max
 })
 const percentLabel = computed(() => `${Math.round(percent.value * 100)}%`)
+// German DHBW-Wirtschaft note (1.0 great … 5.0 fail). Displayed alongside
+// the raw percent so students used to the German grading scale get an
+// immediate read on the result.
+const grade = computed(() => dhbwGrade(percent.value * 100))
+const gradeLabel = computed(() => formatGrade(grade.value))
 const tone = computed<'great' | 'good' | 'tried'>(() => {
   const p = percent.value
   if (p >= 0.85) return 'great'
@@ -210,6 +216,10 @@ function dismissRating() {
         <h1 class="hero__title">{{ attempt.quiz?.name ?? 'Untitled quiz' }}</h1>
         <p class="hero__points label-md">
           {{ attempt.score ?? 0 }} of {{ attempt.maximumScore ?? 0 }} points
+        </p>
+        <p class="hero__grade" :title="'DHBW-Wirtschaft grade for this percentage'">
+          <span class="hero__grade-value">{{ gradeLabel }}</span>
+          <span class="hero__grade-label label-sm">DHBW-Note</span>
         </p>
       </div>
       <div class="hero__score">
@@ -419,6 +429,28 @@ function dismissRating() {
   color: var(--on-surface-variant);
   font-variant-numeric: tabular-nums;
   font-size: 1rem;
+}
+.hero__grade {
+  margin: var(--space-md) 0 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  padding: 6px 14px;
+  background: var(--surface-container-high);
+  border: 1px solid var(--outline-variant);
+  border-radius: 999px;
+}
+.hero__grade-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--on-surface);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.hero__grade-label {
+  color: var(--on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .hero__score {

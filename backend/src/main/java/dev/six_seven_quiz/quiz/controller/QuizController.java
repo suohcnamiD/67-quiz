@@ -46,6 +46,14 @@ public class QuizController {
         return quizService.getAsAuthor(quizId, userDetails);
     }
 
+    @GetMapping("/{quizId}")
+    public QuizSummaryDto getQuizOverview(
+            @PathVariable @NotNull UUID quizId,
+            @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        return quizService.getSummaryAsViewer(quizId, userDetails);
+    }
+
     @GetMapping
     public PagedModel<EntityModel<QuizSummaryDto>> getQuizzes(
             @RequestParam (defaultValue = "0") int page,

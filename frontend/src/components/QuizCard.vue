@@ -1,11 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQueryClient } from '@tanstack/vue-query'
-import {
-  attemptQuiz,
-  getGetAttemptsInProgressQueryKey,
-} from '@/api/attempt-controller/attempt-controller'
 import { deleteQuiz, getGetQuizzesQueryKey } from '@/api/quiz-controller/quiz-controller'
 import { getGetQuizzesByAuthorQueryKey } from '@/api/user-profile-controller/user-profile-controller'
 import { errorMessage } from '@/lib/errors'
@@ -35,9 +31,7 @@ const emit = defineEmits<{
 const router = useRouter()
 const qc = useQueryClient()
 
-const starting = ref(false)
 const deleting = ref(false)
-const canStart = computed(() => !!props.quiz.questionCount && props.quiz.questionCount >= 1 && !starting.value && !deleting.value)
 
 function fmtDuration(iso?: string): string {
   if (!iso) return '—'
@@ -56,18 +50,8 @@ function fmtRating(avg: number | undefined): string {
   return avg.toFixed(1).replace(/\.0$/, '')
 }
 
-async function startAttempt() {
-  if (!props.quiz.id) return
-  starting.value = true
-  try {
-    const attempt = await attemptQuiz({ quizId: props.quiz.id })
-    qc.invalidateQueries({ queryKey: getGetAttemptsInProgressQueryKey() })
-    if (attempt.id) router.push(`/app/attempt/${attempt.id}`)
-  } catch (e) {
-    emit('error', errorMessage(e))
-  } finally {
-    starting.value = false
-  }
+function openOverview() {
+  if (props.quiz.id) router.push(`/app/quiz/${props.quiz.id}`)
 }
 
 async function removeQuiz() {
@@ -99,14 +83,13 @@ async function removeQuiz() {
 
 <template>
   <Card
-    :interactive="canStart"
-    :class="{ 'quiz-card--disabled': !canStart }"
-    :aria-label="canStart ? `Start attempt: ${quiz.name}` : undefined"
-    :role="canStart ? 'button' : undefined"
-    :tabindex="canStart ? 0 : undefined"
-    @click="canStart && startAttempt()"
-    @keydown.enter.prevent="canStart && startAttempt()"
-    @keydown.space.prevent="canStart && startAttempt()"
+    interactive
+    :aria-label="`View quiz: ${quiz.name}`"
+    role="button"
+    :tabindex="0"
+    @click="openOverview"
+    @keydown.enter.prevent="openOverview"
+    @keydown.space.prevent="openOverview"
   >
     <img
       v-if="quiz.hasCover && quiz.id"
@@ -161,7 +144,7 @@ async function removeQuiz() {
       <Button
         type="button"
         variant="ghost"
-        @click.stop="router.push(`/app/quiz/${quiz.id}`)"
+        @click.stop="router.push(`/app/quiz/${quiz.id}/edit`)"
       >Edit</Button>
       <Button
         type="button"
@@ -170,8 +153,7 @@ async function removeQuiz() {
         @click.stop="removeQuiz"
       >Delete</Button>
     </div>
-    <p v-if="!canStart" class="quiz-card__empty label-sm muted">Add at least one question to start.</p>
-    <p v-if="starting" class="quiz-card__starting label-sm muted" aria-live="polite">Starting…</p>
+    <p v-if="!quiz.questionCount" class="quiz-card__empty label-sm muted">No questions yet.</p>
   </Card>
 </template>
 
@@ -216,11 +198,7 @@ async function removeQuiz() {
   flex-shrink: 0;
   white-space: nowrap;
 }
-.quiz-card--disabled {
-  cursor: not-allowed;
-}
-.quiz-card__empty,
-.quiz-card__starting {
+.quiz-card__empty {
   margin: var(--space-sm) 0 0;
 }
 .meta-row {

@@ -131,6 +131,18 @@ public class QuizService {
         return this.quizToDto(quiz, user);
     }
 
+    /**
+     * Public quiz summary for the overview page — anyone signed-in can view.
+     * Contains name, description, cover flag, question count, rating summary,
+     * and author info. Does NOT include the question texts / options — those
+     * only surface once an attempt is started.
+     */
+    public QuizSummaryDto getSummaryAsViewer(@NotNull UUID quizId, UserDetails userDetails) {
+        ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
+        Quiz quiz = quizRepository.findById(quizId).orElseThrow(() -> new QuizNotFoundException(quizId));
+        return this.quizToSummary(quiz, user);
+    }
+
     @Transactional
     public QuizDto renameAsUser(UUID quizId, UserDetails userDetails, RenameQuizRequest request) {
         ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
