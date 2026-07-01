@@ -906,39 +906,42 @@ function fmtRelative(iso?: string): string {
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  /* No flex gap — each <li> pads its own vertical breathing room so the
+   * whole strip is a contiguous dragover surface. Without this the gap
+   * between rows is dead space and the pointer sees no dragover events. */
+  gap: 0;
 }
 .qitem {
   position: relative;
+  /* Each row owns half the gap on either side, so hovering the space
+   * between two cards still fires dragover on one of them. */
+  padding: calc(var(--space-md) / 2) 0;
   transition: transform 120ms ease, opacity 120ms ease;
 }
 .qitem--dragging {
   opacity: 0.4;
 }
-/* Drop indicator: a horizontal bar rendered in the gap between two
- * question cards. The ::before pseudo covers the "insert before this
- * row" case and ::after covers "insert after this row" — matching the
- * dropSlot: N semantic (slot N sits above item N, slot N+1 sits below
- * item N). The bar sits inside the gap of the qlist so it doesn't shift
- * the surrounding cards. */
+/* Drop indicator: a crisp horizontal line + a "pin" dot at the left,
+ * rendered in the gap between two question cards. ::before covers the
+ * "insert above this row" slot; ::after covers "insert below this row".
+ * Solid accent color, no color-mix, so it stays sharp on any surface. */
 .qitem--slot-before::before,
 .qitem--slot-after::after {
   content: '';
   position: absolute;
-  left: 0;
-  right: 0;
-  height: 3px;
+  left: 12px;
+  right: 12px;
+  height: 2px;
   background: var(--primary-container);
-  border-radius: 999px;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-container) 30%, transparent);
+  border-radius: 2px;
   pointer-events: none;
   z-index: 2;
 }
 .qitem--slot-before::before {
-  top: calc(var(--space-md) * -0.5 - 1.5px);
+  top: 0;
 }
 .qitem--slot-after::after {
-  bottom: calc(var(--space-md) * -0.5 - 1.5px);
+  bottom: 0;
 }
 .drag-handle {
   appearance: none;
