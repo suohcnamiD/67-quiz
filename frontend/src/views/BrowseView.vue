@@ -25,8 +25,10 @@ const errorText = ref<string | null>(null)
 
 const page = ref(0)
 const quizzes = useGetQuizzes(computed(() => ({ page: page.value })))
-const inProgress = useGetAttemptsInProgress({ page: 0 })
-const finished = useGetFinishedAttempts({ page: 0 })
+const inProgressPage = ref(0)
+const finishedPage = ref(0)
+const inProgress = useGetAttemptsInProgress(computed(() => ({ page: inProgressPage.value })))
+const finished = useGetFinishedAttempts(computed(() => ({ page: finishedPage.value })))
 const profile = useGetOwnProfile()
 
 const me = computed(() => profile.data.value)
@@ -47,6 +49,9 @@ const inProgressItems = computed(() => inProgress.data.value?._embedded?.attempt
 const finishedItems = computed(() => finished.data.value?._embedded?.attempts ?? [])
 const totalPages = computed(() => quizzes.data.value?.page?.totalPages ?? 1)
 const totalQuizzes = computed(() => quizzes.data.value?.page?.totalElements ?? items.value.length)
+const inProgressTotalPages = computed(() => inProgress.data.value?.page?.totalPages ?? 1)
+const finishedTotalPages = computed(() => finished.data.value?.page?.totalPages ?? 1)
+const finishedTotal = computed(() => finished.data.value?.page?.totalElements ?? finishedItems.value.length)
 
 // Numeric pager: compact list of page indices with leading/trailing ellipses
 // once totalPages exceeds 7. Mobile collapses further via CSS.
@@ -341,6 +346,11 @@ function scoreTone(pct: number): 'great' | 'good' | 'tried' {
         </div>
       </Card>
     </div>
+    <nav v-if="inProgressTotalPages > 1" class="mini-pager" aria-label="In-progress attempts pagination">
+      <Button variant="ghost" :disabled="inProgressPage === 0" @click="inProgressPage = Math.max(0, inProgressPage - 1)">Previous</Button>
+      <span class="label-sm muted">Page {{ inProgressPage + 1 }} / {{ inProgressTotalPages }}</span>
+      <Button variant="ghost" :disabled="inProgressPage + 1 >= inProgressTotalPages" @click="inProgressPage = inProgressPage + 1">Next</Button>
+    </nav>
   </section>
 
   <section class="section" aria-labelledby="browse-heading">
@@ -394,7 +404,10 @@ function scoreTone(pct: number): 'great' | 'good' | 'tried' {
 
   <section v-if="finishedItems.length" id="past-results" class="section" aria-labelledby="past-heading">
     <header class="section__head">
-      <h2 id="past-heading" class="headline-md">Past results</h2>
+      <h2 id="past-heading" class="headline-md">
+        Past results
+        <span v-if="finishedTotal > finishedItems.length" class="section__count label-sm muted">({{ finishedTotal }})</span>
+      </h2>
     </header>
     <div class="grid">
       <Card v-for="a in finishedItems" :key="a.id" interactive @click="router.push(`/app/attempt/${a.id}/result`)">
@@ -413,6 +426,11 @@ function scoreTone(pct: number): 'great' | 'good' | 'tried' {
         </div>
       </Card>
     </div>
+    <nav v-if="finishedTotalPages > 1" class="mini-pager" aria-label="Past results pagination">
+      <Button variant="ghost" :disabled="finishedPage === 0" @click="finishedPage = Math.max(0, finishedPage - 1)">Previous</Button>
+      <span class="label-sm muted">Page {{ finishedPage + 1 }} / {{ finishedTotalPages }}</span>
+      <Button variant="ghost" :disabled="finishedPage + 1 >= finishedTotalPages" @click="finishedPage = finishedPage + 1">Next</Button>
+    </nav>
   </section>
 </template>
 
@@ -684,6 +702,20 @@ function scoreTone(pct: number): 'great' | 'good' | 'tried' {
 }
 .past__meta {
   margin: 0;
+}
+/* Compact prev/next pager used on the attempt sections. The quiz grid
+ * keeps its numeric pager below; these two sections rarely have more
+ * than a couple of pages so we keep it simple. */
+.mini-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+.section__count {
+  margin-left: var(--space-xs);
+  font-weight: 500;
 }
 .people-list {
   list-style: none;
