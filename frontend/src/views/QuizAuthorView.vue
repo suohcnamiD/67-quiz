@@ -292,11 +292,13 @@ async function saveDescription() {
 }
 
 // ---------- Drag-to-reorder questions ----------
-// dragIndex = the row currently being dragged (from position); overIndex =
-// the row it's hovering over (to position). We only commit on drop so
+// dragIndex = the row currently being dragged (from position). dropSlot =
+// the *gap* between rows where the moved question will land: 0 = before
+// the first row, N = after the last row. We render a horizontal bar in
+// that gap so the drop target is unambiguous. We only commit on drop so
 // abandoned drags leave the list untouched.
 const dragIndex = ref<number | null>(null)
-const overIndex = ref<number | null>(null)
+const dropSlot = ref<number | null>(null)
 const reordering = ref(false)
 function onDragStart(i: number, event: DragEvent) {
   dragIndex.value = i
@@ -310,25 +312,50 @@ function onDragOver(i: number, event: DragEvent) {
   if (dragIndex.value === null) return
   event.preventDefault()
   if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
-  overIndex.value = i
+  // Split each row into a top half (drop before it) and a bottom half
+  // (drop after it). currentTarget is the <li> so the bounding rect
+  // covers the whole question card.
+  const el = event.currentTarget as HTMLElement | null
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+  const midpoint = rect.top + rect.height / 2
+  const slot = event.clientY < midpoint ? i : i + 1
+  // Suppress the two slots that would be no-ops (drop right where the
+  // dragged card already sits) so the indicator doesn't flicker in.
+  if (slot === dragIndex.value || slot === dragIndex.value + 1) {
+    dropSlot.value = null
+    return
+  }
+  dropSlot.value = slot
 }
-function onDragLeave(i: number) {
-  if (overIndex.value === i) overIndex.value = null
+function onDragLeave(event: DragEvent) {
+  // Only clear when the pointer leaves the <li> entirely — dragleave
+  // fires for every child boundary otherwise and the bar would flicker.
+  const el = event.currentTarget as HTMLElement | null
+  const related = event.relatedTarget as Node | null
+  if (el && related && el.contains(related)) return
+  dropSlot.value = null
 }
 function onDragEnd() {
   dragIndex.value = null
-  overIndex.value = null
+  dropSlot.value = null
 }
-async function onDrop(i: number) {
+async function onDrop() {
   const from = dragIndex.value
+  const slot = dropSlot.value
   dragIndex.value = null
-  overIndex.value = null
-  if (from === null || from === i) return
+  dropSlot.value = null
+  if (from === null || slot === null) return
+  // Translate slot (gap index) into a target list position after removal.
+  // Removing `from` shifts everything after it down by one, so if the
+  // slot was past `from` we subtract one.
+  const to = slot > from ? slot - 1 : slot
+  if (to === from) return
   const questions = quiz.data.value?.questions ?? []
   const ids = questions.map((q) => q.id).filter((id): id is string => !!id)
   if (ids.length !== questions.length) return
   const [moved] = ids.splice(from, 1)
-  ids.splice(i, 0, moved!)
+  ids.splice(to, 0, moved!)
   reordering.value = true
   errorText.value = null
   try {
@@ -553,12 +580,13 @@ function fmtRelative(iso?: string): string {
             'qitem',
             {
               'qitem--dragging': dragIndex === i,
-              'qitem--drop-target': overIndex === i && dragIndex !== null && dragIndex !== i,
+              'qitem--slot-before': dropSlot === i,
+              'qitem--slot-after': dropSlot === i + 1,
             },
           ]"
           @dragover="onDragOver(i, $event)"
-          @dragleave="onDragLeave(i)"
-          @drop.prevent="onDrop(i)"
+          @dragleave="onDragLeave($event)"
+          @drop.prevent="onDrop()"
         >
           <Card>
             <div class="qhead">
@@ -881,14 +909,36 @@ function fmtRelative(iso?: string): string {
   gap: var(--space-md);
 }
 .qitem {
+  position: relative;
   transition: transform 120ms ease, opacity 120ms ease;
 }
 .qitem--dragging {
   opacity: 0.4;
 }
-.qitem--drop-target > :deep(.card) {
-  border-color: var(--primary-container);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-container) 40%, transparent);
+/* Drop indicator: a horizontal bar rendered in the gap between two
+ * question cards. The ::before pseudo covers the "insert before this
+ * row" case and ::after covers "insert after this row" — matching the
+ * dropSlot: N semantic (slot N sits above item N, slot N+1 sits below
+ * item N). The bar sits inside the gap of the qlist so it doesn't shift
+ * the surrounding cards. */
+.qitem--slot-before::before,
+.qitem--slot-after::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--primary-container);
+  border-radius: 999px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-container) 30%, transparent);
+  pointer-events: none;
+  z-index: 2;
+}
+.qitem--slot-before::before {
+  top: calc(var(--space-md) * -0.5 - 1.5px);
+}
+.qitem--slot-after::after {
+  bottom: calc(var(--space-md) * -0.5 - 1.5px);
 }
 .drag-handle {
   appearance: none;
