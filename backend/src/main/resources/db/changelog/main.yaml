@@ -38,3 +38,6 @@ databaseChangeLog:
   - include:
       file: 012-quiz-created-at.yaml
       relativeToChangelogFile: true
+  - include:
+      file: 013-quiz-created-at-microseconds.yaml
+      relativeToChangelogFile: true

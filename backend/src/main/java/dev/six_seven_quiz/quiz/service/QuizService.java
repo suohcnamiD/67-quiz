@@ -134,20 +134,22 @@ public class QuizService {
      * Pinned quizzes always float to the top. Within the unpinned bucket
      * the secondary sort is driven by the enum:
      *   - NAME   → alphabetical (case-sensitive at the DB level, matches
-     *              existing UX)
-     *   - NEWEST → createdAt DESC
+     *              existing UX), tie-broken by id so ordering is stable
+     *   - NEWEST → createdAt DESC, tie-broken by id DESC — the earlier
+     *              tie-breaker was name ASC, which collapsed NEWEST to
+     *              NAME when the whole set shared a second-precision
+     *              created_at (e.g. after a backfill).
      *   - RATING → handled via a separate JPQL query in the repository
      *              (Pageable.sort is ignored for that case)
-     * Name is always the final tie-breaker so orderings are stable.
      */
     private Pageable pageable(int page, QuizSort sort) {
         Sort.Order pinnedFirst = Sort.Order.desc("pinned");
-        Sort.Order secondary = switch (sort) {
-            case NEWEST -> Sort.Order.desc("createdAt");
-            case RATING -> Sort.Order.asc("name"); // ignored by repo query
-            case NAME -> Sort.Order.asc("name");
+        Sort tail = switch (sort) {
+            case NEWEST -> Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"));
+            case RATING -> Sort.by(Sort.Order.asc("name"), Sort.Order.asc("id")); // ignored by repo query
+            case NAME -> Sort.by(Sort.Order.asc("name"), Sort.Order.asc("id"));
         };
-        return PageRequest.of(page, QUIZZES_PER_PAGE, Sort.by(pinnedFirst, secondary, Sort.Order.asc("name")));
+        return PageRequest.of(page, QUIZZES_PER_PAGE, Sort.by(pinnedFirst).and(tail));
     }
 
     @Transactional
