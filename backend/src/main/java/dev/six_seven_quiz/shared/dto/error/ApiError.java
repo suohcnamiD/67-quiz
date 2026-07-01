@@ -16,6 +16,7 @@ public record ApiError(
                         "ATTEMPT_ALREADY_FINISHED",
                         "BLANK_OPTION_TEXT",
                         "INVALID_QUESTION_SHAPE",
+                        "INVALID_REORDER",
                         "RATING_NOT_ELIGIBLE",
                         "INVALID_RATING",
                         "COMMENT_NOT_FOUND",

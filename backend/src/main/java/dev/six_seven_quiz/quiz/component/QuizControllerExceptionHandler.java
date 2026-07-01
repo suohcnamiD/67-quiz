@@ -1,6 +1,7 @@
 package dev.six_seven_quiz.quiz.component;
 
 import dev.six_seven_quiz.quiz.controller.QuizController;
+import dev.six_seven_quiz.quiz.exception.InvalidReorderException;
 import dev.six_seven_quiz.quiz.exception.NoAccessToQuizException;
 import dev.six_seven_quiz.quiz.exception.QuizNotFoundException;
 import dev.six_seven_quiz.shared.dto.Failure;
@@ -28,5 +29,13 @@ public class QuizControllerExceptionHandler {
     @ExceptionHandler(NoAccessToQuizException.class)
     public ResponseEntity<Failure> handleNoAccess(NoAccessToQuizException exception) {
         return Failure.of(HttpStatus.FORBIDDEN, ApiError.of("NO_ACCESS_TO_QUIZ", Map.of("id", exception.getQuizId()))).toResponseEntity();
+    }
+
+    @ExceptionHandler(InvalidReorderException.class)
+    public ResponseEntity<Failure> handleInvalidReorder(InvalidReorderException exception) {
+        return Failure.of(
+                HttpStatus.BAD_REQUEST,
+                ApiError.of("INVALID_REORDER", Map.of("reason", exception.getReason()))
+        ).toResponseEntity();
     }
 }

@@ -1,6 +1,8 @@
 package dev.six_seven_quiz.quiz.controller;
 
 import dev.six_seven_quiz.quiz.dto.request.CreateQuizRequest;
+import dev.six_seven_quiz.quiz.dto.request.RenameQuizRequest;
+import dev.six_seven_quiz.quiz.dto.request.ReorderQuestionsRequest;
 import dev.six_seven_quiz.quiz.dto.response.authoring.QuizDto;
 import dev.six_seven_quiz.quiz.dto.response.viewing.QuizSummaryDto;
 import dev.six_seven_quiz.quiz.service.QuizService;
@@ -58,5 +60,23 @@ public class QuizController {
             @RequestBody @Valid CreateQuizRequest request
     ) {
         return quizService.createQuiz(userDetails, request);
+    }
+
+    @PatchMapping("/{quizId}")
+    public QuizDto renameQuiz(
+            @PathVariable @NotNull UUID quizId,
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody @Valid RenameQuizRequest request
+    ) {
+        return quizService.renameAsUser(quizId, userDetails, request);
+    }
+
+    @PatchMapping("/{quizId}/reorder")
+    public QuizDto reorderQuestions(
+            @PathVariable @NotNull UUID quizId,
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody @Valid ReorderQuestionsRequest request
+    ) {
+        return quizService.reorderAsUser(quizId, userDetails, request);
     }
 }

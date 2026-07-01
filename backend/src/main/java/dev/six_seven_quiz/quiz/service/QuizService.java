@@ -2,10 +2,14 @@ package dev.six_seven_quiz.quiz.service;
 
 import dev.six_seven_quiz.quiz.component.mapper.QuizMapper;
 import dev.six_seven_quiz.quiz.dto.request.CreateQuizRequest;
+import dev.six_seven_quiz.quiz.dto.request.RenameQuizRequest;
+import dev.six_seven_quiz.quiz.dto.request.ReorderQuestionsRequest;
 import dev.six_seven_quiz.quiz.dto.response.QuizRatingSummaryDto;
 import dev.six_seven_quiz.quiz.dto.response.authoring.QuizDto;
 import dev.six_seven_quiz.quiz.dto.response.viewing.QuizSummaryDto;
+import dev.six_seven_quiz.quiz.exception.InvalidReorderException;
 import dev.six_seven_quiz.quiz.exception.QuizNotFoundException;
+import dev.six_seven_quiz.quiz.model.Question;
 import dev.six_seven_quiz.quiz.model.Quiz;
 import dev.six_seven_quiz.quiz.repository.QuestionRepository;
 import dev.six_seven_quiz.quiz.repository.QuizAttemptRepository;
@@ -23,6 +27,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -120,5 +128,51 @@ public class QuizService {
         Quiz quiz = quizRepository.findById(quizId).orElseThrow(() -> new QuizNotFoundException(quizId));
         QuizValidator.requireOwner(quiz, user);
         return this.quizToDto(quiz, user);
+    }
+
+    @Transactional
+    public QuizDto renameAsUser(UUID quizId, UserDetails userDetails, RenameQuizRequest request) {
+        ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
+        Quiz quiz = quizRepository.findById(quizId).orElseThrow(() -> new QuizNotFoundException(quizId));
+        QuizValidator.requireOwner(quiz, user);
+        quiz.setName(request.name().trim());
+        return this.quizToDto(quizRepository.save(quiz), user);
+    }
+
+    /**
+     * Reorder the quiz's questions to match the given id list. The list must
+     * be a permutation of the quiz's current question ids — same size, same
+     * set — otherwise we bail out with INVALID_REORDER instead of silently
+     * dropping or duplicating questions.
+     */
+    @Transactional
+    public QuizDto reorderAsUser(UUID quizId, UserDetails userDetails, ReorderQuestionsRequest request) {
+        ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
+        Quiz quiz = quizRepository.findById(quizId).orElseThrow(() -> new QuizNotFoundException(quizId));
+        QuizValidator.requireOwner(quiz, user);
+
+        List<Question> current = quiz.getQuestions();
+        List<UUID> requested = request.questionIds();
+        if (requested.size() != current.size()) {
+            throw new InvalidReorderException("question list size does not match the quiz's current questions");
+        }
+        Set<UUID> currentIds = new HashSet<>();
+        for (Question q : current) currentIds.add(q.getId());
+        Set<UUID> requestedIds = new HashSet<>(requested);
+        if (!currentIds.equals(requestedIds)) {
+            throw new InvalidReorderException("question ids do not match the quiz's current questions");
+        }
+
+        List<Question> reordered = new ArrayList<>(current.size());
+        for (UUID id : requested) {
+            for (Question q : current) {
+                if (q.getId().equals(id)) {
+                    reordered.add(q);
+                    break;
+                }
+            }
+        }
+        quiz.setQuestions(reordered);
+        return this.quizToDto(quizRepository.save(quiz), user);
     }
 }
