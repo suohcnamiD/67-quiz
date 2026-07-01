@@ -426,27 +426,102 @@ const explainerLines = computed<string[]>(() => {
     width: 100%;
   }
   .tab { text-align: center; }
+
+  /* Two-row layout: rank + user + info on top, metrics on their own row
+   * split into three equal columns. The old rule sent all three metrics
+   * to the same grid-area with justify-self, which just aligned them
+   * within the SAME cell instead of splitting it — they overlapped. */
   .row {
-    grid-template-columns: 44px 1fr auto;
-    grid-template-areas:
-      "rank user info"
-      "rank metrics metrics";
-    row-gap: var(--space-xs);
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: auto auto;
+    row-gap: var(--space-sm);
+    column-gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    align-items: center;
   }
-  .row__rank { grid-area: rank; }
-  .row__user { grid-area: user; }
-  .row__primary, .row__tertiary, .row__secondary {
-    grid-area: metrics;
+  .row__rank {
+    grid-row: 1;
+    grid-column: 1;
+    justify-self: start;
+  }
+  .row__user {
+    grid-row: 1;
+    grid-column: 2 / span 2;
+    min-width: 0;
+  }
+  .info-btn {
+    grid-row: 1;
+    grid-column: 3;
+    justify-self: end;
+    width: 32px;
+    height: 32px;
+  }
+  /* When there's no tertiary metric the user cell can stretch further —
+   * :has() lets us reclaim the width when the third slot is unused. */
+  .row__primary,
+  .row__tertiary,
+  .row__secondary {
+    grid-row: 2;
     flex-direction: row;
     align-items: baseline;
     gap: 4px;
+    min-width: 0;
+    font-size: 0.9rem;
   }
-  .row__primary { grid-row: 2; grid-column: 2; justify-self: start; }
-  .row__tertiary { grid-row: 2; grid-column: 2; justify-self: center; }
-  .row__secondary { grid-row: 2; grid-column: 2; justify-self: end; }
-  .info-btn { grid-area: info; }
+  .row__primary strong,
+  .row__tertiary strong,
+  .row__secondary strong {
+    font-size: 1rem;
+  }
+  .row__label { margin-top: 0; }
+  .row__primary {
+    grid-column: 1;
+    justify-self: start;
+  }
+  .row__tertiary {
+    grid-column: 2;
+    justify-self: center;
+  }
+  .row__secondary {
+    grid-column: 3;
+    justify-self: end;
+  }
+  /* Authors board has no tertiary — let secondary occupy the middle so
+   * primary/secondary sit at opposite ends of the row instead of both
+   * hugging the left. */
+  .row:not(:has(.row__tertiary)) .row__secondary {
+    grid-column: 2 / span 2;
+    justify-self: end;
+  }
+
   .you {
     position: static;
+    align-items: flex-start;
+    padding: var(--space-sm) var(--space-md);
   }
+  .you__metrics {
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 420px) {
+  /* Very narrow: stack metrics vertically so long labels don't clip. */
+  .row {
+    grid-template-columns: auto 1fr auto;
+  }
+  .row__user { grid-column: 2 / span 2; }
+  .info-btn { grid-column: 3; }
+  .row__primary,
+  .row__tertiary,
+  .row__secondary {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    justify-content: space-between;
+    width: 100%;
+  }
+  .row__primary   { grid-row: 2; }
+  .row__tertiary  { grid-row: 3; }
+  .row__secondary { grid-row: 4; }
+  .row:not(:has(.row__tertiary)) .row__secondary { grid-row: 3; }
 }
 </style>

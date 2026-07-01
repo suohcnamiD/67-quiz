@@ -147,14 +147,22 @@ async function finishCore(viaAuto = false) {
     }
   }
   if (viaAuto) autoFinishState.value = 'succeeded'
-  // Navigate first, then invalidate. If we invalidated before navigating,
-  // the in-progress query would drop this attempt and the AttemptView
-  // would briefly render "Attempt not found" between frames.
+  // Refetch the finished list BEFORE we navigate so ResultView finds the
+  // just-finished attempt in cache — otherwise it renders "Result not
+  // found" while the background fetch runs (Firefox tends to abort our
+  // post-nav refetch as NS_BINDING_ABORTED when ResultView starts its
+  // own query).
+  //
+  // Deliberately do NOT invalidate the in-progress query yet. Invalidating
+  // it here triggers a refetch that drops this attempt from the cache,
+  // which makes AttemptView.attempt become undefined and the template
+  // flips to the "Loading…" fallback for a frame before router.push
+  // completes. Instead, evict the stale entry from the in-progress cache
+  // AFTER navigation so no re-render of AttemptView is triggered while
+  // we're still on the page.
+  await qc.refetchQueries({ queryKey: getGetFinishedAttemptsQueryKey() })
   router.push({ path: `/app/attempt/${attemptId.value}/result`, query: { just: '1' } })
-  await Promise.all([
-    qc.invalidateQueries({ queryKey: getGetAttemptsInProgressQueryKey() }),
-    qc.invalidateQueries({ queryKey: getGetFinishedAttemptsQueryKey() }),
-  ])
+  qc.invalidateQueries({ queryKey: getGetAttemptsInProgressQueryKey() })
   finishing.value = false
 }
 async function finish() {

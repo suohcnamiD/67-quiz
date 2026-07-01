@@ -34,6 +34,7 @@ import jakarta.transaction.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
@@ -58,7 +59,9 @@ public class AttemptService {
     private final NotificationService notificationService;
 
     private Pageable produceSanitizedPageable(int page) {
-        return PageRequest.of(page, ATTEMPTS_PER_PAGE);
+        // Newest attempts first — matches how users think about "my past
+        // attempts" (last one taken should be at the top).
+        return PageRequest.of(page, ATTEMPTS_PER_PAGE, Sort.by(Sort.Direction.DESC, "startedAt"));
     }
 
     @PersistenceContext
@@ -217,36 +220,49 @@ public class AttemptService {
         ApplicationUser user = applicationUserService.getAuthenticatedUserFromDetails(userDetails);
         // Run the deadline sweep first so its bulk UPDATE + entityManager.clear()
         // can't strand a stale, managed copy of the attempt we're about to
-        // mutate. Load the attempt after the sweep has settled.
+        // mutate. Load the attempt after the sweep has settled, and take a
+        // pessimistic write lock so a second finish (polling list, second tab,
+        // auto-finish) waits for us instead of racing to flush and tripping
+        // MariaDB's "record has changed since last read" error.
         refreshFinishedAttempts(user);
-        Attempt attempt = quizAttemptRepository.findById(request.attemptId()).orElseThrow(() -> new AttemptNotFoundException(request.attemptId()));
+        Attempt attempt = quizAttemptRepository.findByIdForUpdate(request.attemptId())
+                .orElseThrow(() -> new AttemptNotFoundException(request.attemptId()));
         validateUserAttemptOwnership(user, attempt);
-        validateAttemptUnfinished(attempt);
 
-        attempt.finish();
+        // Idempotent flip. If the attempt is already finished (concurrent
+        // finisher, double-click, auto-finish beat us), skip the write and
+        // return the current state — throwing AttemptFinishedException here
+        // would surface a spurious error for what is really a success.
+        boolean transitioned = false;
+        if (!attempt.isFinished()) {
+            attempt.finish();
+            attempt = quizAttemptRepository.save(attempt);
+            entityManager.flush();
+            entityManager.refresh(attempt);
+            transitioned = true;
+        }
 
-        attempt = quizAttemptRepository.save(attempt);
-        entityManager.flush();
-        entityManager.refresh(attempt);
-
-        // Notify the quiz author unless they took their own quiz. The quiz can
-        // have been deleted between the attempt start and finish (quiz_attempts
-        // .quiz_id is ON DELETE SET NULL), so guard both the quiz and its
-        // author against null before emitting.
-        Quiz finishedQuiz = attempt.getQuiz();
-        ApplicationUser author = finishedQuiz != null ? finishedQuiz.getAuthor() : null;
-        if (author != null && !author.getId().equals(user.getId())) {
-            int maxScore = attempt.getMaximumScore();
-            int score = attempt.getEarnedScore();
-            java.util.Map<String, Object> payload = new java.util.HashMap<>();
-            payload.put("actorUsername", user.getUsername());
-            payload.put("actorDisplayName", user.getDisplayName());
-            payload.put("quizId", finishedQuiz.getId().toString());
-            payload.put("quizName", finishedQuiz.getName());
-            payload.put("attemptId", attempt.getId().toString());
-            payload.put("score", score);
-            payload.put("maxScore", maxScore);
-            notificationService.create(author, NotificationType.QUIZ_ATTEMPTED, payload);
+        // Notify the quiz author unless they took their own quiz. Only emit
+        // when we actually flipped the attempt — otherwise a duplicate finish
+        // would re-notify. The quiz can have been deleted between the attempt
+        // start and finish (quiz_attempts.quiz_id is ON DELETE SET NULL), so
+        // guard both the quiz and its author.
+        if (transitioned) {
+            Quiz finishedQuiz = attempt.getQuiz();
+            ApplicationUser author = finishedQuiz != null ? finishedQuiz.getAuthor() : null;
+            if (author != null && !author.getId().equals(user.getId())) {
+                int maxScore = attempt.getMaximumScore();
+                int score = attempt.getEarnedScore();
+                java.util.Map<String, Object> payload = new java.util.HashMap<>();
+                payload.put("actorUsername", user.getUsername());
+                payload.put("actorDisplayName", user.getDisplayName());
+                payload.put("quizId", finishedQuiz.getId().toString());
+                payload.put("quizName", finishedQuiz.getName());
+                payload.put("attemptId", attempt.getId().toString());
+                payload.put("score", score);
+                payload.put("maxScore", maxScore);
+                notificationService.create(author, NotificationType.QUIZ_ATTEMPTED, payload);
+            }
         }
 
         return attemptToFinishedSummary(attempt);

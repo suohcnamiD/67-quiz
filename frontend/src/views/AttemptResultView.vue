@@ -22,10 +22,16 @@ const router = useRouter()
 const qc = useQueryClient()
 const attemptId = computed(() => route.params.attemptId as string)
 
-const { data, isPending } = useGetFinishedAttempts({ page: 0 })
+const { data, isPending, isFetching } = useGetFinishedAttempts({ page: 0 })
 const attempt = computed(() =>
   (data.value?._embedded?.attempts ?? []).find((a) => a.id === attemptId.value),
 )
+// If the finished list is cached (user visited past results before), isPending
+// is false immediately even though the just-finished attempt hasn't landed
+// yet. Show the loading state until the background refetch resolves so we
+// don't briefly render "Result not found" between the finish call and the
+// invalidation completing.
+const stillFetching = computed(() => isPending.value || (isFetching.value && !attempt.value))
 const quizId = computed(() => attempt.value?.quiz?.id)
 
 function questionScore(q: FinishedQuestionDto): { earned: number; max: number } {
@@ -191,7 +197,7 @@ function dismissRating() {
 </script>
 
 <template>
-  <div v-if="isPending" class="empty body-md">Loading…</div>
+  <div v-if="stillFetching" class="empty body-md">Loading…</div>
   <Card v-else-if="!attempt" class="notfound">
     <h1 class="headline-md">Result not found</h1>
     <p class="body-md muted">This attempt doesn't exist, isn't finished yet, or you don't have access to it.</p>

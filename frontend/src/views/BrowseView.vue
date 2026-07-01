@@ -16,6 +16,7 @@ import Chip from '@/components/Chip.vue'
 import Button from '@/components/Button.vue'
 import QuizCard from '@/components/QuizCard.vue'
 import UserCard from '@/components/UserCard.vue'
+import CircleProgress from '@/components/CircleProgress.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -24,8 +25,10 @@ const errorText = ref<string | null>(null)
 
 const page = ref(0)
 const quizzes = useGetQuizzes(computed(() => ({ page: page.value })))
-const inProgress = useGetAttemptsInProgress({ page: 0 })
-const finished = useGetFinishedAttempts({ page: 0 })
+const inProgressPage = ref(0)
+const finishedPage = ref(0)
+const inProgress = useGetAttemptsInProgress(computed(() => ({ page: inProgressPage.value })))
+const finished = useGetFinishedAttempts(computed(() => ({ page: finishedPage.value })))
 const profile = useGetOwnProfile()
 
 const me = computed(() => profile.data.value)
@@ -46,6 +49,9 @@ const inProgressItems = computed(() => inProgress.data.value?._embedded?.attempt
 const finishedItems = computed(() => finished.data.value?._embedded?.attempts ?? [])
 const totalPages = computed(() => quizzes.data.value?.page?.totalPages ?? 1)
 const totalQuizzes = computed(() => quizzes.data.value?.page?.totalElements ?? items.value.length)
+const inProgressTotalPages = computed(() => inProgress.data.value?.page?.totalPages ?? 1)
+const finishedTotalPages = computed(() => finished.data.value?.page?.totalPages ?? 1)
+const finishedTotal = computed(() => finished.data.value?.page?.totalElements ?? finishedItems.value.length)
 
 // Numeric pager: compact list of page indices with leading/trailing ellipses
 // once totalPages exceeds 7. Mobile collapses further via CSS.
@@ -159,6 +165,18 @@ function scrollToPastResults() {
     // the hash; the existing watchEffect handles the scroll once it mounts.
     router.replace({ path: '/app', hash: '#past-results' })
   }
+}
+
+function scorePct(earned: number | undefined | null, max: number | undefined | null): number {
+  const e = earned ?? 0
+  const m = max ?? 0
+  if (!m) return 0
+  return e / m
+}
+function scoreTone(pct: number): 'great' | 'good' | 'tried' {
+  if (pct >= 0.85) return 'great'
+  if (pct >= 0.5) return 'good'
+  return 'tried'
 }
 </script>
 
@@ -328,6 +346,11 @@ function scrollToPastResults() {
         </div>
       </Card>
     </div>
+    <nav v-if="inProgressTotalPages > 1" class="mini-pager" aria-label="In-progress attempts pagination">
+      <Button variant="ghost" :disabled="inProgressPage === 0" @click="inProgressPage = Math.max(0, inProgressPage - 1)">Previous</Button>
+      <span class="label-sm muted">Page {{ inProgressPage + 1 }} / {{ inProgressTotalPages }}</span>
+      <Button variant="ghost" :disabled="inProgressPage + 1 >= inProgressTotalPages" @click="inProgressPage = inProgressPage + 1">Next</Button>
+    </nav>
   </section>
 
   <section class="section" aria-labelledby="browse-heading">
@@ -381,24 +404,33 @@ function scrollToPastResults() {
 
   <section v-if="finishedItems.length" id="past-results" class="section" aria-labelledby="past-heading">
     <header class="section__head">
-      <h2 id="past-heading" class="headline-md">Past results</h2>
+      <h2 id="past-heading" class="headline-md">
+        Past results
+        <span v-if="finishedTotal > finishedItems.length" class="section__count label-sm muted">({{ finishedTotal }})</span>
+      </h2>
     </header>
     <div class="grid">
       <Card v-for="a in finishedItems" :key="a.id" interactive @click="router.push(`/app/attempt/${a.id}/result`)">
-        <div class="row">
-          <h3 class="headline-md">{{ a.quiz?.name ?? 'Untitled quiz' }}</h3>
-          <Chip tone="success">Finished</Chip>
-        </div>
-        <div class="row">
-          <div class="score-stack">
-            <span class="label-sm muted">Score</span>
-            <span class="headline-md">{{ a.score ?? 0 }} <span class="muted">/ {{ a.maximumScore ?? 0 }}</span></span>
+        <div class="past">
+          <CircleProgress
+            :value="scorePct(a.score, a.maximumScore)"
+            :tone="scoreTone(scorePct(a.score, a.maximumScore))"
+            :size="64"
+            :thickness="7"
+            :label="`Scored ${a.score ?? 0} out of ${a.maximumScore ?? 0}`"
+          />
+          <div class="past__body">
+            <h3 class="past__title">{{ a.quiz?.name ?? 'Untitled quiz' }}</h3>
+            <p v-if="a.startedAt" class="past__meta label-sm muted">{{ fmtRelative(a.startedAt) }}</p>
           </div>
-          <span class="label-sm muted">{{ a.questions?.length ?? 0 }} questions</span>
         </div>
-        <p v-if="a.startedAt" class="meta body-md">Attempted {{ fmtRelative(a.startedAt) }}</p>
       </Card>
     </div>
+    <nav v-if="finishedTotalPages > 1" class="mini-pager" aria-label="Past results pagination">
+      <Button variant="ghost" :disabled="finishedPage === 0" @click="finishedPage = Math.max(0, finishedPage - 1)">Previous</Button>
+      <span class="label-sm muted">Page {{ finishedPage + 1 }} / {{ finishedTotalPages }}</span>
+      <Button variant="ghost" :disabled="finishedPage + 1 >= finishedTotalPages" @click="finishedPage = finishedPage + 1">Next</Button>
+    </nav>
   </section>
 </template>
 
@@ -640,6 +672,50 @@ function scrollToPastResults() {
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+}
+/* Past-attempt card: circle progress on the left, title + relative time
+ * on the right. Dropped the redundant "Score", "N questions", and Finished
+ * chip — the circle is the score, and the section header already tells
+ * the reader these are past attempts. */
+.past {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+.past__body {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.past__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--on-surface);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.past__meta {
+  margin: 0;
+}
+/* Compact prev/next pager used on the attempt sections. The quiz grid
+ * keeps its numeric pager below; these two sections rarely have more
+ * than a couple of pages so we keep it simple. */
+.mini-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+.section__count {
+  margin-left: var(--space-xs);
+  font-weight: 500;
 }
 .people-list {
   list-style: none;

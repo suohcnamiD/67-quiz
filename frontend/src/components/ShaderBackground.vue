@@ -135,6 +135,8 @@ void main() {
   z-index: 0;
   opacity: 0;
   transition: opacity 1.2s ease;
+  /* Decorative background — never intercept clicks, focus, or scroll. */
+  pointer-events: none;
 }
 .shader-bg--visible {
   opacity: 1;
